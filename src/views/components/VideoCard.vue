@@ -126,7 +126,7 @@ const handleEdit = () => {
 .code {
   font-size: 14px;
   font-weight: bold;
-  color: #e74c3c;
+  color: #333;
   flex-shrink: 0;
 }
 
@@ -153,9 +153,6 @@ const handleEdit = () => {
 .type-tag {
   font-size: 12px;
   color: #666;
-  background: #f5f5f5;
-  padding: 2px 8px;
-  border-radius: 10px;
   white-space: nowrap;
   flex-shrink: 0;
 }
