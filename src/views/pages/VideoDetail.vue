@@ -4,13 +4,14 @@
             <!-- 左侧：播放区 + 信息区 -->
             <div class="left-panel">
                 <div class="player-section">
-                    <div class="player-wrapper" :style="playerRotation">
+                    <div class="player-wrapper" :style="wrapperStyle">
                         <video
                             v-if="video.videoUrl"
                             ref="videoPlayer"
                             :src="video.videoUrl"
                             controls
-                            @timeupdate="onTimeUpdate"
+                            @loadedmetadata="onMetadata"
+                            :style="videoStyle"
                         ></video>
                         <div v-else class="no-video">暂无视频</div>
                     </div>
@@ -38,49 +39,62 @@
                 </div>
             </div>
 
-            <!-- 右侧：操作区 + 推荐区 -->
-            <div class="right-panel">
-                <div class="action-section">
-                    <button class="action-btn" @click="captureScreenshot">
-                        <span class="btn-icon">📸</span>
-                        <span>截图</span>
-                    </button>
-                    <button class="action-btn" @click="toggleRotation">
-                        <span class="btn-icon">🔄</span>
-                        <span>{{ isRotated ? '复原' : '旋转' }}</span>
-                    </button>
-                    <button class="action-btn" :class="{ active: isLiked }" @click="toggleLike">
-                        <span class="btn-icon">{{ isLiked ? '❤️' : '🤍' }}</span>
-                        <span>{{ isLiked ? '已赞' : '点赞' }}</span>
-                        <span class="like-count" v-if="likeCount > 0">({{ likeCount }})</span>
-                    </button>
-                    <button class="action-btn" @click="goToEdit">
-                        <span class="btn-icon">✏️</span>
-                        <span>编辑</span>
-                    </button>
+            <!-- 右侧：操作区 + 推荐区，支持折叠 -->
+            <div class="right-panel" :class="{ collapsed: panelCollapsed }">
+                <div class="panel-toggle" @click="panelCollapsed = !panelCollapsed">
+                    {{ panelCollapsed ? '◀' : '▶' }}
                 </div>
-                <div class="recommend-section" v-if="recommendList.length > 0">
-                    <div class="recommend-title">推荐视频</div>
-                    <div class="recommend-grid">
-                        <div
-                            v-for="item in recommendList"
-                            :key="item.id"
-                            class="recommend-card"
-                            @click="goToVideo(item.id)"
-                        >
-                            <div class="recommend-cover">
-                                <img v-if="item.coverUrl" :src="item.coverUrl" :alt="item.name" />
-                                <div v-else class="no-cover">暂无封面</div>
-                            </div>
-                            <div class="recommend-info">
-                                <div class="recommend-name">{{ item.name }}</div>
-                                <div class="recommend-code">{{ item.code }}</div>
+                <template v-if="!panelCollapsed">
+                    <div class="action-section">
+                        <button class="action-btn" @click="captureScreenshot">
+                            <span class="btn-icon">📸</span>
+                            <span>截图</span>
+                        </button>
+                        <button class="action-btn" @click="rotateVideo">
+                            <span class="btn-icon">🔄</span>
+                            <span>旋转{{ rotation ? '（' + rotation + '°）' : '' }}</span>
+                        </button>
+                        <button class="action-btn" @click="doLike">
+                            <span class="btn-icon">❤️</span>
+                            <span>点赞</span>
+                            <span class="like-count" v-if="likeCount > 0">({{ likeCount }})</span>
+                        </button>
+                        <button class="action-btn" @click="showEditDialog = true">
+                            <span class="btn-icon">✏️</span>
+                            <span>编辑</span>
+                        </button>
+                    </div>
+                    <div class="recommend-section" v-if="recommendList.length > 0">
+                        <div class="recommend-title">推荐视频</div>
+                        <div class="recommend-grid">
+                            <div
+                                v-for="item in recommendList"
+                                :key="item.id"
+                                class="recommend-card"
+                                @click="goToVideo(item.id)"
+                            >
+                                <div class="recommend-cover">
+                                    <img v-if="item.coverUrl" :src="item.coverUrl" :alt="item.name" />
+                                    <div v-else class="no-cover">暂无封面</div>
+                                </div>
+                                <div class="recommend-info">
+                                    <div class="recommend-name">{{ item.name }}</div>
+                                    <div class="recommend-code">{{ item.code }}</div>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
+                </template>
             </div>
         </div>
+
+        <!-- 编辑弹窗 -->
+        <AddVideoDialog
+            :visible="showEditDialog"
+            :editingVideo="editingVideo"
+            @confirm="onEditConfirm"
+            @cancel="showEditDialog = false; editingVideo = null"
+        />
     </div>
 </template>
 
@@ -88,6 +102,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { videoApi, likeApi } from '@/scripts/api'
+import AddVideoDialog from '@/views/components/AddVideoDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -96,20 +111,46 @@ const actors = ref([])
 const series = ref(null)
 const recommendList = ref([])
 const likeCount = ref(0)
-const isLiked = ref(false)
-const isRotated = ref(false)
+const rotation = ref(0)
 const videoPlayer = ref(null)
-const userToken = ref(localStorage.getItem('userToken') || generateToken())
+const showEditDialog = ref(false)
+const editingVideo = ref(null)
+const panelCollapsed = ref(false)
 
-const playerRotation = computed(() => ({
-    transform: isRotated.value ? 'rotate(90deg)' : 'none'
-}))
+const videoNaturalWidth = ref(0)
+const videoNaturalHeight = ref(0)
+
+const wrapperStyle = computed(() => {
+    if (!videoNaturalWidth.value || !videoNaturalHeight.value) {
+        return { aspectRatio: '16/9' }
+    }
+    const ar = videoNaturalWidth.value / videoNaturalHeight.value
+    if (rotation.value % 180 === 90) {
+        // 旋转90或270度，宽高比互换
+        return { aspectRatio: (1 / ar).toFixed(4) }
+    }
+    return { aspectRatio: ar.toFixed(4) }
+})
+
+const videoStyle = computed(() => {
+    return {
+        transform: `rotate(${rotation.value}deg)`,
+        transformOrigin: 'center center'
+    }
+})
 
 onMounted(async () => {
     await loadVideo()
     await loadLikeInfo()
     await loadRecommend()
 })
+
+const onMetadata = () => {
+    if (videoPlayer.value) {
+        videoNaturalWidth.value = videoPlayer.value.videoWidth
+        videoNaturalHeight.value = videoPlayer.value.videoHeight
+    }
+}
 
 const loadVideo = async () => {
     try {
@@ -126,14 +167,10 @@ const loadVideo = async () => {
 
 const loadLikeInfo = async () => {
     try {
-        const [countRes, likedRes] = await Promise.all([
-            likeApi.getCount(route.params.id),
-            likeApi.checkLiked(route.params.id, userToken.value)
-        ])
-        if (countRes.success) likeCount.value = countRes.data
-        if (likedRes.success) isLiked.value = likedRes.data
+        const res = await likeApi.getCount(route.params.id)
+        if (res.success) likeCount.value = res.data
     } catch (error) {
-        console.error('加载点赞信息失败:', error)
+        console.error('加载点赞数失败:', error)
     }
 }
 
@@ -148,47 +185,44 @@ const loadRecommend = async () => {
     }
 }
 
-const toggleLike = async () => {
+const doLike = async () => {
     try {
-        if (isLiked.value) {
-            const res = await likeApi.unlike(route.params.id, userToken.value)
-            if (res.success) {
-                isLiked.value = false
-                likeCount.value--
-            }
-        } else {
-            const res = await likeApi.like(route.params.id, userToken.value)
-            if (res.success) {
-                isLiked.value = true
-                likeCount.value++
-                localStorage.setItem('userToken', userToken.value)
-            }
+        const userToken = localStorage.getItem('userToken') || generateToken()
+        const res = await likeApi.like(route.params.id, userToken)
+        if (res.success) {
+            likeCount.value++
+            localStorage.setItem('userToken', userToken)
         }
     } catch (error) {
-        console.error('点赞操作失败:', error)
+        console.error('点赞失败:', error)
     }
 }
 
 const captureScreenshot = () => {
     if (!videoPlayer.value) return
-    const video = videoPlayer.value
+    const v = videoPlayer.value
+    if (v.videoWidth === 0) return
     const canvas = document.createElement('canvas')
-    canvas.width = video.videoWidth
-    canvas.height = video.videoHeight
+    canvas.width = v.videoWidth
+    canvas.height = v.videoHeight
     const ctx = canvas.getContext('2d')
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-    const link = document.createElement('a')
-    link.download = `${video.value.code || 'screenshot'}_${Date.now()}.png`
-    link.href = canvas.toDataURL('image/png')
-    link.click()
+    ctx.drawImage(v, 0, 0, canvas.width, canvas.height)
+    const dataUrl = canvas.toDataURL('image/png')
+    const win = window.open()
+    if (win) {
+        win.document.write(`<html><head><title>截图 - ${video.value.code || ''}</title></head><body style="margin:0;background:#000;display:flex;align-items:center;justify-content:center;min-height:100vh;"><img src="${dataUrl}" style="max-width:100%;max-height:100vh;" /></body></html>`)
+        win.document.close()
+    }
 }
 
-const toggleRotation = () => {
-    isRotated.value = !isRotated.value
+const rotateVideo = () => {
+    rotation.value = (rotation.value + 90) % 360
 }
 
-const goToEdit = () => {
-    router.push(`/video/${route.params.id}/edit`)
+const onEditConfirm = () => {
+    showEditDialog.value = false
+    editingVideo.value = null
+    loadVideo()
 }
 
 const goToSeries = (id) => {
@@ -203,8 +237,6 @@ const goToVideo = (id) => {
     router.push(`/video/${id}`)
     window.scrollTo(0, 0)
 }
-
-const onTimeUpdate = () => {}
 
 const formatSize = (bytes) => {
     if (!bytes) return '未知'
@@ -231,7 +263,7 @@ function generateToken() {
 
 .layout {
     display: flex;
-    gap: 24px;
+    gap: 16px;
     align-items: flex-start;
 }
 
@@ -252,15 +284,19 @@ function generateToken() {
 
 .player-wrapper {
     width: 100%;
+    position: relative;
+    background: #000;
 }
 
 .player-wrapper video {
     width: 100%;
+    height: 100%;
     display: block;
+    object-fit: contain;
 }
 
 .no-video {
-    height: 400px;
+    aspect-ratio: 16/9;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -312,29 +348,66 @@ function generateToken() {
 }
 
 .right-panel {
-    width: 360px;
+    width: 300px;
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
-    gap: 24px;
+    gap: 20px;
+    position: relative;
+    transition: width 0.3s, padding 0.3s, opacity 0.3s;
+    overflow: hidden;
+}
+
+.right-panel.collapsed {
+    width: 0;
+    padding: 0;
+    opacity: 0;
+    gap: 0;
+}
+
+.panel-toggle {
+    position: absolute;
+    left: -20px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 20px;
+    height: 60px;
+    background: #eee;
+    border-radius: 4px 0 0 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 12px;
+    color: #666;
+    z-index: 10;
+    transition: background 0.2s;
+}
+
+.panel-toggle:hover {
+    background: #ddd;
+}
+
+.right-panel.collapsed .panel-toggle {
+    left: -20px;
 }
 
 .action-section {
     display: flex;
-    gap: 12px;
+    gap: 8px;
     flex-wrap: wrap;
 }
 
 .action-btn {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 10px 16px;
+    gap: 4px;
+    padding: 8px 12px;
     border: 1px solid #ddd;
     border-radius: 8px;
     background: #fff;
     cursor: pointer;
-    font-size: 14px;
+    font-size: 13px;
     color: #333;
     transition: all 0.2s;
 }
@@ -345,14 +418,8 @@ function generateToken() {
     background: #f0f8ff;
 }
 
-.action-btn.active {
-    border-color: #e74c3c;
-    color: #e74c3c;
-    background: #fef0f0;
-}
-
 .btn-icon {
-    font-size: 16px;
+    font-size: 15px;
 }
 
 .like-count {
@@ -361,16 +428,16 @@ function generateToken() {
 }
 
 .recommend-title {
-    font-size: 16px;
+    font-size: 15px;
     font-weight: bold;
     color: #333;
-    margin-bottom: 16px;
+    margin-bottom: 12px;
 }
 
 .recommend-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 12px;
+    gap: 10px;
 }
 
 .recommend-card {
@@ -418,11 +485,11 @@ function generateToken() {
 }
 
 .recommend-info {
-    padding: 8px;
+    padding: 6px 8px;
 }
 
 .recommend-name {
-    font-size: 13px;
+    font-size: 12px;
     color: #333;
     font-weight: bold;
     overflow: hidden;
@@ -431,7 +498,7 @@ function generateToken() {
 }
 
 .recommend-code {
-    font-size: 12px;
+    font-size: 11px;
     color: #999;
     margin-top: 2px;
     overflow: hidden;
@@ -439,13 +506,15 @@ function generateToken() {
     white-space: nowrap;
 }
 
-/* 响应式：小屏幕时上下布局 */
 @media (max-width: 900px) {
     .layout {
         flex-direction: column;
     }
     .right-panel {
-        width: 100%;
+        width: 100% !important;
+    }
+    .right-panel.collapsed {
+        width: 0 !important;
     }
 }
 </style>
