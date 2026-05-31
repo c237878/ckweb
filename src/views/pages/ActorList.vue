@@ -15,9 +15,14 @@
     <div class="actor-grid">
       <div class="actor-card" v-for="actor in actors" :key="actor.id">
         <div class="actor-info" @click="goToDetail(actor.id)">
-          <h3>{{ actor.name }}</h3>
-          <p v-if="actor.alias" class="actor-alias">{{ actor.alias }}</p>
-          <p class="actor-type">{{ actor.country || '未设置' }}</p>
+          <div class="actor-row1">
+            <span class="actor-name">{{ actor.name }}</span>
+            <span class="actor-type">{{ actor.country || '未设置' }}</span>
+          </div>
+          <div class="actor-row2">
+            <span v-if="actor.alias" class="actor-alias">{{ actor.alias }}</span>
+            <span class="actor-count">{{ actor.videoCount || 0 }} 部影片</span>
+          </div>
         </div>
         <div class="actor-actions">
           <button class="edit-btn" @click.stop="handleEditActor(actor)">编辑</button>
@@ -217,25 +222,51 @@ h1 {
 }
 
 .actor-info {
-  padding: 20px;
-  text-align: center;
+  padding: 15px 20px;
   flex: 1;
 }
 
-.actor-info h3 {
-  margin-bottom: 5px;
-  font-size: 16px;
+.actor-row1 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
 }
 
-.actor-alias {
-  color: #999;
-  font-size: 13px;
-  margin-bottom: 5px;
+.actor-name {
+  font-size: 16px;
+  font-weight: bold;
 }
 
 .actor-type {
   color: #3498db;
   font-size: 12px;
+  background: #ebf5fb;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.actor-row2 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.actor-alias {
+  color: #999;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  margin-right: 10px;
+}
+
+.actor-count {
+  color: #e74c3c;
+  font-size: 12px;
+  font-weight: bold;
+  white-space: nowrap;
 }
 
 .actor-actions {

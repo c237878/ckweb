@@ -4,6 +4,14 @@
       <h1>影视系列</h1>
       <button class="add-btn" @click="showAddDialog = true">添加系列</button>
     </div>
+    <div class="filters">
+      <select v-model="filters.country" @change="loadSeries">
+        <option value="">全部类型</option>
+        <option v-for="country in existingCountries" :key="country" :value="country">
+          {{ country }}
+        </option>
+      </select>
+    </div>
     <div class="series-grid">
       <div class="series-card" v-for="series in seriesList" :key="series.id">
         <div class="series-info" @click="goToDetail(series.id)">
@@ -41,25 +49,53 @@ import AddSeriesDialog from '@/views/components/AddSeriesDialog.vue'
 
 const router = useRouter()
 const seriesList = ref([])
+const existingCountries = ref([])
 const page = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
+const filters = ref({
+  country: ''
+})
 const showAddDialog = ref(false)
 const editingSeries = ref(null)
 
-onMounted(() => {
-  loadSeries()
+onMounted(async () => {
+  await Promise.all([
+    loadSeries(),
+    loadExistingCountries()
+  ])
 })
 
 const loadSeries = async () => {
   try {
-    const res = await seriesApi.getList({ page: page.value, pageSize: pageSize.value })
+    const params = {
+      page: page.value,
+      pageSize: pageSize.value
+    }
+    if (filters.value.country) params.country = filters.value.country
+
+    const res = await seriesApi.getList(params)
     if (res.success) {
       seriesList.value = res.data
       total.value = res.total
     }
   } catch (error) {
     console.error('加载系列失败:', error)
+  }
+}
+
+const loadExistingCountries = async () => {
+  try {
+    const res = await seriesApi.getList({ page: 1, pageSize: 1000 })
+    if (res.success && res.data) {
+      const countries = new Set()
+      res.data.forEach(series => {
+        if (series.country) countries.add(series.country)
+      })
+      existingCountries.value = Array.from(countries)
+    }
+  } catch (error) {
+    console.error('加载类型列表失败:', error)
   }
 }
 
@@ -147,6 +183,16 @@ h1 {
 
 .add-btn:hover {
   background: #c0392b;
+}
+
+.filters {
+  margin-bottom: 30px;
+}
+
+.filters select {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
 }
 
 .series-grid {
