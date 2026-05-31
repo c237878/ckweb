@@ -18,7 +18,7 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { friendLinkApi, systemSettingApi } from '@/scripts/api'
+import { friendLinkApi, settingApi } from '@/scripts/api'
 
 const friendLinks = ref([])
 const siteName = ref('影视网站') // 默认值
@@ -37,9 +37,9 @@ onMounted(async () => {
 
   // 加载网站名称
   try {
-    const res = await systemSettingApi.get('site_name')
+    const res = await settingApi.getByName('siteName')
     if (res.success && res.data) {
-      siteName.value = res.data.content
+      siteName.value = res.data
     }
   } catch (error) {
     console.error('加载网站名称失败:', error)
