@@ -7,11 +7,11 @@
     </div>
     <div class="video-body" @click="goToDetail">
       <div class="row1">
+        <span v-if="video.code" class="code">{{ video.code }}</span>
         <span class="name">{{ video.name }}</span>
-        <span v-if="video.country" class="type-tag">{{ video.country }}</span>
       </div>
       <div class="row2">
-        <span v-if="video.code" class="code">{{ video.code }}</span>
+        <span v-if="video.country" class="type-tag">{{ video.country }}</span>
         <span v-if="video.actors && video.actors.length > 0" class="actors">
           {{ video.actors.map(a => a.name).join(', ') }}
         </span>
@@ -118,9 +118,16 @@ const handleEdit = () => {
 
 .row1 {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 8px;
   overflow: hidden;
+}
+
+.code {
+  font-size: 14px;
+  font-weight: bold;
+  color: #e74c3c;
+  flex-shrink: 0;
 }
 
 .name {
@@ -130,18 +137,6 @@ const handleEdit = () => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  flex: 1;
-  margin-right: 8px;
-}
-
-.type-tag {
-  font-size: 12px;
-  color: #666;
-  background: #f5f5f5;
-  padding: 2px 8px;
-  border-radius: 10px;
-  white-space: nowrap;
-  flex-shrink: 0;
 }
 
 .row2 {
@@ -155,9 +150,14 @@ const handleEdit = () => {
   white-space: nowrap;
 }
 
-.code {
+.type-tag {
+  font-size: 12px;
+  color: #666;
+  background: #f5f5f5;
+  padding: 2px 8px;
+  border-radius: 10px;
+  white-space: nowrap;
   flex-shrink: 0;
-  color: #999;
 }
 
 .actors {
