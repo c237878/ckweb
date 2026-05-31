@@ -24,7 +24,7 @@ export const videoApi = {
   // 获取视频详情
   getDetail: (id) => api.get(`/video/${id}`),
   // 获取今日推荐
-  getRecommend: (limit = 10) => api.get('/video/recommend', { params: { limit } }),
+  getRecommend: (videoId = '', limit = 8) => api.get('/video/recommend', { params: { videoId, limit } }),
   // 获取最新上映
   getLatest: (limit = 10) => api.get('/video/latest', { params: { limit } }),
   // 获取最多点赞
