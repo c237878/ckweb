@@ -9,7 +9,6 @@
                             v-if="video.videoUrl"
                             ref="videoPlayer"
                             :src="video.videoUrl"
-                            crossorigin="anonymous"
                             controls
                             @loadedmetadata="onMetadata"
                             :style="videoStyle"
@@ -47,10 +46,6 @@
                 </div>
                 <template v-if="!panelCollapsed">
                     <div class="action-section">
-                        <button class="action-btn" @click="captureScreenshot">
-                            <span class="btn-icon">📸</span>
-                            <span>截图</span>
-                        </button>
                         <button class="action-btn" @click="rotateVideo">
                             <span class="btn-icon">🔄</span>
                             <span>旋转{{ rotation ? '（' + rotation + '°）' : '' }}</span>
@@ -206,23 +201,6 @@ const doLike = async () => {
         }
     } catch (error) {
         console.error('点赞失败:', error)
-    }
-}
-
-const captureScreenshot = () => {
-    if (!videoPlayer.value) return
-    const v = videoPlayer.value
-    if (v.videoWidth === 0) return
-    const canvas = document.createElement('canvas')
-    canvas.width = v.videoWidth
-    canvas.height = v.videoHeight
-    const ctx = canvas.getContext('2d')
-    ctx.drawImage(v, 0, 0, canvas.width, canvas.height)
-    const dataUrl = canvas.toDataURL('image/png')
-    const win = window.open()
-    if (win) {
-        win.document.write(`<html><head><title>截图 - ${video.value.code || ''}</title></head><body style="margin:0;background:#000;display:flex;align-items:center;justify-content:center;min-height:100vh;"><img src="${dataUrl}" style="max-width:100%;max-height:100vh;" /></body></html>`)
-        win.document.close()
     }
 }
 
