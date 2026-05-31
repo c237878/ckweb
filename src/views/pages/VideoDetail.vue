@@ -9,6 +9,7 @@
                             v-if="video.videoUrl"
                             ref="videoPlayer"
                             :src="video.videoUrl"
+                            crossorigin="anonymous"
                             controls
                             @loadedmetadata="onMetadata"
                             :style="videoStyle"
@@ -99,7 +100,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { videoApi, likeApi } from '@/scripts/api'
 import AddVideoDialog from '@/views/components/AddVideoDialog.vue'
@@ -143,6 +144,16 @@ onMounted(async () => {
     await loadVideo()
     await loadLikeInfo()
     await loadRecommend()
+})
+
+watch(() => route.params.id, async (newId, oldId) => {
+    if (newId && newId !== oldId) {
+        rotation.value = 0
+        await loadVideo()
+        await loadLikeInfo()
+        await loadRecommend()
+        window.scrollTo(0, 0)
+    }
 })
 
 const onMetadata = () => {
