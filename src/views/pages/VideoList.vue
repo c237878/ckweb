@@ -13,15 +13,15 @@
       </select>
       <select v-model="filters.country" @change="loadVideos">
         <option value="">全部类型</option>
-        <option v-for="country in countries" :key="country" :value="country">
+        <option v-for="country in existingCountries" :key="country" :value="country">
           {{ country }}
         </option>
       </select>
     </div>
     <div class="video-grid">
-      <VideoCard 
-        v-for="video in videos" 
-        :key="video.id" 
+      <VideoCard
+        v-for="video in videos"
+        :key="video.id"
         :video="video"
         :show-actions="true"
         @edit="handleEditVideo"
@@ -51,7 +51,7 @@ import AddVideoDialog from '@/views/components/AddVideoDialog.vue'
 
 const videos = ref([])
 const seriesList = ref([])
-const countries = ref(['日本', '韩国', '美国', '中国', '其他'])
+const existingCountries = ref([])
 const page = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
@@ -63,8 +63,11 @@ const showAddDialog = ref(false)
 const editingVideo = ref(null)
 
 onMounted(async () => {
-  await loadSeries()
-  await loadVideos()
+  await Promise.all([
+    loadSeries(),
+    loadExistingCountries(),
+    loadVideos()
+  ])
 })
 
 const loadSeries = async () => {
@@ -75,6 +78,21 @@ const loadSeries = async () => {
     }
   } catch (error) {
     console.error('加载系列失败:', error)
+  }
+}
+
+const loadExistingCountries = async () => {
+  try {
+    const res = await videoApi.getList({ page: 1, pageSize: 1000 })
+    if (res.success && res.data) {
+      const countries = new Set()
+      res.data.forEach(video => {
+        if (video.country) countries.add(video.country)
+      })
+      existingCountries.value = Array.from(countries)
+    }
+  } catch (error) {
+    console.error('加载类型列表失败:', error)
   }
 }
 
@@ -128,7 +146,7 @@ const handleSaveVideo = async (videoData) => {
   try {
     let res
     let videoId
-    
+
     if (editingVideo.value) {
       res = await videoApi.update(editingVideo.value.id, videoData)
       videoId = editingVideo.value.id
@@ -138,14 +156,14 @@ const handleSaveVideo = async (videoData) => {
     }
 
     if (res.success) {
-      // 保存演员关联
       if (videoData.actorIds && videoData.actorIds.length > 0) {
         await videoActorApi.setVideoActors(videoId, videoData.actorIds)
       }
-      
+
       showAddDialog.value = false
       editingVideo.value = null
       await loadVideos()
+      await loadExistingCountries()
       alert(editingVideo.value ? '更新成功！' : '添加成功！')
     } else {
       alert('操作失败：' + res.message)
@@ -171,10 +189,12 @@ const handleSaveVideo = async (videoData) => {
 
 h1 {
   margin: 0;
+  font-size: 22px;
+  color: #333;
 }
 
 .add-btn {
-  padding: 10px 25px;
+  padding: 8px 20px;
   background: #e74c3c;
   color: white;
   border: none;
@@ -189,21 +209,23 @@ h1 {
 }
 
 .filters {
-  margin-bottom: 30px;
+  margin-bottom: 20px;
   display: flex;
-  gap: 20px;
+  gap: 12px;
 }
 
 .filters select {
   padding: 8px 12px;
   border: 1px solid #ddd;
   border-radius: 4px;
+  font-size: 14px;
+  color: #333;
 }
 
 .video-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
   margin-bottom: 30px;
 }
 

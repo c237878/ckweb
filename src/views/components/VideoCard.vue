@@ -5,19 +5,19 @@
       <div v-else class="no-cover">暂无封面</div>
       <span v-if="video.quality" class="quality-badge">{{ video.quality }}</span>
     </div>
-    <div class="video-info" @click="goToDetail">
-      <div class="info-row1">
-        <span v-if="video.code" class="video-code">{{ video.code }}</span>
-        <span class="video-name">{{ video.name }}</span>
+    <div class="video-body" @click="goToDetail">
+      <div class="row1">
+        <span class="name">{{ video.name }}</span>
+        <span v-if="video.country" class="type-tag">{{ video.country }}</span>
       </div>
-      <div class="info-row2">
-        <span v-if="video.country" class="video-country">{{ video.country }}</span>
-        <span v-if="video.actors && video.actors.length > 0" class="video-actors">
+      <div class="row2">
+        <span v-if="video.code" class="code">{{ video.code }}</span>
+        <span v-if="video.actors && video.actors.length > 0" class="actors">
           {{ video.actors.map(a => a.name).join(', ') }}
         </span>
       </div>
     </div>
-    <div v-if="showActions" class="video-actions">
+    <div v-if="showActions" class="card-actions">
       <button class="edit-btn" @click.stop="handleEdit">编辑</button>
     </div>
   </div>
@@ -70,7 +70,7 @@ const handleEdit = () => {
 .video-cover {
   position: relative;
   width: 100%;
-  padding-top: 67.25%; /* 538/800 = 67.25% */
+  padding-top: 67.25%;
   background: #f0f0f0;
   overflow: hidden;
 }
@@ -94,63 +94,84 @@ const handleEdit = () => {
   align-items: center;
   justify-content: center;
   color: #999;
+  font-size: 14px;
 }
 
 .quality-badge {
   position: absolute;
   top: 10px;
   right: 10px;
-  background: #e74c3c;
+  background: rgba(0, 0, 0, 0.6);
   color: white;
   padding: 2px 8px;
   border-radius: 4px;
   font-size: 12px;
 }
 
-.video-info {
-  padding: 12px 15px;
+.video-body {
+  padding: 12px 16px;
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
-.info-row1 {
+.row1 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  overflow: hidden;
+}
+
+.name {
+  font-size: 14px;
   font-weight: bold;
-  margin-bottom: 6px;
+  color: #333;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.video-code {
-  color: #e74c3c;
+  flex: 1;
   margin-right: 8px;
-  font-size: 13px;
 }
 
-.video-name {
-  font-size: 14px;
-}
-
-.info-row2 {
+.type-tag {
   font-size: 12px;
   color: #666;
+  background: #f5f5f5;
+  padding: 2px 8px;
+  border-radius: 10px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.row2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #999;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.video-country {
-  margin-right: 8px;
-  color: #3498db;
+.code {
+  flex-shrink: 0;
+  color: #999;
 }
 
-.video-actors {
-  color: #95a5a6;
+.actors {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #999;
 }
 
-.video-actions {
-  padding: 8px 15px;
+.card-actions {
+  padding: 8px 16px;
   display: flex;
   justify-content: flex-end;
+  border-top: 1px solid #f5f5f5;
 }
 
 .edit-btn {

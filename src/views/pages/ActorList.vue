@@ -14,17 +14,17 @@
     </div>
     <div class="actor-grid">
       <div class="actor-card" v-for="actor in actors" :key="actor.id">
-        <div class="actor-info" @click="goToDetail(actor.id)">
-          <div class="actor-row1">
-            <span class="actor-name">{{ actor.name }}</span>
-            <span class="actor-type">{{ actor.country || '未设置' }}</span>
+        <div class="card-body" @click="goToDetail(actor.id)">
+          <div class="row1">
+            <span class="name">{{ actor.name }}</span>
+            <span class="type-tag">{{ actor.country || '未设置' }}</span>
           </div>
-          <div class="actor-row2">
-            <span v-if="actor.alias" class="actor-alias">{{ actor.alias }}</span>
-            <span class="actor-count">{{ actor.videoCount || 0 }} 部影片</span>
+          <div class="row2">
+            <span v-if="actor.alias" class="alias">{{ actor.alias }}</span>
+            <span class="count">{{ actor.videoCount || 0 }} 部影片</span>
           </div>
         </div>
-        <div class="actor-actions">
+        <div class="card-actions">
           <button class="edit-btn" @click.stop="handleEditActor(actor)">编辑</button>
         </div>
       </div>
@@ -172,10 +172,12 @@ const handleSaveActor = async (actorData) => {
 
 h1 {
   margin: 0;
+  font-size: 22px;
+  color: #333;
 }
 
 .add-btn {
-  padding: 10px 25px;
+  padding: 8px 20px;
   background: #e74c3c;
   color: white;
   border: none;
@@ -190,19 +192,21 @@ h1 {
 }
 
 .filters {
-  margin-bottom: 30px;
+  margin-bottom: 20px;
 }
 
 .filters select {
   padding: 8px 12px;
   border: 1px solid #ddd;
   border-radius: 4px;
+  font-size: 14px;
+  color: #333;
 }
 
 .actor-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 20px;
+  gap: 16px;
   margin-bottom: 30px;
 }
 
@@ -218,70 +222,82 @@ h1 {
 }
 
 .actor-card:hover {
-  transform: translateY(-5px);
+  transform: translateY(-3px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-.actor-info {
-  padding: 15px 20px;
+.card-body {
+  padding: 16px;
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.actor-row1 {
+.row1 {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
+  overflow: hidden;
 }
 
-.actor-name {
+.name {
   font-size: 16px;
   font-weight: bold;
-}
-
-.actor-type {
-  color: #3498db;
-  font-size: 12px;
-  background: #ebf5fb;
-  padding: 2px 8px;
-  border-radius: 10px;
-}
-
-.actor-row2 {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.actor-alias {
-  color: #999;
-  font-size: 13px;
+  color: #333;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   flex: 1;
-  margin-right: 10px;
+  margin-right: 8px;
 }
 
-.actor-count {
-  color: #e74c3c;
+.type-tag {
   font-size: 12px;
-  font-weight: bold;
+  color: #666;
+  background: #f5f5f5;
+  padding: 2px 8px;
+  border-radius: 10px;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
-.actor-actions {
-  padding: 10px 15px;
-  border-top: 1px solid #f0f0f0;
+.row2 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: #999;
+}
+
+.alias {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  margin-right: 8px;
+  color: #999;
+}
+
+.count {
+  white-space: nowrap;
+  flex-shrink: 0;
+  color: #999;
+}
+
+.card-actions {
+  padding: 10px 16px;
+  border-top: 1px solid #f5f5f5;
   display: flex;
   justify-content: flex-end;
 }
 
 .edit-btn {
-  padding: 6px 20px;
+  padding: 4px 16px;
   border: none;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 12px;
   transition: opacity 0.3s;
   background: #3498db;
   color: white;

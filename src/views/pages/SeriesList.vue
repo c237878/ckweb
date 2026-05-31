@@ -14,13 +14,17 @@
     </div>
     <div class="series-grid">
       <div class="series-card" v-for="series in seriesList" :key="series.id">
-        <div class="series-info" @click="goToDetail(series.id)">
-          <h3>{{ series.name }}</h3>
-          <p v-if="series.alias" class="series-alias">{{ series.alias }}</p>
-          <p class="series-type">{{ series.country || '未设置' }}</p>
-          <p class="count">{{ series.videoCount || 0 }} 部影片</p>
+        <div class="card-body" @click="goToDetail(series.id)">
+          <div class="row1">
+            <span class="name">{{ series.name }}</span>
+            <span class="type-tag">{{ series.country || '未设置' }}</span>
+          </div>
+          <div class="row2">
+            <span v-if="series.alias" class="alias">{{ series.alias }}</span>
+            <span class="count">{{ series.videoCount || 0 }} 部影片</span>
+          </div>
         </div>
-        <div class="series-actions">
+        <div class="card-actions">
           <button class="edit-btn" @click.stop="handleEditSeries(series)">编辑</button>
         </div>
       </div>
@@ -163,15 +167,17 @@ const handleSaveSeries = async (seriesData) => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 30px;
+  margin-bottom: 20px;
 }
 
 h1 {
   margin: 0;
+  font-size: 22px;
+  color: #333;
 }
 
 .add-btn {
-  padding: 10px 25px;
+  padding: 8px 20px;
   background: #e74c3c;
   color: white;
   border: none;
@@ -186,78 +192,112 @@ h1 {
 }
 
 .filters {
-  margin-bottom: 30px;
+  margin-bottom: 20px;
 }
 
 .filters select {
   padding: 8px 12px;
   border: 1px solid #ddd;
   border-radius: 4px;
+  font-size: 14px;
+  color: #333;
 }
 
 .series-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
   margin-bottom: 30px;
 }
 
 .series-card {
   cursor: pointer;
-  padding: 20px;
-  background: #fff;
   border-radius: 8px;
+  overflow: hidden;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   transition: transform 0.3s;
+  background: #fff;
   display: flex;
   flex-direction: column;
 }
 
 .series-card:hover {
-  transform: translateY(-5px);
+  transform: translateY(-3px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-.series-info {
+.card-body {
+  padding: 16px;
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.series-info h3 {
-  font-size: 18px;
-  margin-bottom: 10px;
+.row1 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  overflow: hidden;
 }
 
-.series-alias {
-  color: #999;
-  font-size: 13px;
-  margin-bottom: 5px;
-}
-
-.series-type {
-  color: #3498db;
-  font-size: 12px;
-  margin-bottom: 5px;
-}
-
-.series-info .count {
-  margin-top: 10px;
-  color: #e74c3c;
+.name {
+  font-size: 16px;
   font-weight: bold;
+  color: #333;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  margin-right: 8px;
 }
 
-.series-actions {
-  padding: 10px 15px;
-  border-top: 1px solid #f0f0f0;
+.type-tag {
+  font-size: 12px;
+  color: #666;
+  background: #f5f5f5;
+  padding: 2px 8px;
+  border-radius: 10px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.row2 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: #999;
+}
+
+.alias {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  margin-right: 8px;
+  color: #999;
+}
+
+.count {
+  white-space: nowrap;
+  flex-shrink: 0;
+  color: #999;
+}
+
+.card-actions {
+  padding: 10px 16px;
+  border-top: 1px solid #f5f5f5;
   display: flex;
   justify-content: flex-end;
-  margin-top: 15px;
 }
 
 .edit-btn {
-  padding: 6px 20px;
+  padding: 4px 16px;
   border: none;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 12px;
   transition: opacity 0.3s;
   background: #3498db;
   color: white;
