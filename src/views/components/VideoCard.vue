@@ -144,15 +144,13 @@ const handleEdit = () => {
   align-items: center;
   gap: 8px;
   font-size: 12px;
-  color: #999;
+  color: #666;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .type-tag {
-  font-size: 12px;
-  color: #666;
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -161,7 +159,6 @@ const handleEdit = () => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #999;
 }
 
 .card-actions {
