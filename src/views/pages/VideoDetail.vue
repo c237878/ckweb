@@ -59,7 +59,7 @@
                             <span>点赞</span>
                             <span class="like-count" v-if="likeCount > 0">({{ likeCount }})</span>
                         </button>
-                        <button class="action-btn" @click="showEditDialog = true">
+                        <button class="action-btn" @click="openEditDialog">
                             <span class="btn-icon">✏️</span>
                             <span>编辑</span>
                         </button>
@@ -217,6 +217,11 @@ const captureScreenshot = () => {
 
 const rotateVideo = () => {
     rotation.value = (rotation.value + 90) % 360
+}
+
+const openEditDialog = () => {
+    editingVideo.value = { ...video.value }
+    showEditDialog.value = true
 }
 
 const onEditConfirm = () => {
