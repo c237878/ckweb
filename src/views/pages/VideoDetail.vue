@@ -63,21 +63,13 @@
                     <div class="recommend-section" v-if="recommendList.length > 0">
                         <div class="recommend-title">推荐视频</div>
                         <div class="recommend-grid">
-                            <div
+                            <VideoCard
                                 v-for="item in recommendList"
                                 :key="item.id"
-                                class="recommend-card"
+                                :video="item"
+                                mode="brief"
                                 @click="goToVideo(item.id)"
-                            >
-                                <div class="recommend-cover">
-                                    <img v-if="item.coverUrl" :src="item.coverUrl" :alt="item.name" />
-                                    <div v-else class="no-cover">暂无封面</div>
-                                </div>
-                                <div class="recommend-info">
-                                    <div class="recommend-name">{{ item.name }}</div>
-                                    <div class="recommend-code">{{ item.code }}</div>
-                                </div>
-                            </div>
+                            />
                         </div>
                     </div>
                 </template>
@@ -99,6 +91,7 @@ import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { videoApi, likeApi } from '@/scripts/api'
 import AddVideoDialog from '@/views/components/AddVideoDialog.vue'
+import VideoCard from '@/views/components/VideoCard.vue'
 
 const route = useRoute()
 const router = useRouter()

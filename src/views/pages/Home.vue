@@ -4,7 +4,7 @@
     <section class="section">
       <h2 class="section-title">今日推荐</h2>
       <div class="video-grid">
-        <VideoCard v-for="video in recommendVideos" :key="video.id" :video="video" :show-actions="false" />
+        <VideoCard v-for="video in recommendVideos" :key="video.id" :video="video" mode="display" />
       </div>
     </section>
 
@@ -12,7 +12,7 @@
     <section class="section">
       <h2 class="section-title">最新上映</h2>
       <div class="video-grid">
-        <VideoCard v-for="video in latestVideos" :key="video.id" :video="video" :show-actions="false" />
+        <VideoCard v-for="video in latestVideos" :key="video.id" :video="video" mode="display" />
       </div>
     </section>
 
@@ -20,7 +20,7 @@
     <section class="section">
       <h2 class="section-title">最受喜爱</h2>
       <div class="video-grid">
-        <VideoCard v-for="video in mostLikedVideos" :key="video.id" :video="video" :show-actions="false" />
+        <VideoCard v-for="video in mostLikedVideos" :key="video.id" :video="video" mode="display" />
       </div>
     </section>
   </div>

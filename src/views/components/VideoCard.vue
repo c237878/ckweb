@@ -1,23 +1,34 @@
 <template>
-  <div class="video-card">
-    <div class="video-cover" @click="goToDetail">
+  <div class="video-card" :class="[`mode-${mode}`]" @click="goToDetail">
+    <div class="video-cover">
       <img v-if="video.coverUrl" :src="video.coverUrl" :alt="video.name" />
       <div v-else class="no-cover">暂无封面</div>
       <span v-if="video.quality" class="quality-badge">{{ video.quality }}</span>
     </div>
-    <div class="video-body" @click="goToDetail">
-      <div class="row1">
-        <span v-if="video.code" class="code">{{ video.code }}</span>
-        <span class="name">{{ video.name }}</span>
-      </div>
-      <div class="row2">
-        <span v-if="video.country" class="type-tag">{{ video.country }}</span>
-        <span v-if="video.actors && video.actors.length > 0" class="actors">
+    <div class="video-body">
+      <!-- 完全模式 / 展示模式 -->
+      <template v-if="mode !== 'brief'">
+        <div class="row1">
+          <span v-if="video.code" class="code">{{ video.code }}</span>
+          <span class="name">{{ video.name }}</span>
+        </div>
+        <div class="row2" v-if="video.country || (video.actors && video.actors.length > 0)">
+          <span v-if="video.country" class="type-tag">{{ video.country }}</span>
+          <span v-if="video.actors && video.actors.length > 0" class="actors">
+            {{ video.actors.map(a => a.name).join(', ') }}
+          </span>
+        </div>
+      </template>
+      <!-- 简介模式 -->
+      <template v-else>
+        <div class="brief-name">{{ video.name }}</div>
+        <div class="brief-actors" v-if="video.actors && video.actors.length > 0">
           {{ video.actors.map(a => a.name).join(', ') }}
-        </span>
-      </div>
+        </div>
+      </template>
     </div>
-    <div v-if="showActions" class="card-actions">
+    <!-- 完全模式才显示操作按钮 -->
+    <div v-if="mode === 'full' && showActions" class="card-actions" @click.stop>
       <button class="edit-btn" @click.stop="handleEdit">编辑</button>
     </div>
   </div>
@@ -31,6 +42,10 @@ const props = defineProps({
     type: Object,
     required: true
   },
+  mode: {
+    type: String,
+    default: 'full', // 'full' | 'display' | 'brief'
+  },
   showActions: {
     type: Boolean,
     default: true
@@ -38,7 +53,6 @@ const props = defineProps({
 })
 
 const router = useRouter()
-
 const emit = defineEmits(['edit'])
 
 const goToDetail = () => {
@@ -65,6 +79,11 @@ const handleEdit = () => {
 .video-card:hover {
   transform: translateY(-5px);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+/* 简介模式：更小巧 */
+.mode-brief {
+  font-size: 12px;
 }
 
 .video-cover {
@@ -114,6 +133,7 @@ const handleEdit = () => {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-width: 0;
 }
 
 .row1 {
@@ -156,6 +176,24 @@ const handleEdit = () => {
 }
 
 .actors {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 简介模式样式 */
+.brief-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.brief-actors {
+  font-size: 11px;
+  color: #999;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

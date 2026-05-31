@@ -10,7 +10,7 @@
     <div class="actor-videos">
       <h2>相关影片</h2>
       <div class="video-grid">
-        <VideoCard v-for="video in videos" :key="video.id" :video="video" />
+        <VideoCard v-for="video in videos" :key="video.id" :video="video" mode="display" />
       </div>
     </div>
   </div>

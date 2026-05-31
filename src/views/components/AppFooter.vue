@@ -10,7 +10,7 @@
         </div>
       </div>
       <div class="copyright">
-        <p>&copy; {{ currentYear }} 影视网站 All Rights Reserved</p>
+        <p>&copy; {{ currentYear }} {{ siteName }} All Rights Reserved</p>
       </div>
     </div>
   </footer>
@@ -18,9 +18,10 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { friendLinkApi } from '@/scripts/api'
+import { friendLinkApi, systemSettingApi } from '@/scripts/api'
 
 const friendLinks = ref([])
+const siteName = ref('影视网站') // 默认值
 
 const currentYear = computed(() => new Date().getFullYear())
 
@@ -32,6 +33,16 @@ onMounted(async () => {
     }
   } catch (error) {
     console.error('加载友情链接失败:', error)
+  }
+
+  // 加载网站名称
+  try {
+    const res = await systemSettingApi.get('site_name')
+    if (res.success && res.data) {
+      siteName.value = res.data.content
+    }
+  } catch (error) {
+    console.error('加载网站名称失败:', error)
   }
 })
 </script>
