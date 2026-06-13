@@ -2,10 +2,6 @@
   <Dialog :visible="visible" :title="editingVideo ? '编辑影片' : '添加影片'" @confirm="handleSave" @cancel="handleCancel">
     <template #content>
       <div class="form-item">
-        <label>番号</label>
-        <input v-model="form.code" type="text" placeholder="影片番号（可选）" />
-      </div>
-      <div class="form-item">
         <label>名称 *</label>
         <input v-model="form.name" type="text" placeholder="影片名称（必填）" />
       </div>
@@ -15,6 +11,18 @@
           <option value="电影">电影</option>
           <option value="电视剧">电视剧</option>
           <option value="动漫">动漫</option>
+          <option value="其他">其他</option>
+        </select>
+      </div>
+      <div class="form-item">
+        <label>国家</label>
+        <select v-model="form.country">
+          <option value="">未选择</option>
+          <option value="日本">日本</option>
+          <option value="中国">中国</option>
+          <option value="韩国">韩国</option>
+          <option value="美国">美国</option>
+          <option value="泰国">泰国</option>
           <option value="其他">其他</option>
         </select>
       </div>
@@ -76,9 +84,9 @@ const actorSearch = ref('')
 const matchedActors = ref([])
 
 const form = ref({
-  code: '',
   name: '',
   category: '电影',
+  country: '',
   filePath: ''
 })
 
@@ -91,9 +99,9 @@ watch(() => props.visible, async (newVal) => {
     await loadActors()
     if (props.editingVideo) {
       form.value = {
-        code: props.editingVideo.code || '',
         name: props.editingVideo.name || '',
         category: props.editingVideo.category || '电影',
+        country: props.editingVideo.country || '',
         filePath: props.editingVideo.filePath || ''
       }
       await loadVideoActors(props.editingVideo.id)
@@ -119,10 +127,9 @@ const loadVideoActors = async (videoId) => {
     const res = await videoApi.getDetail(videoId)
     if (res.success && res.data && res.data.video) {
       form.value.name = res.data.video.name || res.data.video.title || ''
-      form.value.code = res.data.video.code || ''
       form.value.category = res.data.video.category || ''
+      form.value.country = res.data.video.country || ''
       form.value.filePath = res.data.video.filePath || ''
-      form.value.coverPath = res.data.video.coverPath || ''
       selectedActors.value = res.data.actors || []
     }
   } catch (error) {
@@ -157,9 +164,9 @@ const removeActor = (actorId) => {
 
 const resetForm = () => {
   form.value = {
-    code: '',
     name: '',
     category: '电影',
+    country: '',
     filePath: ''
   }
   selectedActors.value = []
@@ -175,8 +182,8 @@ const handleSave = () => {
   
   const formData = {
     title: form.value.name,
-    code: form.value.code,
     category: form.value.category,
+    country: form.value.country,
     filePath: form.value.filePath,
     actorIds: selectedActors.value.map(a => a.id)
   }

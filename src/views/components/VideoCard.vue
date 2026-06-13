@@ -1,22 +1,18 @@
 <template>
   <div class="video-card" :class="[`mode-${mode}`]" @click="goToDetail">
     <div class="video-cover">
-      <img v-if="video.id" :src="`/api/video/cover/${video.id}`" :alt="video.name" />
-      <div v-else class="no-cover">暂无封面</div>
-      <span v-if="video.quality" class="quality-badge">{{ video.quality }}</span>
+      <img v-if="video.hasCover" :src="`/api/video/cover/${video.id}`" :alt="video.name" @error="$event.target.style.display='none'" />
+      <div v-if="!video.hasCover" class="no-cover">{{ video.name?.charAt(0) || '?' }}</div>
     </div>
     <div class="video-body">
       <!-- 完全模式 / 展示模式 -->
       <template v-if="mode !== 'brief'">
         <div class="row1">
-          <span v-if="video.code" class="code">{{ video.code }}</span>
           <span class="name">{{ video.name }}</span>
         </div>
-        <div class="row2" v-if="video.category || (video.actors && video.actors.length > 0)">
+        <div class="row2" v-if="video.category || video.country">
           <span v-if="video.category" class="type-tag">{{ video.category }}</span>
-          <span v-if="video.actors && video.actors.length > 0" class="actors">
-            {{ video.actors.map(a => a.name).join(', ') }}
-          </span>
+          <span v-if="video.country" class="country-tag">{{ video.country }}</span>
         </div>
       </template>
       <!-- 简介模式 -->
@@ -171,6 +167,11 @@ const handleEdit = () => {
 }
 
 .type-tag {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.country-tag {
   white-space: nowrap;
   flex-shrink: 0;
 }

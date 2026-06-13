@@ -18,11 +18,11 @@
                 </div>
                 <div class="info-section">
                     <div class="info-row1">
-                        <span v-if="video.code" class="code-tag">{{ video.code }}</span>
                         {{ video.name }}
                     </div>
                     <div class="info-row2">
                         <span v-if="video.category" class="type-tag">{{ video.category }}</span>
+                        <span v-if="video.country" class="country-tag">{{ video.country }}</span>
                         <span v-if="video.year">{{ video.year }}年</span>
                         <span v-if="video.fileSize">{{ formatSize(video.fileSize) }}</span>
                         <span v-if="video.playCount">{{ video.playCount }}次播放</span>
@@ -285,16 +285,6 @@ const formatSize = (bytes) => {
     color: #333;
 }
 
-.code-tag {
-    background: #f0f0f0;
-    color: #666;
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-size: 13px;
-    font-weight: normal;
-    margin-right: 8px;
-}
-
 .info-row2 {
     font-size: 14px;
     color: #666;
@@ -306,6 +296,22 @@ const formatSize = (bytes) => {
 .type-tag {
     background: #e8f4ff;
     color: #3498db;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+.country-tag {
+    background: #fef3e8;
+    color: #e67e22;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+.country-tag {
+    background: #fff3e0;
+    color: #e67e22;
     padding: 2px 8px;
     border-radius: 4px;
     font-size: 13px;
