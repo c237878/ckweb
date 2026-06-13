@@ -17,15 +17,15 @@
                     </div>
                 </div>
                 <div class="info-section">
-                    <div class="info-row1">{{ video.code }} {{ video.name }}</div>
-                    <div class="info-row2">
-                        <span v-if="video.country">{{ video.country }}</span>
-                        <span v-if="video.quality">{{ video.quality }}</span>
-                        <span v-if="video.videoSize">{{ formatSize(video.videoSize) }}</span>
+                    <div class="info-row1">
+                        <span v-if="video.code" class="code-tag">{{ video.code }}</span>
+                        {{ video.name }}
                     </div>
-                    <div class="info-row3" v-if="series">
-                        <span>所属系列：</span>
-                        <a class="series-link" @click="goToSeries(series.id)">{{ series.name }}</a>
+                    <div class="info-row2">
+                        <span v-if="video.category" class="type-tag">{{ video.category }}</span>
+                        <span v-if="video.year">{{ video.year }}年</span>
+                        <span v-if="video.fileSize">{{ formatSize(video.fileSize) }}</span>
+                        <span v-if="video.playCount">{{ video.playCount }}次播放</span>
                     </div>
                     <div class="info-row4" v-if="actors.length > 0">
                         <span>参演演员：</span>
@@ -36,6 +36,7 @@
                             @click="goToActor(actor.id)"
                         >{{ actor.name }}</a>
                     </div>
+                    <div class="info-row-note" v-if="video.note">{{ video.note }}</div>
                 </div>
             </div>
 
@@ -49,11 +50,6 @@
                         <button class="action-btn" @click="rotateVideo">
                             <span class="btn-icon">🔄</span>
                             <span>旋转{{ rotation ? '（' + rotation + '°）' : '' }}</span>
-                        </button>
-                        <button class="action-btn" @click="doLike">
-                            <span class="btn-icon">❤️</span>
-                            <span>点赞</span>
-                            <span class="like-count" v-if="likeCount > 0">({{ likeCount }})</span>
                         </button>
                         <button class="action-btn" @click="openEditDialog">
                             <span class="btn-icon">✏️</span>
@@ -80,8 +76,9 @@
         <AddVideoDialog
             :visible="showEditDialog"
             :editingVideo="editingVideo"
-            @confirm="onEditConfirm"
+            @save="onEditSave"
             @cancel="showEditDialog = false; editingVideo = null"
+            @delete="onDeleteVideo"
         />
     </div>
 </template>
@@ -89,7 +86,7 @@
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { videoApi, likeApi } from '@/scripts/api'
+import { videoApi } from '@/scripts/api'
 import AddVideoDialog from '@/views/components/AddVideoDialog.vue'
 import VideoCard from '@/views/components/VideoCard.vue'
 
@@ -97,9 +94,7 @@ const route = useRoute()
 const router = useRouter()
 const video = ref(null)
 const actors = ref([])
-const series = ref(null)
 const recommendList = ref([])
-const likeCount = ref(0)
 const rotation = ref(0)
 const videoPlayer = ref(null)
 const showEditDialog = ref(false)
@@ -115,7 +110,6 @@ const wrapperStyle = computed(() => {
     }
     const ar = videoNaturalWidth.value / videoNaturalHeight.value
     if (rotation.value % 180 === 90) {
-        // 旋转90或270度，宽高比互换
         return { aspectRatio: (1 / ar).toFixed(4) }
     }
     return { aspectRatio: ar.toFixed(4) }
@@ -130,7 +124,6 @@ const videoStyle = computed(() => {
 
 onMounted(async () => {
     await loadVideo()
-    await loadLikeInfo()
     await loadRecommend()
 })
 
@@ -138,7 +131,6 @@ watch(() => route.params.id, async (newId, oldId) => {
     if (newId && newId !== oldId) {
         rotation.value = 0
         await loadVideo()
-        await loadLikeInfo()
         await loadRecommend()
         window.scrollTo(0, 0)
     }
@@ -155,45 +147,28 @@ const loadVideo = async () => {
     try {
         const res = await videoApi.getDetail(route.params.id)
         if (res.success) {
-            video.value = res.data
-            actors.value = res.actors || []
-            series.value = res.series || null
+            video.value = res.data.video || res.data
+            actors.value = res.data.actors || []
         }
     } catch (error) {
         console.error('加载视频详情失败:', error)
     }
 }
 
-const loadLikeInfo = async () => {
-    try {
-        const res = await likeApi.getCount(route.params.id)
-        if (res.success) likeCount.value = res.data
-    } catch (error) {
-        console.error('加载点赞数失败:', error)
-    }
-}
-
 const loadRecommend = async () => {
     try {
-        const res = await videoApi.getRecommend(route.params.id, 8)
+        // 从同分类中随机推荐（排除当前视频）
+        if (!video.value?.category) return
+        const res = await videoApi.getList({
+            pageIndex: 1,
+            pageSize: 8,
+            category: video.value.category
+        })
         if (res.success) {
-            recommendList.value = res.data || []
+            recommendList.value = (res.data.list || []).filter(v => v.id !== video.value.id)
         }
     } catch (error) {
         console.error('加载推荐视频失败:', error)
-    }
-}
-
-const doLike = async () => {
-    try {
-        const userToken = localStorage.getItem('userToken') || generateToken()
-        const res = await likeApi.like(route.params.id, userToken)
-        if (res.success) {
-            likeCount.value++
-            localStorage.setItem('userToken', userToken)
-        }
-    } catch (error) {
-        console.error('点赞失败:', error)
     }
 }
 
@@ -206,14 +181,24 @@ const openEditDialog = () => {
     showEditDialog.value = true
 }
 
-const onEditConfirm = () => {
-    showEditDialog.value = false
-    editingVideo.value = null
-    loadVideo()
+const onEditSave = async (formData) => {
+    try {
+        await videoApi.update(video.value.id, formData)
+        showEditDialog.value = false
+        editingVideo.value = null
+        await loadVideo()
+    } catch (error) {
+        console.error('保存失败:', error)
+    }
 }
 
-const goToSeries = (id) => {
-    router.push(`/series/${id}`)
+const onDeleteVideo = async (videoId) => {
+    try {
+        await videoApi.delete(videoId)
+        router.push('/')
+    } catch (error) {
+        console.error('删除失败:', error)
+    }
 }
 
 const goToActor = (id) => {
@@ -226,18 +211,14 @@ const goToVideo = (id) => {
 }
 
 const formatSize = (bytes) => {
-    if (!bytes) return '未知'
+    if (!bytes) return ''
     const units = ['B', 'KB', 'MB', 'GB', 'TB']
     let i = 0
     while (bytes >= 1024 && i < units.length - 1) {
         bytes /= 1024
         i++
     }
-    return bytes.toFixed(2) + ' ' + units[i]
-}
-
-function generateToken() {
-    return 'user_' + Math.random().toString(36).substr(2, 9) + Date.now().toString(36)
+    return bytes.toFixed(1) + ' ' + units[i]
 }
 </script>
 
@@ -304,27 +285,50 @@ function generateToken() {
     color: #333;
 }
 
+.code-tag {
+    background: #f0f0f0;
+    color: #666;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: normal;
+    margin-right: 8px;
+}
+
 .info-row2 {
     font-size: 14px;
     color: #666;
     display: flex;
     gap: 12px;
+    align-items: center;
 }
 
-.info-row3,
+.type-tag {
+    background: #e8f4ff;
+    color: #3498db;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
 .info-row4 {
     font-size: 14px;
     color: #666;
 }
 
-.series-link,
+.info-row-note {
+    font-size: 13px;
+    color: #999;
+    line-height: 1.6;
+}
+
 .actor-link {
     color: #3498db;
     cursor: pointer;
     text-decoration: none;
+    margin-right: 4px;
 }
 
-.series-link:hover,
 .actor-link:hover {
     text-decoration: underline;
 }
@@ -375,10 +379,6 @@ function generateToken() {
     background: #ddd;
 }
 
-.right-panel.collapsed .panel-toggle {
-    left: -20px;
-}
-
 .action-section {
     display: flex;
     gap: 8px;
@@ -409,11 +409,6 @@ function generateToken() {
     font-size: 15px;
 }
 
-.like-count {
-    font-size: 12px;
-    color: #999;
-}
-
 .recommend-title {
     font-size: 15px;
     font-weight: bold;
@@ -425,72 +420,6 @@ function generateToken() {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 10px;
-}
-
-.recommend-card {
-    cursor: pointer;
-    border-radius: 8px;
-    overflow: hidden;
-    background: #fff;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    transition: transform 0.2s;
-}
-
-.recommend-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.recommend-cover {
-    width: 100%;
-    padding-top: 67.25%;
-    position: relative;
-    background: #f0f0f0;
-    overflow: hidden;
-}
-
-.recommend-cover img {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-.no-cover {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #999;
-    font-size: 12px;
-}
-
-.recommend-info {
-    padding: 6px 8px;
-}
-
-.recommend-name {
-    font-size: 12px;
-    color: #333;
-    font-weight: bold;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.recommend-code {
-    font-size: 11px;
-    color: #999;
-    margin-top: 2px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
 }
 
 @media (max-width: 900px) {

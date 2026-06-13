@@ -12,8 +12,8 @@
           <span v-if="video.code" class="code">{{ video.code }}</span>
           <span class="name">{{ video.name }}</span>
         </div>
-        <div class="row2" v-if="video.country || (video.actors && video.actors.length > 0)">
-          <span v-if="video.country" class="type-tag">{{ video.country }}</span>
+        <div class="row2" v-if="video.category || (video.actors && video.actors.length > 0)">
+          <span v-if="video.category" class="type-tag">{{ video.category }}</span>
           <span v-if="video.actors && video.actors.length > 0" class="actors">
             {{ video.actors.map(a => a.name).join(', ') }}
           </span>

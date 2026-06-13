@@ -1,26 +1,11 @@
 <template>
   <div class="home">
-    <!-- 今日推荐 -->
-    <section class="section">
-      <h2 class="section-title">今日推荐</h2>
+    <!-- 按分类展示 -->
+    <section class="section" v-for="cat in categories" :key="cat.name">
+      <h2 class="section-title">{{ cat.name }}</h2>
       <div class="video-grid">
-        <VideoCard v-for="video in recommendVideos" :key="video.id" :video="video" mode="display" />
-      </div>
-    </section>
-
-    <!-- 最新上映 -->
-    <section class="section">
-      <h2 class="section-title">最新上映</h2>
-      <div class="video-grid">
-        <VideoCard v-for="video in latestVideos" :key="video.id" :video="video" mode="display" />
-      </div>
-    </section>
-
-    <!-- 最受喜爱 -->
-    <section class="section">
-      <h2 class="section-title">最受喜爱</h2>
-      <div class="video-grid">
-        <VideoCard v-for="video in mostLikedVideos" :key="video.id" :video="video" mode="display" />
+        <VideoCard v-for="video in cat.videos" :key="video.id" :video="video" mode="display" />
+        <div v-if="cat.videos.length === 0" class="empty-hint">暂无影片</div>
       </div>
     </section>
   </div>
@@ -31,25 +16,24 @@ import { ref, onMounted } from 'vue'
 import { videoApi } from '@/scripts/api'
 import VideoCard from '@/views/components/VideoCard.vue'
 
-const recommendVideos = ref([])
-const latestVideos = ref([])
-const mostLikedVideos = ref([])
+const categories = ref([
+  { name: '电影', value: '电影', videos: [] },
+  { name: '电视剧', value: '电视剧', videos: [] },
+  { name: '动漫', value: '动漫', videos: [] },
+  { name: '其他', value: '其他', videos: [] }
+])
 
 onMounted(async () => {
-  try {
-    // 加载首页数据
-    const [recommendRes, latestRes, mostLikedRes] = await Promise.all([
-      videoApi.getRecommend(8),
-      videoApi.getLatest(8),
-      videoApi.getMostLiked(8)
-    ])
-
-    if (recommendRes.success) recommendVideos.value = recommendRes.data
-    if (latestRes.success) latestVideos.value = latestRes.data
-    if (mostLikedRes.success) mostLikedVideos.value = mostLikedRes.data
-  } catch (error) {
-    console.error('加载首页数据失败:', error)
-  }
+  await Promise.all(categories.value.map(async (cat) => {
+    try {
+      const res = await videoApi.getList({ pageIndex: 1, pageSize: 12, category: cat.value })
+      if (res.success) {
+        cat.videos = res.data.list || []
+      }
+    } catch (error) {
+      console.error(`加载${cat.name}失败:`, error)
+    }
+  }))
 })
 </script>
 
@@ -74,5 +58,11 @@ onMounted(async () => {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
   gap: 20px;
+}
+
+.empty-hint {
+  color: #999;
+  font-size: 14px;
+  padding: 20px;
 }
 </style>
