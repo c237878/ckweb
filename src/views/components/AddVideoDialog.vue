@@ -46,7 +46,6 @@
                 @mousedown="addActor(actor)"
               >
                 {{ actor.name }}
-                <span v-if="actor.alias" class="alias">({{ actor.alias }})</span>
               </div>
             </div>
           </div>
@@ -106,9 +105,9 @@ watch(() => props.visible, async (newVal) => {
 
 const loadActors = async () => {
   try {
-    const res = await actorApi.getList({ pageIndex: 1, pageSize: 1000 })
+    const res = await actorApi.getList({ page: 1, pageSize: 1000 })
     if (res.success) {
-      actorList.value = res.data.list || []
+      actorList.value = res.data || []
     }
   } catch (error) {
     console.error('加载演员失败:', error)
@@ -117,9 +116,14 @@ const loadActors = async () => {
 
 const loadVideoActors = async (videoId) => {
   try {
-    const res = await videoApi.getById(videoId)
-    if (res.success && res.data.actors) {
-      selectedActors.value = res.data.actors
+    const res = await videoApi.getDetail(videoId)
+    if (res.success && res.data && res.data.video) {
+      form.value.name = res.data.video.name || res.data.video.title || ''
+      form.value.code = res.data.video.code || ''
+      form.value.category = res.data.video.category || ''
+      form.value.filePath = res.data.video.filePath || ''
+      form.value.coverPath = res.data.video.coverPath || ''
+      selectedActors.value = res.data.actors || []
     }
   } catch (error) {
     console.error('加载视频演员失败:', error)
@@ -134,8 +138,7 @@ const searchActors = () => {
   const keyword = actorSearch.value.toLowerCase()
   matchedActors.value = actorList.value.filter(actor => 
     !selectedActors.value.find(a => a.id === actor.id) && (
-      actor.name.toLowerCase().includes(keyword) || 
-      (actor.alias && actor.alias.toLowerCase().includes(keyword))
+      actor.name.toLowerCase().includes(keyword)
     )
   ).slice(0, 10)
 }

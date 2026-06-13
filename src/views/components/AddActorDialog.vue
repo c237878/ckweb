@@ -1,48 +1,34 @@
 <template>
-  <Dialog :visible="visible" :title="editingActor ? '编辑演员' : '添加演员'" @confirm="handleSave" @cancel="handleCancel">
-    <template #content>
-      <div class="form-item">
-        <label>姓名 *</label>
-        <input v-model="form.name" type="text" placeholder="演员姓名（必填）" />
+  <div class="dialog-overlay" v-if="visible"
+       @mousedown="handleOverlayDown"
+       @click="handleOverlayClick">
+    <div class="dialog">
+      <div class="dialog-header">
+        <h3>{{ isEdit ? '编辑演员' : '添加演员' }}</h3>
       </div>
-      <div class="form-item">
-        <label>别名</label>
-        <input v-model="form.alias" type="text" placeholder="别名或艺名（可选）" />
-      </div>
-      <div class="form-item">
-        <label>类型</label>
-        <div class="input-with-suggestions">
-          <input 
-            v-model="form.country" 
-            type="text" 
-            placeholder="选择或输入类型"
-            @input="filterCountries"
-            @focus="showCountrySuggestions = true"
-            @blur="hideCountrySuggestions"
-          />
-          <div v-if="showCountrySuggestions && filteredCountries.length > 0" class="suggestions">
-            <div 
-              v-for="country in filteredCountries" 
-              :key="country" 
-              class="suggestion-item"
-              @mousedown="selectCountry(country)"
-            >
-              {{ country }}
-            </div>
-          </div>
+      <div class="dialog-body">
+        <div class="form-group">
+          <label>姓名 <span class="required">*</span></label>
+          <input v-model="form.name" placeholder="演员姓名" />
+        </div>
+        <div class="form-group">
+          <label>简介</label>
+          <textarea v-model="form.bio" placeholder="演员简介（选填）" rows="3"></textarea>
         </div>
       </div>
-    </template>
-    <template #actions>
-      <button v-if="editingActor" class="delete-btn" @click="handleDelete">删除</button>
-    </template>
-  </Dialog>
+      <div class="dialog-footer">
+        <button v-if="isEdit" class="btn btn-delete" @click="handleDelete">删除</button>
+        <div class="right-btns">
+          <button class="btn btn-cancel" @click="handleCancel">取消</button>
+          <button class="btn btn-confirm" @click="handleSave">保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup>
-import { ref, watch, defineProps, defineEmits, onMounted } from 'vue'
-import { actorApi } from '@/scripts/api'
-import Dialog from './Dialog.vue'
+import { ref, watch } from 'vue'
 
 const props = defineProps({
   visible: Boolean,
@@ -51,164 +37,171 @@ const props = defineProps({
 
 const emit = defineEmits(['save', 'cancel', 'delete'])
 
-const existingCountries = ref([])
-const filteredCountries = ref([])
-const showCountrySuggestions = ref(false)
-
+const isEdit = ref(false)
 const form = ref({
   name: '',
-  alias: '',
-  country: ''
+  bio: ''
 })
 
-onMounted(async () => {
-  await loadExistingCountries()
-})
+let mouseDownOnDialog = false
 
-watch(() => props.visible, async (newVal) => {
-  if (newVal) {
-    await loadExistingCountries()
+function handleOverlayDown(e) {
+  const dialog = e.currentTarget.querySelector('.dialog')
+  mouseDownOnDialog = dialog && dialog.contains(e.target)
+}
+
+function handleOverlayClick() {
+  if (!mouseDownOnDialog) {
+    handleCancel()
+  }
+}
+
+watch(() => props.visible, (val) => {
+  if (val) {
     if (props.editingActor) {
-      form.value = { ...props.editingActor }
+      isEdit.value = true
+      form.value = {
+        name: props.editingActor.name || '',
+        bio: props.editingActor.bio || ''
+      }
     } else {
-      resetForm()
+      isEdit.value = false
+      form.value = { name: '', bio: '' }
     }
   }
 })
-
-const loadExistingCountries = async () => {
-  try {
-    const res = await actorApi.getList({ page: 1, pageSize: 1000 })
-    if (res.success && res.data) {
-      const countries = new Set()
-      res.data.forEach(actor => {
-        if (actor.country) countries.add(actor.country)
-      })
-      existingCountries.value = Array.from(countries)
-      filteredCountries.value = existingCountries.value
-    }
-  } catch (error) {
-    console.error('加载类型列表失败:', error)
-  }
-}
-
-const filterCountries = () => {
-  if (!form.value.country) {
-    filteredCountries.value = existingCountries.value
-  } else {
-    filteredCountries.value = existingCountries.value.filter(c => 
-      c.toLowerCase().includes(form.value.country.toLowerCase())
-    )
-  }
-}
-
-const selectCountry = (country) => {
-  form.value.country = country
-  showCountrySuggestions.value = false
-}
-
-const hideCountrySuggestions = () => {
-  setTimeout(() => {
-    showCountrySuggestions.value = false
-  }, 200)
-}
-
-const resetForm = () => {
-  form.value = {
-    name: '',
-    alias: '',
-    country: ''
-  }
-}
 
 const handleSave = () => {
-  if (!form.value.name) {
-    alert('请填写演员姓名')
+  if (!form.value.name.trim()) {
+    alert('请输入演员姓名')
     return
   }
   emit('save', { ...form.value })
 }
 
 const handleCancel = () => {
-  resetForm()
   emit('cancel')
 }
 
 const handleDelete = () => {
-  if (confirm('确定要删除这个演员吗？此操作不可恢复！')) {
+  if (confirm('确定要删除该演员吗？')) {
     emit('delete', props.editingActor.id)
   }
 }
 </script>
 
 <style scoped>
-.form-item {
-  margin-bottom: 20px;
+.dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
 }
 
-.form-item label {
-  display: block;
-  margin-bottom: 8px;
-  font-weight: bold;
+.dialog {
+  background: #fff;
+  border-radius: 8px;
+  width: 480px;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.dialog-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #eee;
+}
+
+.dialog-header h3 {
+  margin: 0;
+  font-size: 18px;
   color: #333;
 }
 
-.form-item input,
-.form-item select,
-.form-item textarea {
-  width: 100%;
-  padding: 10px;
+.dialog-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-group label {
+  font-size: 14px;
+  color: #333;
+  font-weight: 500;
+}
+
+.required {
+  color: #e74c3c;
+}
+
+.form-group input,
+.form-group textarea,
+.form-group select {
+  padding: 8px 12px;
   border: 1px solid #ddd;
   border-radius: 4px;
   font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
 }
 
-.form-item textarea {
-  min-height: 80px;
-  resize: vertical;
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group select:focus {
+  border-color: #3498db;
 }
 
-.input-with-suggestions {
-  position: relative;
+.dialog-footer {
+  padding: 16px 20px;
+  border-top: 1px solid #eee;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
-.suggestions {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  background: white;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  max-height: 200px;
-  overflow-y: auto;
-  z-index: 10;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+.right-btns {
+  display: flex;
+  gap: 8px;
 }
 
-.suggestion-item {
-  padding: 10px;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.suggestion-item:hover {
-  background: #f5f5f5;
-}
-
-.delete-btn {
-  padding: 10px 30px;
+.btn {
+  padding: 8px 20px;
   border: none;
   border-radius: 4px;
   cursor: pointer;
   font-size: 14px;
-  transition: opacity 0.3s;
-  background: #e74c3c;
-  color: white;
-  margin-right: auto;
+  transition: opacity 0.2s;
 }
 
-.delete-btn:hover {
+.btn:hover {
   opacity: 0.8;
+}
+
+.btn-cancel {
+  background: #ddd;
+  color: #333;
+}
+
+.btn-confirm {
+  background: #3498db;
+  color: white;
+}
+
+.btn-delete {
+  background: #e74c3c;
+  color: white;
 }
 </style>

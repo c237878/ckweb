@@ -3,14 +3,14 @@
     <div class="actor-header">
       <div class="actor-info">
         <h1>{{ actor.name }}</h1>
-        <p v-if="actor.alias"><strong>别名:</strong> {{ actor.alias }}</p>
-        <p><strong>国家:</strong> {{ actor.country }}</p>
+        <p v-if="actor.bio">{{ actor.bio }}</p>
       </div>
     </div>
     <div class="actor-videos">
-      <h2>相关影片</h2>
+      <h2>参演影片</h2>
       <div class="video-grid">
         <VideoCard v-for="video in videos" :key="video.id" :video="video" mode="display" />
+        <div v-if="videos.length === 0" class="empty-hint">暂无影片</div>
       </div>
     </div>
   </div>
@@ -44,9 +44,9 @@ const loadActor = async () => {
 
 const loadVideos = async () => {
   try {
-    const res = await actorApi.getVideos(route.params.id, { page: 1, pageSize: 20 })
+    const res = await actorApi.getVideos(route.params.id, { page: 1, pageSize: 50 })
     if (res.success) {
-      videos.value = res.data
+      videos.value = res.data || []
     }
   } catch (error) {
     console.error('加载演员影片失败:', error)
@@ -60,57 +60,18 @@ const loadVideos = async () => {
 }
 
 .actor-header {
-  display: flex;
-  gap: 30px;
   margin-bottom: 40px;
-}
-
-.actor-avatar {
-  width: 250px;
-  height: 300px;
-  border-radius: 8px;
-  overflow: hidden;
-  background: #f0f0f0;
-  flex-shrink: 0;
-}
-
-.actor-avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.no-avatar {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: #999;
-}
-
-.actor-info {
-  flex: 1;
 }
 
 .actor-info h1 {
   font-size: 32px;
-  margin-bottom: 15px;
+  margin-bottom: 10px;
 }
 
 .actor-info p {
-  margin: 10px 0;
+  margin: 5px 0;
   color: #666;
-}
-
-.description {
-  margin-top: 20px;
-  padding: 15px;
-  background: #f5f5f5;
-  border-radius: 8px;
-}
-
-.description h3 {
-  margin-bottom: 10px;
+  font-size: 15px;
 }
 
 .actor-videos h2 {
@@ -121,5 +82,11 @@ const loadVideos = async () => {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
   gap: 20px;
+}
+
+.empty-hint {
+  color: #999;
+  font-size: 14px;
+  padding: 20px;
 }
 </style>

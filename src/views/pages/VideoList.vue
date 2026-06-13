@@ -61,7 +61,7 @@ onMounted(async () => {
 const loadVideos = async () => {
   try {
     const params = {
-      pageIndex: page.value,
+      page: page.value,
       pageSize: pageSize.value
     }
     if (filters.value.category) params.category = filters.value.category

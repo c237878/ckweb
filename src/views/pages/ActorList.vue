@@ -5,23 +5,23 @@
       <button class="add-btn" @click="showAddDialog = true">添加演员</button>
     </div>
     <div class="filters">
-      <select v-model="filters.country" @change="loadActors">
-        <option value="">全部类型</option>
-        <option v-for="country in existingCountries" :key="country" :value="country">
-          {{ country }}
-        </option>
-      </select>
+      <input
+        v-model="keyword"
+        placeholder="搜索演员..."
+        class="search-input"
+        @keyup.enter="loadActors"
+      />
+      <button class="search-btn" @click="loadActors">搜索</button>
     </div>
     <div class="actor-grid">
       <div class="actor-card" v-for="actor in actors" :key="actor.id">
         <div class="card-body" @click="goToDetail(actor.id)">
           <div class="row1">
             <span class="name">{{ actor.name }}</span>
-            <span class="type-tag">{{ actor.country || '未设置' }}</span>
+            <span class="count">{{ actor.videoCount || 0 }} 部</span>
           </div>
-          <div class="row2">
-            <span v-if="actor.alias" class="alias">{{ actor.alias }}</span>
-            <span class="count">{{ actor.videoCount || 0 }} 部影片</span>
+          <div class="row2" v-if="actor.bio">
+            <span class="bio">{{ actor.bio }}</span>
           </div>
         </div>
         <div class="card-actions">
@@ -29,6 +29,7 @@
         </div>
       </div>
     </div>
+    <div class="empty-hint" v-if="actors.length === 0 && !loading">暂无演员</div>
     <div class="pagination" v-if="total > pageSize">
       <button :disabled="page === 1" @click="changePage(page - 1)">上一页</button>
       <span>第 {{ page }} 页</span>
@@ -53,53 +54,36 @@ import AddActorDialog from '@/views/components/AddActorDialog.vue'
 
 const router = useRouter()
 const actors = ref([])
-const existingCountries = ref([])
+const keyword = ref('')
 const page = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
-const filters = ref({
-  country: ''
-})
+const loading = ref(false)
 const showAddDialog = ref(false)
 const editingActor = ref(null)
 
-onMounted(async () => {
-  await Promise.all([
-    loadActors(),
-    loadExistingCountries()
-  ])
+onMounted(() => {
+  loadActors()
 })
 
 const loadActors = async () => {
+  loading.value = true
   try {
     const params = {
       page: page.value,
       pageSize: pageSize.value
     }
-    if (filters.value.country) params.country = filters.value.country
+    if (keyword.value) params.keyword = keyword.value
 
     const res = await actorApi.getList(params)
     if (res.success) {
-      actors.value = res.data
-      total.value = res.total
+      actors.value = res.data || []
+      total.value = res.total || 0
     }
   } catch (error) {
     console.error('加载演员失败:', error)
-  }
-}
-
-const loadExistingCountries = async () => {
-  try {
-    const res = await actorApi.getList({ page: 1, pageSize: 1000 })
-    if (res.success && res.data) {
-      const countries = new Set()
-      res.data.forEach(actor => {
-        if (actor.country) countries.add(actor.country)
-      })
-      existingCountries.value = Array.from(countries)
-    }
-  } catch (error) {
-    console.error('加载类型列表失败:', error)
+  } finally {
+    loading.value = false
   }
 }
 
@@ -123,14 +107,10 @@ const handleDeleteActor = async (actorId) => {
     if (res.success) {
       showAddDialog.value = false
       editingActor.value = null
-      alert('删除成功！')
       await loadActors()
-    } else {
-      alert('删除失败：' + res.message)
     }
   } catch (error) {
     console.error('删除演员失败:', error)
-    alert('删除失败：' + error.message)
   }
 }
 
@@ -147,13 +127,9 @@ const handleSaveActor = async (actorData) => {
       showAddDialog.value = false
       editingActor.value = null
       await loadActors()
-      alert(editingActor.value ? '更新成功！' : '添加成功！')
-    } else {
-      alert('操作失败：' + res.message)
     }
   } catch (error) {
     console.error('保存演员失败:', error)
-    alert('操作失败：' + error.message)
   }
 }
 </script>
@@ -192,20 +168,36 @@ h1 {
 }
 
 .filters {
+  display: flex;
+  gap: 8px;
   margin-bottom: 20px;
 }
 
-.filters select {
+.search-input {
   padding: 8px 12px;
   border: 1px solid #ddd;
   border-radius: 4px;
   font-size: 14px;
-  color: #333;
+  width: 200px;
+}
+
+.search-btn {
+  padding: 8px 16px;
+  background: #3498db;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.search-btn:hover {
+  background: #2980b9;
 }
 
 .actor-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 16px;
   margin-bottom: 30px;
 }
@@ -252,9 +244,9 @@ h1 {
   margin-right: 8px;
 }
 
-.type-tag {
+.count {
   font-size: 12px;
-  color: #666;
+  color: #999;
   background: #f5f5f5;
   padding: 2px 8px;
   border-radius: 10px;
@@ -263,26 +255,14 @@ h1 {
 }
 
 .row2 {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
   font-size: 13px;
   color: #999;
 }
 
-.alias {
+.bio {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  flex: 1;
-  margin-right: 8px;
-  color: #999;
-}
-
-.count {
-  white-space: nowrap;
-  flex-shrink: 0;
-  color: #999;
 }
 
 .card-actions {
@@ -298,13 +278,20 @@ h1 {
   border-radius: 4px;
   cursor: pointer;
   font-size: 12px;
-  transition: opacity 0.3s;
   background: #3498db;
   color: white;
+  transition: opacity 0.3s;
 }
 
 .edit-btn:hover {
   opacity: 0.8;
+}
+
+.empty-hint {
+  color: #999;
+  font-size: 14px;
+  padding: 40px;
+  text-align: center;
 }
 
 .pagination {
