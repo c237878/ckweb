@@ -171,7 +171,10 @@ const handleSave = () => {
   }
   
   const formData = {
-    ...form.value,
+    title: form.value.name,
+    code: form.value.code,
+    category: form.value.category,
+    filePath: form.value.filePath,
     actorIds: selectedActors.value.map(a => a.id)
   }
   
