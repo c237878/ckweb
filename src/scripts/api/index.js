@@ -19,22 +19,24 @@ api.interceptors.response.use(
 
 // 视频相关API
 export const videoApi = {
-  // 获取视频列表
-  getList: (params) => api.get('/video', { params }),
+ // 获取视频列表
+  getList: (params) => api.get('/video/list', { params }),
   // 获取视频详情
   getDetail: (id) => api.get(`/video/${id}`),
-  // 获取今日推荐
-  getRecommend: (videoId = '', limit = 8) => api.get('/video/recommend', { params: { videoId, limit } }),
-  // 获取最新上映
-  getLatest: (limit = 10) => api.get('/video/latest', { params: { limit } }),
-  // 获取最多点赞
-  getMostLiked: (limit = 10) => api.get('/video/most-liked', { params: { limit } }),
-  // 添加视频
-  add: (data) => api.post('/video', data),
+  // 手动添加视频
+  add: (data) => api.post('/video/add', data),
   // 更新视频
   update: (id, data) => api.put(`/video/${id}`, data),
   // 删除视频
-  delete: (id) => api.delete(`/video/${id}`)
+  delete: (id) => api.delete(`/video/${id}`),
+  // 扫描目录
+  scan: (data) => api.post('/video/scan', data),
+  // 获取扫描状态
+  getScanStatus: (taskId) => api.get(`/video/scan/${taskId}`),
+  // 视频流（直接跳转，不走 axios）
+  getStreamUrl: (id) => `/api/video/stream/${id}`,
+  // 封面URL（直接跳转，不走 axios）
+  getCoverUrl: (id) => `/api/video/cover/${id}`
 }
 
 // 演员相关API

@@ -10,50 +10,17 @@
         <input v-model="form.name" type="text" placeholder="影片名称（必填）" />
       </div>
       <div class="form-item">
-        <label>类型</label>
-        <div class="input-with-suggestions">
-          <input 
-            v-model="form.country" 
-            type="text" 
-            placeholder="选择或输入国家"
-            @input="filterCountries"
-            @focus="showCountrySuggestions = true"
-            @blur="hideCountrySuggestions"
-          />
-          <div v-if="showCountrySuggestions && filteredCountries.length > 0" class="suggestions">
-            <div 
-              v-for="country in filteredCountries" 
-              :key="country" 
-              class="suggestion-item"
-              @mousedown="selectCountry(country)"
-            >
-              {{ country }}
-            </div>
-          </div>
-        </div>
+        <label>分类</label>
+        <select v-model="form.category">
+          <option value="电影">电影</option>
+          <option value="电视剧">电视剧</option>
+          <option value="动漫">动漫</option>
+          <option value="其他">其他</option>
+        </select>
       </div>
       <div class="form-item">
-        <label>所属系列</label>
-        <div class="input-with-suggestions">
-          <input 
-            v-model="form.seriesName" 
-            type="text" 
-            placeholder="输入系列名称（自动匹配）"
-            @input="matchSeries"
-            @focus="showSeriesSuggestions = true"
-            @blur="hideSeriesSuggestions"
-          />
-          <div v-if="showSeriesSuggestions && matchedSeries.length > 0" class="suggestions">
-            <div 
-              v-for="series in matchedSeries" 
-              :key="series.id" 
-              class="suggestion-item"
-              @mousedown="selectSeries(series)"
-            >
-              {{ series.name }}
-            </div>
-          </div>
-        </div>
+        <label>文件路径</label>
+        <input v-model="form.filePath" type="text" placeholder="视频文件完整路径（如 /Volumes/disk1/movies/...）" />
       </div>
       <div class="form-item">
         <label>演员</label>
@@ -70,10 +37,8 @@
               type="text" 
               placeholder="搜索演员并添加"
               @input="searchActors"
-              @focus="showActorSuggestions = true"
-              @blur="hideActorSuggestions"
             />
-            <div v-if="showActorSuggestions && matchedActors.length > 0" class="suggestions">
+            <div v-if="matchedActors.length > 0" class="suggestions">
               <div 
                 v-for="actor in matchedActors" 
                 :key="actor.id" 
@@ -87,45 +52,6 @@
           </div>
         </div>
       </div>
-      <div class="form-item">
-        <label>封面图地址</label>
-        <input v-model="form.coverUrl" type="url" placeholder="封面相对路径（如 /libsF/封面图/xxx.jpg）" />
-      </div>
-      <div class="form-item">
-        <label>视频地址</label>
-        <input v-model="form.videoUrl" type="url" placeholder="视频相对路径（如 /libsF/视频库/xxx.mp4）" />
-      </div>
-      <div class="form-item">
-        <label>视频大小（字节）</label>
-        <input v-model.number="form.videoSize" type="number" placeholder="视频文件大小" />
-      </div>
-      <div class="form-item">
-        <label>画质标记</label>
-        <div class="input-with-suggestions">
-          <input 
-            v-model="form.quality" 
-            type="text" 
-            placeholder="选择或输入画质"
-            @input="filterQualities"
-            @focus="showQualitySuggestions = true"
-            @blur="hideQualitySuggestions"
-          />
-          <div v-if="showQualitySuggestions && filteredQualities.length > 0" class="suggestions">
-            <div 
-              v-for="quality in filteredQualities" 
-              :key="quality" 
-              class="suggestion-item"
-              @mousedown="selectQuality(quality)"
-            >
-              {{ quality }}
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="form-item">
-        <label>排序序号</label>
-        <input v-model.number="form.sortOrder" type="number" placeholder="数字越小越靠前" />
-      </div>
     </template>
     <template #actions>
       <button v-if="editingVideo" class="delete-btn" @click="handleDelete">删除</button>
@@ -135,7 +61,7 @@
 
 <script setup>
 import { ref, watch, defineProps, defineEmits, onMounted } from 'vue'
-import { seriesApi, videoApi, actorApi, videoActorApi } from '@/scripts/api'
+import { videoApi, actorApi } from '@/scripts/api'
 import Dialog from './Dialog.vue'
 
 const props = defineProps({
@@ -145,67 +71,32 @@ const props = defineProps({
 
 const emit = defineEmits(['save', 'cancel', 'delete'])
 
-const seriesList = ref([])
 const actorList = ref([])
-const existingCountries = ref([])
-const existingQualities = ref([])
 const selectedActors = ref([])
 const actorSearch = ref('')
+const matchedActors = ref([])
 
 const form = ref({
   code: '',
   name: '',
-  country: '',
-  seriesId: '',
-  seriesName: '',
-  coverUrl: '',
-  videoUrl: '',
-  videoSize: 0,
-  quality: '',
-  sortOrder: 0
+  category: '电影',
+  filePath: ''
 })
 
-const showCountrySuggestions = ref(false)
-const filteredCountries = ref([])
-const showSeriesSuggestions = ref(false)
-const matchedSeries = ref([])
-const showActorSuggestions = ref(false)
-const matchedActors = ref([])
-const showQualitySuggestions = ref(false)
-const filteredQualities = ref([])
-
 onMounted(async () => {
-  await Promise.all([
-    loadSeries(),
-    loadActors(),
-    loadExistingCountries(),
-    loadExistingQualities()
-  ])
+  await loadActors()
 })
 
 watch(() => props.visible, async (newVal) => {
   if (newVal) {
-    await Promise.all([
-      loadSeries(),
-      loadActors(),
-      loadExistingCountries(),
-      loadExistingQualities()
-    ])
+    await loadActors()
     if (props.editingVideo) {
-      // 编辑模式：复制数据到表单
       form.value = {
         code: props.editingVideo.code || '',
         name: props.editingVideo.name || '',
-        country: props.editingVideo.country || '',
-        seriesId: props.editingVideo.seriesId || '',
-        seriesName: getSeriesName(props.editingVideo.seriesId),
-        coverUrl: props.editingVideo.coverUrl || '',
-        videoUrl: props.editingVideo.videoUrl || '',
-        videoSize: props.editingVideo.videoSize || 0,
-        quality: props.editingVideo.quality || '',
-        sortOrder: props.editingVideo.sortOrder || 0
+        category: props.editingVideo.category || '电影',
+        filePath: props.editingVideo.filePath || ''
       }
-      // 加载关联的演员
       await loadVideoActors(props.editingVideo.id)
     } else {
       resetForm()
@@ -213,28 +104,11 @@ watch(() => props.visible, async (newVal) => {
   }
 })
 
-const getSeriesName = (seriesId) => {
-  if (!seriesId) return ''
-  const series = seriesList.value.find(s => s.id === seriesId)
-  return series ? series.name : ''
-}
-
-const loadSeries = async () => {
-  try {
-    const res = await seriesApi.getList({ page: 1, pageSize: 100 })
-    if (res.success) {
-      seriesList.value = res.data
-    }
-  } catch (error) {
-    console.error('加载系列失败:', error)
-  }
-}
-
 const loadActors = async () => {
   try {
-    const res = await actorApi.getList({ page: 1, pageSize: 1000 })
+    const res = await actorApi.getList({ pageIndex: 1, pageSize: 1000 })
     if (res.success) {
-      actorList.value = res.data
+      actorList.value = res.data.list || []
     }
   } catch (error) {
     console.error('加载演员失败:', error)
@@ -243,100 +117,13 @@ const loadActors = async () => {
 
 const loadVideoActors = async (videoId) => {
   try {
-    const res = await videoActorApi.getActorsByVideo(videoId)
-    if (res.success) {
-      selectedActors.value = res.data
+    const res = await videoApi.getById(videoId)
+    if (res.success && res.data.actors) {
+      selectedActors.value = res.data.actors
     }
   } catch (error) {
     console.error('加载视频演员失败:', error)
   }
-}
-
-const loadExistingCountries = async () => {
-  try {
-    const res = await videoApi.getList({ page: 1, pageSize: 1000 })
-    if (res.success && res.data) {
-      const countries = new Set()
-      res.data.forEach(video => {
-        if (video.country) countries.add(video.country)
-      })
-      existingCountries.value = Array.from(countries)
-      filteredCountries.value = existingCountries.value
-    }
-  } catch (error) {
-    console.error('加载类型列表失败:', error)
-  }
-}
-
-const loadExistingQualities = async () => {
-  try {
-    const res = await videoApi.getList({ page: 1, pageSize: 1000 })
-    if (res.success && res.data) {
-      const qualities = new Set()
-      res.data.forEach(video => {
-        if (video.quality) qualities.add(video.quality)
-      })
-      existingQualities.value = Array.from(qualities)
-      filteredQualities.value = existingQualities.value
-    }
-  } catch (error) {
-    console.error('加载画质列表失败:', error)
-  }
-}
-
-const filterCountries = () => {
-  if (!form.value.country) {
-    filteredCountries.value = existingCountries.value
-  } else {
-    filteredCountries.value = existingCountries.value.filter(c => 
-      c.toLowerCase().includes(form.value.country.toLowerCase())
-    )
-  }
-}
-
-const selectCountry = (country) => {
-  form.value.country = country
-  showCountrySuggestions.value = false
-}
-
-const hideCountrySuggestions = () => {
-  setTimeout(() => {
-    showCountrySuggestions.value = false
-  }, 200)
-}
-
-const matchSeries = () => {
-  if (!form.value.seriesName) {
-    matchedSeries.value = []
-    form.value.seriesId = ''
-    return
-  }
-  
-  const input = form.value.seriesName.toLowerCase()
-  matchedSeries.value = seriesList.value.filter(s => 
-    s.name.toLowerCase().includes(input)
-  )
-  
-  const exactMatch = seriesList.value.find(s => 
-    s.name.toLowerCase() === input
-  )
-  if (exactMatch) {
-    form.value.seriesId = exactMatch.id
-  } else {
-    form.value.seriesId = ''
-  }
-}
-
-const selectSeries = (series) => {
-  form.value.seriesId = series.id
-  form.value.seriesName = series.name
-  showSeriesSuggestions.value = false
-}
-
-const hideSeriesSuggestions = () => {
-  setTimeout(() => {
-    showSeriesSuggestions.value = false
-  }, 200)
 }
 
 const searchActors = () => {
@@ -344,15 +131,13 @@ const searchActors = () => {
     matchedActors.value = []
     return
   }
-  
-  const input = actorSearch.value.toLowerCase()
-  matchedActors.value = actorList.value.filter(actor => {
-    // 已选中的不再显示
-    if (selectedActors.value.find(a => a.id === actor.id)) return false
-    // 匹配姓名或别名
-    return actor.name.toLowerCase().includes(input) || 
-           (actor.alias && actor.alias.toLowerCase().includes(input))
-  })
+  const keyword = actorSearch.value.toLowerCase()
+  matchedActors.value = actorList.value.filter(actor => 
+    !selectedActors.value.find(a => a.id === actor.id) && (
+      actor.name.toLowerCase().includes(keyword) || 
+      (actor.alias && actor.alias.toLowerCase().includes(keyword))
+    )
+  ).slice(0, 10)
 }
 
 const addActor = (actor) => {
@@ -361,55 +146,22 @@ const addActor = (actor) => {
   }
   actorSearch.value = ''
   matchedActors.value = []
-  showActorSuggestions.value = false
 }
 
 const removeActor = (actorId) => {
   selectedActors.value = selectedActors.value.filter(a => a.id !== actorId)
 }
 
-const hideActorSuggestions = () => {
-  setTimeout(() => {
-    showActorSuggestions.value = false
-  }, 200)
-}
-
-const filterQualities = () => {
-  if (!form.value.quality) {
-    filteredQualities.value = existingQualities.value
-  } else {
-    filteredQualities.value = existingQualities.value.filter(q => 
-      q.toLowerCase().includes(form.value.quality.toLowerCase())
-    )
-  }
-}
-
-const selectQuality = (quality) => {
-  form.value.quality = quality
-  showQualitySuggestions.value = false
-}
-
-const hideQualitySuggestions = () => {
-  setTimeout(() => {
-    showQualitySuggestions.value = false
-  }, 200)
-}
-
 const resetForm = () => {
   form.value = {
     code: '',
     name: '',
-    country: '',
-    seriesId: '',
-    seriesName: '',
-    coverUrl: '',
-    videoUrl: '',
-    videoSize: 0,
-    quality: '',
-    sortOrder: 0
+    category: '电影',
+    filePath: ''
   }
   selectedActors.value = []
   actorSearch.value = ''
+  matchedActors.value = []
 }
 
 const handleSave = () => {
@@ -417,10 +169,13 @@ const handleSave = () => {
     alert('请填写影片名称')
     return
   }
-  emit('save', { 
-    ...form.value, 
-    actorIds: selectedActors.value.map(a => a.id) 
-  })
+  
+  const formData = {
+    ...form.value,
+    actorIds: selectedActors.value.map(a => a.id)
+  }
+  
+  emit('save', formData)
 }
 
 const handleCancel = () => {
@@ -429,7 +184,7 @@ const handleCancel = () => {
 }
 
 const handleDelete = () => {
-  if (confirm('确定要删除这个影片吗？此操作不可恢复！')) {
+  if (props.editingVideo && props.editingVideo.id) {
     emit('delete', props.editingVideo.id)
   }
 }
@@ -448,18 +203,12 @@ const handleDelete = () => {
 }
 
 .form-item input,
-.form-item select,
-.form-item textarea {
+.form-item select {
   width: 100%;
   padding: 10px;
   border: 1px solid #ddd;
   border-radius: 4px;
   font-size: 14px;
-}
-
-.form-item textarea {
-  min-height: 80px;
-  resize: vertical;
 }
 
 .input-with-suggestions {
