@@ -89,11 +89,11 @@
       </div>
       <div class="form-item">
         <label>封面图地址</label>
-        <input v-model="form.coverUrl" type="url" placeholder="封面图片地址（可选）" />
+        <input v-model="form.coverUrl" type="url" placeholder="封面相对路径（如 /libsF/封面图/xxx.jpg）" />
       </div>
       <div class="form-item">
         <label>视频地址</label>
-        <input v-model="form.videoUrl" type="url" placeholder="视频播放地址（可选）" />
+        <input v-model="form.videoUrl" type="url" placeholder="视频相对路径（如 /libsF/视频库/xxx.mp4）" />
       </div>
       <div class="form-item">
         <label>视频大小（字节）</label>

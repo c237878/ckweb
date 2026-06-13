@@ -1,7 +1,7 @@
 <template>
   <div class="video-card" :class="[`mode-${mode}`]" @click="goToDetail">
     <div class="video-cover">
-      <img v-if="video.coverUrl" :src="video.coverUrl" :alt="video.name" />
+      <img v-if="video.id" :src="`/api/video/cover/${video.id}`" :alt="video.name" />
       <div v-else class="no-cover">暂无封面</div>
       <span v-if="video.quality" class="quality-badge">{{ video.quality }}</span>
     </div>

@@ -83,10 +83,11 @@ const loadSeries = async () => {
 
 const loadExistingCountries = async () => {
   try {
-    const res = await videoApi.getList({ page: 1, pageSize: 1000 })
+    const res = await videoApi.getList({ pageIndex: 1, pageSize: 1000 })
     if (res.success && res.data) {
+      const list = Array.isArray(res.data) ? res.data : res.data.list
       const countries = new Set()
-      res.data.forEach(video => {
+      list.forEach(video => {
         if (video.country) countries.add(video.country)
       })
       existingCountries.value = Array.from(countries)
@@ -99,7 +100,7 @@ const loadExistingCountries = async () => {
 const loadVideos = async () => {
   try {
     const params = {
-      page: page.value,
+      pageIndex: page.value,
       pageSize: pageSize.value
     }
     if (filters.value.seriesId) params.seriesId = filters.value.seriesId
@@ -107,8 +108,8 @@ const loadVideos = async () => {
 
     const res = await videoApi.getList(params)
     if (res.success) {
-      videos.value = res.data
-      total.value = res.total
+      videos.value = Array.isArray(res.data) ? res.data : res.data.list
+      total.value = Array.isArray(res.data) ? res.data.length : res.data.total
     }
   } catch (error) {
     console.error('加载影片失败:', error)

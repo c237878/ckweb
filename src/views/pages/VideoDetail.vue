@@ -6,9 +6,9 @@
                 <div class="player-section">
                     <div class="player-wrapper" :style="wrapperStyle">
                         <video
-                            v-if="video.videoUrl"
+                            v-if="video.id"
                             ref="videoPlayer"
-                            :src="video.videoUrl"
+                            :src="`/api/video/stream/${video.id}`"
                             controls
                             @loadedmetadata="onMetadata"
                             :style="videoStyle"
