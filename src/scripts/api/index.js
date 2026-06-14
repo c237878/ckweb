@@ -55,7 +55,8 @@ export const sambaApi = {
   getById: (id) => api.get(`/samba/${id}`),
   add: (data) => api.post('/samba/add', data),
   update: (id, data) => api.put(`/samba/${id}`, data),
-  delete: (id) => api.delete(`/samba/${id}`)
+  delete: (id) => api.delete(`/samba/${id}`),
+  importSystem: () => api.post('/samba/import-system')
 }
 
 export default api
