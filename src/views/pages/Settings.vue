@@ -50,7 +50,6 @@
               <span class="samba-status-badge readonly" v-if="item.readOnly">只读</span>
             </div>
             <div class="samba-path">{{ item.path }}</div>
-            <div class="samba-user" v-if="item.username">用户: {{ item.username }}</div>
           </div>
           <div class="samba-actions">
             <button class="btn-edit" @click="openEditSambaDialog(item)">编辑</button>
@@ -105,18 +104,6 @@
             <label>目录路径 *</label>
             <input v-model="sambaForm.path" placeholder="如: /Volumes/wdc4t/视频" />
           </div>
-          <div class="form-group">
-            <label>访问用户</label>
-            <input v-model="sambaForm.username" placeholder="可选，留空则允许所有人访问" />
-          </div>
-          <div class="form-group">
-            <label>访问密码</label>
-            <input v-model="sambaForm.password" type="password" :placeholder="editingSamba ? '留空则不修改密码' : '可选'" />
-          </div>
-          <div class="form-group">
-            <label>域(Domain)</label>
-            <input v-model="sambaForm.domain" placeholder="可选" />
-          </div>
           <div class="form-group form-check">
             <label>
               <input type="checkbox" v-model="sambaForm.smbEnabled" />
@@ -166,9 +153,6 @@ const importing = ref(false)
 const sambaForm = ref({
   name: '',
   path: '',
-  username: '',
-  password: '',
-  domain: '',
   smbEnabled: true,
   guestAccess: true,
   readOnly: false
@@ -264,9 +248,6 @@ const openAddSambaDialog = () => {
   sambaForm.value = {
     name: '',
     path: '',
-    username: '',
-    password: '',
-    domain: '',
     smbEnabled: true,
     guestAccess: true,
     readOnly: false
@@ -279,9 +260,6 @@ const openEditSambaDialog = (item) => {
   sambaForm.value = {
     name: item.name,
     path: item.path,
-    username: item.username || '',
-    password: '',
-    domain: item.domain || '',
     smbEnabled: item.isEnabled,
     guestAccess: item.guestAccess,
     readOnly: item.readOnly
@@ -301,9 +279,6 @@ const saveSamba = async () => {
     const payload = {
       name: sambaForm.value.name,
       path: sambaForm.value.path,
-      username: sambaForm.value.username || null,
-      password: sambaForm.value.password || null,
-      domain: sambaForm.value.domain || null,
       isEnabled: sambaForm.value.smbEnabled,
       guestAccess: sambaForm.value.guestAccess,
       readOnly: sambaForm.value.readOnly
