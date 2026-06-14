@@ -12,20 +12,39 @@
       </div>
     </div>
 
-    <!-- Samba管理 -->
+    <!-- Samba共享管理 -->
     <div class="settings-section">
       <h2>
         Samba共享管理
-        <button class="add-btn" @click="openAddSambaDialog">+ 添加</button>
+        <button class="add-btn" @click="openAddSambaDialog">+ 添加共享</button>
       </h2>
+
+      <!-- 系统共享状态提示 -->
+      <div class="system-status" v-if="systemShares.length > 0">
+        <span class="status-label">系统共享点：</span>
+        <div class="share-chip" v-for="s in systemShares" :key="s.name"
+             :class="{ active: s.smbShared }">
+          <span class="chip-name">{{ s.name }}</span>
+          <span class="chip-path">{{ s.path }}</span>
+          <span class="chip-flags">
+            <span class="flag" :class="{ on: s.smbShared }">SMB</span>
+            <span class="flag" :class="{ on: s.guestAccess }">访客</span>
+            <span class="flag" :class="{ on: s.readOnly }">只读</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- 共享列表 -->
       <div class="samba-list" v-if="sambaList.length > 0">
         <div class="samba-item" v-for="item in sambaList" :key="item.id">
           <div class="samba-info">
             <div class="samba-name">
               {{ item.name }}
-              <span class="samba-status" :class="{ disabled: !item.isEnabled }">
-                {{ item.isEnabled ? '已启用' : '已禁用' }}
+              <span class="samba-status-badge" :class="{ active: item.smbShared, inactive: !item.smbShared && item.systemExists }">
+                {{ item.smbShared ? '已启用' : (!item.systemExists ? '未同步' : '已禁用') }}
               </span>
+              <span class="samba-status-badge guest" v-if="item.guestAccess">访客</span>
+              <span class="samba-status-badge readonly" v-if="item.readOnly">只读</span>
             </div>
             <div class="samba-path">{{ item.path }}</div>
             <div class="samba-user" v-if="item.username">用户: {{ item.username }}</div>
@@ -36,7 +55,9 @@
           </div>
         </div>
       </div>
-      <div class="empty-tip" v-else>暂无Samba共享，点击上方按钮添加</div>
+      <div class="empty-tip" v-else>
+        暂无Samba共享，点击上方按钮添加
+      </div>
     </div>
 
     <!-- 数据管理 -->
@@ -74,35 +95,47 @@
         </div>
         <div class="dialog-body">
           <div class="form-group">
-            <label>名称 *</label>
+            <label>共享名称 *</label>
             <input v-model="sambaForm.name" placeholder="如: NAS视频库" />
           </div>
           <div class="form-group">
-            <label>路径 *</label>
-            <input v-model="sambaForm.path" placeholder="如: smb://192.168.1.100/video" />
+            <label>目录路径 *</label>
+            <input v-model="sambaForm.path" placeholder="如: /Volumes/wdc4t/视频" />
           </div>
           <div class="form-group">
-            <label>用户名</label>
-            <input v-model="sambaForm.username" placeholder="可选" />
+            <label>访问用户</label>
+            <input v-model="sambaForm.username" placeholder="可选，留空则允许所有人访问" />
           </div>
           <div class="form-group">
-            <label>密码</label>
-            <input v-model="sambaForm.password" type="password" placeholder="可选" />
+            <label>访问密码</label>
+            <input v-model="sambaForm.password" type="password" :placeholder="editingSamba ? '留空则不修改密码' : '可选'" />
           </div>
           <div class="form-group">
-            <label>域</label>
+            <label>域(Domain)</label>
             <input v-model="sambaForm.domain" placeholder="可选" />
           </div>
           <div class="form-group form-check">
             <label>
-              <input type="checkbox" v-model="sambaForm.isEnabled" />
-              启用此共享
+              <input type="checkbox" v-model="sambaForm.smbEnabled" />
+              启用SMB共享
+            </label>
+          </div>
+          <div class="form-group form-check">
+            <label>
+              <input type="checkbox" v-model="sambaForm.guestAccess" />
+              允许访客访问
+            </label>
+          </div>
+          <div class="form-group form-check">
+            <label>
+              <input type="checkbox" v-model="sambaForm.readOnly" />
+              只读模式
             </label>
           </div>
         </div>
         <div class="dialog-footer">
           <button class="btn btn-cancel" @click="showSambaDialog = false">取消</button>
-          <button class="btn btn-confirm" @click="saveSamba" :disabled="saving">保存</button>
+          <button class="btn btn-confirm" @click="saveSamba" :disabled="saving">{{ saving ? '保存中...' : '保存' }}</button>
         </div>
       </div>
     </div>
@@ -122,6 +155,7 @@ const scanDir = ref('')
 const scanning = ref(false)
 
 const sambaList = ref([])
+const systemShares = ref([])
 const showSambaDialog = ref(false)
 const editingSamba = ref(null)
 const saving = ref(false)
@@ -131,7 +165,9 @@ const sambaForm = ref({
   username: '',
   password: '',
   domain: '',
-  isEnabled: true
+  smbEnabled: true,
+  guestAccess: true,
+  readOnly: false
 })
 
 // 扫描弹窗点击穿透处理
@@ -185,9 +221,15 @@ const saveSetting = async (item) => {
 
 const loadSambaList = async () => {
   try {
-    const res = await sambaApi.getList()
-    if (res.success) {
-      sambaList.value = res.data || []
+    const [listRes, sysRes] = await Promise.all([
+      sambaApi.getList(),
+      sambaApi.getSystemShares()
+    ])
+    if (listRes.success) {
+      sambaList.value = listRes.data || []
+    }
+    if (sysRes.success) {
+      systemShares.value = sysRes.data || []
     }
   } catch (error) {
     console.error('加载Samba列表失败:', error)
@@ -202,7 +244,9 @@ const openAddSambaDialog = () => {
     username: '',
     password: '',
     domain: '',
-    isEnabled: true
+    smbEnabled: true,
+    guestAccess: true,
+    readOnly: false
   }
   showSambaDialog.value = true
 }
@@ -215,7 +259,9 @@ const openEditSambaDialog = (item) => {
     username: item.username || '',
     password: '',
     domain: item.domain || '',
-    isEnabled: item.isEnabled
+    smbEnabled: item.isEnabled,
+    guestAccess: item.guestAccess,
+    readOnly: item.readOnly
   }
   showSambaDialog.value = true
 }
@@ -229,10 +275,21 @@ const saveSamba = async () => {
   saving.value = true
   try {
     let res
+    const payload = {
+      name: sambaForm.value.name,
+      path: sambaForm.value.path,
+      username: sambaForm.value.username || null,
+      password: sambaForm.value.password || null,
+      domain: sambaForm.value.domain || null,
+      isEnabled: sambaForm.value.smbEnabled,
+      guestAccess: sambaForm.value.guestAccess,
+      readOnly: sambaForm.value.readOnly
+    }
+
     if (editingSamba.value) {
-      res = await sambaApi.update(editingSamba.value.id, sambaForm.value)
+      res = await sambaApi.update(editingSamba.value.id, payload)
     } else {
-      res = await sambaApi.add(sambaForm.value)
+      res = await sambaApi.add(payload)
     }
 
     if (res.success) {
@@ -249,7 +306,7 @@ const saveSamba = async () => {
 }
 
 const deleteSamba = async (item) => {
-  if (!confirm(`确定删除 "${item.name}" 吗?`)) return
+  if (!confirm(`确定删除 "${item.name}" 吗？\n这将同时移除系统共享。`)) return
 
   try {
     const res = await sambaApi.delete(item.id)
@@ -293,7 +350,7 @@ const doScan = async () => {
 <style scoped>
 .settings {
   padding: 20px 0;
-  max-width: 800px;
+  max-width: 900px;
 }
 
 h1 {
@@ -368,6 +425,72 @@ h1 {
   background: #2980b9;
 }
 
+/* 系统共享状态 */
+.system-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 12px;
+  background: #f0f0f0;
+  border-radius: 8px;
+  align-items: center;
+}
+
+.status-label {
+  font-size: 13px;
+  color: #666;
+  font-weight: 600;
+}
+
+.share-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 16px;
+  font-size: 13px;
+}
+
+.share-chip.active {
+  border-color: #27ae60;
+  background: #f0fff4;
+}
+
+.chip-name {
+  font-weight: 600;
+  color: #333;
+}
+
+.chip-path {
+  color: #888;
+  font-size: 12px;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chip-flags {
+  display: flex;
+  gap: 4px;
+}
+
+.flag {
+  font-size: 11px;
+  padding: 1px 5px;
+  background: #ddd;
+  color: #666;
+  border-radius: 8px;
+}
+
+.flag.on {
+  background: #27ae60;
+  color: white;
+}
+
 /* Samba列表样式 */
 .samba-list {
   display: flex;
@@ -397,9 +520,10 @@ h1 {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
-.samba-status {
+.samba-status-badge {
   font-size: 12px;
   padding: 2px 8px;
   background: #27ae60;
@@ -408,8 +532,16 @@ h1 {
   font-weight: normal;
 }
 
-.samba-status.disabled {
-  background: #95a5a6;
+.samba-status-badge.inactive {
+  background: #e74c3c;
+}
+
+.samba-status-badge.guest {
+  background: #3498db;
+}
+
+.samba-status-badge.readonly {
+  background: #f39c12;
 }
 
 .samba-path {

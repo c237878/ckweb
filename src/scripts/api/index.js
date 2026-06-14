@@ -51,6 +51,7 @@ export const settingApi = {
 // Samba共享相关API
 export const sambaApi = {
   getList: () => api.get('/samba/list'),
+  getSystemShares: () => api.get('/samba/system-shares'),
   getById: (id) => api.get(`/samba/${id}`),
   add: (data) => api.post('/samba/add', data),
   update: (id, data) => api.put(`/samba/${id}`, data),
