@@ -27,6 +27,9 @@
                         <span v-if="video.fileSize">{{ formatSize(video.fileSize) }}</span>
                         <span v-if="video.playCount">{{ video.playCount }}次播放</span>
                     </div>
+                    <div class="info-row3" v-if="video.sambaDir">
+                        <span>所属Samba目录：{{ getSambaDisplayName(video.sambaDir) }} ({{ video.sambaDir }})</span>
+                    </div>
                     <div class="info-row4" v-if="actors.length > 0">
                         <span>参演演员：</span>
                         <a
@@ -210,6 +213,13 @@ const goToVideo = (id) => {
     window.scrollTo(0, 0)
 }
 
+const getSambaDisplayName = (path) => {
+    if (!path) return ''
+    // 取最后一个路径段作为友好名称
+    const parts = path.split('/').filter(Boolean)
+    return parts[parts.length - 1] || path
+}
+
 const formatSize = (bytes) => {
     if (!bytes) return ''
     const units = ['B', 'KB', 'MB', 'GB', 'TB']
@@ -326,6 +336,11 @@ const formatSize = (bytes) => {
     font-size: 13px;
     color: #999;
     line-height: 1.6;
+}
+
+.info-row3 {
+    font-size: 14px;
+    color: #666;
 }
 
 .actor-link {

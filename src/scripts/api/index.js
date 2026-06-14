@@ -24,6 +24,7 @@ export const videoApi = {
   add: (data) => api.post('/video/add', data),
   update: (id, data) => api.put(`/video/${id}`, data),
   delete: (id) => api.delete(`/video/${id}`),
+  batchDelete: (ids) => api.delete('/video/batch', { data: { ids } }),
   scan: (data) => api.post('/video/scan', data),
   getScanStatus: (taskId) => api.get(`/video/scan/${taskId}`),
   getStreamUrl: (id) => `/api/video/stream/${id}`,

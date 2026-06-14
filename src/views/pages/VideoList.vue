@@ -7,8 +7,8 @@
           <input type="checkbox" :checked="isAllSelected" @change="toggleSelectAll" />
           全选
         </label>
-        <button v-if="selectedVideos.length > 0" class="batch-delete-btn" @click="batchDelete">
-          批量删除 ({{ selectedVideos.length }})
+        <button v-if="selectedIds.length > 0" class="batch-delete-btn" @click="batchDelete">
+          批量删除 ({{ selectedIds.length }})
         </button>
         <button class="add-btn" @click="showAddDialog = true">添加影片</button>
       </div>
@@ -33,7 +33,7 @@
         :video="video"
         :show-actions="true"
         :selectable="true"
-        :selected="selectedVideos.includes(video.id)"
+        :selected="selectedIds.includes(video.id)"
         @edit="handleEditVideo"
         @select="handleSelectVideo"
       />
@@ -71,37 +71,34 @@ const filters = ref({
 })
 const showAddDialog = ref(false)
 const editingVideo = ref(null)
-const selectedVideos = ref([])
+const selectedIds = ref([])
 
 const isAllSelected = computed(() => {
-  return videos.value.length > 0 && selectedVideos.value.length === videos.value.length
+  return videos.value.length > 0 && selectedIds.value.length === videos.value.length
 })
 
 const toggleSelectAll = () => {
   if (isAllSelected.value) {
-    selectedVideos.value = []
+    selectedIds.value = []
   } else {
-    selectedVideos.value = videos.value.map(v => v.id)
+    selectedIds.value = videos.value.map(v => v.id)
   }
 }
 
 const handleSelectVideo = (videoId) => {
-  const index = selectedVideos.value.indexOf(videoId)
+  const index = selectedIds.value.indexOf(videoId)
   if (index > -1) {
-    selectedVideos.value.splice(index, 1)
+    selectedIds.value.splice(index, 1)
   } else {
-    selectedVideos.value.push(videoId)
+    selectedIds.value.push(videoId)
   }
 }
 
 const batchDelete = async () => {
-  if (!confirm(`确定要删除选中的 ${selectedVideos.value.length} 部影片吗？`)) return
-  
+  if (!confirm(`确定要删除选中的 ${selectedIds.value.length} 部影片吗？`)) return
   try {
-    for (const videoId of selectedVideos.value) {
-      await videoApi.delete(videoId)
-    }
-    selectedVideos.value = []
+    await videoApi.batchDelete(selectedIds.value)
+    selectedIds.value = []
     await loadVideos()
     alert('批量删除成功！')
   } catch (error) {
