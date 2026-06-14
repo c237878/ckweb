@@ -45,11 +45,19 @@ const props = defineProps({
   showActions: {
     type: Boolean,
     default: true
+  },
+  selectable: {
+    type: Boolean,
+    default: false
+  },
+  selected: {
+    type: Boolean,
+    default: false
   }
 })
 
 const router = useRouter()
-const emit = defineEmits(['edit'])
+const emit = defineEmits(['edit', 'select'])
 
 const goToDetail = () => {
   router.push(`/video/${props.video.id}`)
@@ -88,6 +96,20 @@ const handleEdit = () => {
   padding-top: 67.25%;
   background: #f0f0f0;
   overflow: hidden;
+}
+
+.select-checkbox {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 10;
+  cursor: pointer;
+}
+
+.select-checkbox input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
 }
 
 .video-cover img {

@@ -27,6 +27,13 @@
         </select>
       </div>
       <div class="form-item">
+        <label>所属Samba目录</label>
+        <select v-model="form.sambaDir">
+          <option value="">未选择</option>
+          <option v-for="samba in sambaList" :key="samba.id" :value="samba.path">{{ samba.name }} ({{ samba.path }})</option>
+        </select>
+      </div>
+      <div class="form-item">
         <label>文件路径</label>
         <input v-model="form.filePath" type="text" placeholder="视频文件完整路径（如 /Volumes/disk1/movies/...）" />
       </div>
@@ -78,6 +85,7 @@ const props = defineProps({
 
 const emit = defineEmits(['save', 'cancel', 'delete'])
 
+const sambaList = ref([])
 const actorList = ref([])
 const selectedActors = ref([])
 const actorSearch = ref('')
@@ -87,16 +95,19 @@ const form = ref({
   name: '',
   category: '电影',
   country: '',
-  filePath: ''
+  filePath: '',
+  sambaDir: ''
 })
 
 onMounted(async () => {
   await loadActors()
+  await loadSambaList()
 })
 
 watch(() => props.visible, async (newVal) => {
   if (newVal) {
     await loadActors()
+    await loadSambaList()
     if (props.editingVideo) {
       form.value = {
         name: props.editingVideo.name || '',
@@ -122,6 +133,17 @@ const loadActors = async () => {
   }
 }
 
+const loadSambaList = async () => {
+  try {
+    const res = await sambaApi.getList()
+    if (res.success) {
+      sambaList.value = res.data || []
+    }
+  } catch (error) {
+    console.error('加载Samba列表失败:', error)
+  }
+}
+
 const loadVideoActors = async (videoId) => {
   try {
     const res = await videoApi.getDetail(videoId)
@@ -130,6 +152,7 @@ const loadVideoActors = async (videoId) => {
       form.value.category = res.data.video.category || ''
       form.value.country = res.data.video.country || ''
       form.value.filePath = res.data.video.filePath || ''
+      form.value.sambaDir = res.data.video.sambaDir || ''
       selectedActors.value = res.data.actors || []
     }
   } catch (error) {
@@ -167,7 +190,8 @@ const resetForm = () => {
     name: '',
     category: '电影',
     country: '',
-    filePath: ''
+    filePath: '',
+    sambaDir: ''
   }
   selectedActors.value = []
   actorSearch.value = ''
@@ -185,6 +209,7 @@ const handleSave = () => {
     category: form.value.category,
     country: form.value.country,
     filePath: form.value.filePath,
+    sambaDir: form.value.sambaDir,
     actorIds: selectedActors.value.map(a => a.id)
   }
   

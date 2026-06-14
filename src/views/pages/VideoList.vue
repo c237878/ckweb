@@ -2,7 +2,16 @@
   <div class="video-list">
     <div class="list-header">
       <h1>影片列表</h1>
-      <button class="add-btn" @click="showAddDialog = true">添加影片</button>
+      <div class="header-actions">
+        <label class="select-all">
+          <input type="checkbox" :checked="isAllSelected" @change="toggleSelectAll" />
+          全选
+        </label>
+        <button v-if="selectedVideos.length > 0" class="batch-delete-btn" @click="batchDelete">
+          批量删除 ({{ selectedVideos.length }})
+        </button>
+        <button class="add-btn" @click="showAddDialog = true">添加影片</button>
+      </div>
     </div>
     <div class="filters">
       <select v-model="filters.category" @change="loadVideos">
@@ -12,6 +21,10 @@
         <option value="动漫">动漫</option>
         <option value="其他">其他</option>
       </select>
+      <select v-model="filters.sambaDir" @change="loadVideos">
+        <option value="">全部Samba目录</option>
+        <option v-for="samba in sambaList" :key="samba.id" :value="samba.path">{{ samba.name }}</option>
+      </select>
     </div>
     <div class="video-grid">
       <VideoCard
@@ -19,7 +32,10 @@
         :key="video.id"
         :video="video"
         :show-actions="true"
+        :selectable="true"
+        :selected="selectedVideos.includes(video.id)"
         @edit="handleEditVideo"
+        @select="handleSelectVideo"
       />
     </div>
     <div class="pagination" v-if="total > pageSize">
@@ -39,8 +55,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { videoApi } from '@/scripts/api'
+import { ref, onMounted, computed } from 'vue'
+import { videoApi, sambaApi } from '@/scripts/api'
 import VideoCard from '@/views/components/VideoCard.vue'
 import AddVideoDialog from '@/views/components/AddVideoDialog.vue'
 
@@ -48,15 +64,67 @@ const videos = ref([])
 const page = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
+const sambaList = ref([])
 const filters = ref({
-  category: ''
+  category: '',
+  sambaDir: ''
 })
 const showAddDialog = ref(false)
 const editingVideo = ref(null)
+const selectedVideos = ref([])
+
+const isAllSelected = computed(() => {
+  return videos.value.length > 0 && selectedVideos.value.length === videos.value.length
+})
+
+const toggleSelectAll = () => {
+  if (isAllSelected.value) {
+    selectedVideos.value = []
+  } else {
+    selectedVideos.value = videos.value.map(v => v.id)
+  }
+}
+
+const handleSelectVideo = (videoId) => {
+  const index = selectedVideos.value.indexOf(videoId)
+  if (index > -1) {
+    selectedVideos.value.splice(index, 1)
+  } else {
+    selectedVideos.value.push(videoId)
+  }
+}
+
+const batchDelete = async () => {
+  if (!confirm(`确定要删除选中的 ${selectedVideos.value.length} 部影片吗？`)) return
+  
+  try {
+    for (const videoId of selectedVideos.value) {
+      await videoApi.delete(videoId)
+    }
+    selectedVideos.value = []
+    await loadVideos()
+    alert('批量删除成功！')
+  } catch (error) {
+    console.error('批量删除失败:', error)
+    alert('批量删除失败：' + error.message)
+  }
+}
 
 onMounted(async () => {
+  await loadSambaList()
   await loadVideos()
 })
+
+const loadSambaList = async () => {
+  try {
+    const res = await sambaApi.getList()
+    if (res.success) {
+      sambaList.value = res.data || []
+    }
+  } catch (error) {
+    console.error('加载Samba列表失败:', error)
+  }
+}
 
 const loadVideos = async () => {
   try {
@@ -65,6 +133,7 @@ const loadVideos = async () => {
       pageSize: pageSize.value
     }
     if (filters.value.category) params.category = filters.value.category
+    if (filters.value.sambaDir) params.sambaDir = filters.value.sambaDir
 
     const res = await videoApi.getList(params)
     if (res.success) {
@@ -199,5 +268,40 @@ const handleDeleteVideo = async (videoId) => {
 .pagination span {
   font-size: 14px;
   color: #666;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.select-all {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #666;
+}
+
+.select-all input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.batch-delete-btn {
+  padding: 8px 16px;
+  background: #e74c3c;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.batch-delete-btn:hover {
+  background: #c0392b;
 }
 </style>

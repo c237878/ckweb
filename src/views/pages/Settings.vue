@@ -52,6 +52,7 @@
             <div class="samba-path">{{ item.path }}</div>
           </div>
           <div class="samba-actions">
+            <button class="btn-scan" @click="scanSamba(item)">扫描</button>
             <button class="btn-edit" @click="openEditSambaDialog(item)">编辑</button>
             <button class="btn-delete" @click="deleteSamba(item)">删除</button>
           </div>
@@ -62,31 +63,7 @@
       </div>
     </div>
 
-    <!-- 数据管理 -->
-    <div class="settings-section">
-      <h2>数据管理</h2>
-      <button class="scan-btn" @click="openScanDialog">扫描视频目录</button>
-    </div>
-
     <!-- 扫描弹窗 -->
-    <div class="dialog-overlay" v-if="showScanDialog"
-         @mousedown="handleScanOverlayDown"
-         @click="handleScanOverlayClick">
-      <div class="dialog">
-        <div class="dialog-header"><h3>扫描视频目录</h3></div>
-        <div class="dialog-body">
-          <div class="form-group">
-            <label>扫描目录路径</label>
-            <input v-model="scanDir" placeholder="/Volumes/wdc4t/视频" />
-          </div>
-        </div>
-        <div class="dialog-footer">
-          <button class="btn btn-cancel" @click="showScanDialog = false">取消</button>
-          <button class="btn btn-confirm" @click="doScan" :disabled="scanning">开始扫描</button>
-        </div>
-      </div>
-    </div>
-
     <!-- Samba添加/编辑弹窗 -->
     <div class="dialog-overlay" v-if="showSambaDialog"
          @mousedown="handleSambaOverlayDown"
@@ -140,10 +117,6 @@ const settingsList = ref([
   { id: 'siteName', label: '网站名称', value: '', placeholder: '影视网站' }
 ])
 
-const showScanDialog = ref(false)
-const scanDir = ref('')
-const scanning = ref(false)
-
 const sambaList = ref([])
 const systemShares = ref([])
 const showSambaDialog = ref(false)
@@ -157,16 +130,6 @@ const sambaForm = ref({
   guestAccess: true,
   readOnly: false
 })
-
-// 扫描弹窗点击穿透处理
-let mouseDownOnScanDialog = false
-function handleScanOverlayDown(e) {
-  const dialog = e.currentTarget.querySelector('.dialog')
-  mouseDownOnScanDialog = dialog && dialog.contains(e.target)
-}
-function handleScanOverlayClick() {
-  if (!mouseDownOnScanDialog) showScanDialog.value = false
-}
 
 // Samba弹窗点击穿透处理
 let mouseDownOnSambaDialog = false
@@ -300,6 +263,21 @@ const saveSamba = async () => {
     alert('保存失败: ' + error.message)
   } finally {
     saving.value = false
+  }
+}
+
+const scanSamba = async (item) => {
+  if (!confirm(`确定扫描 Samba 共享 "${item.name}" 的目录吗？\n\n扫描目录：${item.path}`)) return
+  
+  try {
+    const res = await videoApi.scan({ targetPath: item.path, recursive: true })
+    if (res.success) {
+      alert(`扫描任务已启动！任务ID: ${res.data.taskId}`)
+    } else {
+      alert('扫描失败：' + (res.message || '未知错误'))
+    }
+  } catch (error) {
+    alert('扫描失败：' + error.message)
   }
 }
 
@@ -579,12 +557,21 @@ h1 {
   gap: 8px;
 }
 
-.btn-edit, .btn-delete {
+.btn-edit, .btn-delete, .btn-scan {
   padding: 6px 14px;
   border: none;
   border-radius: 4px;
   cursor: pointer;
   font-size: 13px;
+}
+
+.btn-scan {
+  background: #27ae60;
+  color: white;
+}
+
+.btn-scan:hover {
+  background: #219a52;
 }
 
 .btn-edit {
