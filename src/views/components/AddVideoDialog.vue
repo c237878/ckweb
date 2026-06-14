@@ -75,7 +75,7 @@
 
 <script setup>
 import { ref, watch, defineProps, defineEmits, onMounted } from 'vue'
-import { videoApi, actorApi } from '@/scripts/api'
+import { videoApi, actorApi, sambaApi } from '@/scripts/api'
 import Dialog from './Dialog.vue'
 
 const props = defineProps({
