@@ -1,6 +1,8 @@
 <template>
   <div class="settings">
     <h1>系统设置</h1>
+
+    <!-- 基本信息 -->
     <div class="settings-section">
       <h2>基本信息</h2>
       <div class="setting-item" v-for="item in settingsList" :key="item.id">
@@ -9,6 +11,35 @@
         <button class="save-btn" @click="saveSetting(item)">保存</button>
       </div>
     </div>
+
+    <!-- Samba管理 -->
+    <div class="settings-section">
+      <h2>
+        Samba共享管理
+        <button class="add-btn" @click="openAddSambaDialog">+ 添加</button>
+      </h2>
+      <div class="samba-list" v-if="sambaList.length > 0">
+        <div class="samba-item" v-for="item in sambaList" :key="item.id">
+          <div class="samba-info">
+            <div class="samba-name">
+              {{ item.name }}
+              <span class="samba-status" :class="{ disabled: !item.isEnabled }">
+                {{ item.isEnabled ? '已启用' : '已禁用' }}
+              </span>
+            </div>
+            <div class="samba-path">{{ item.path }}</div>
+            <div class="samba-user" v-if="item.username">用户: {{ item.username }}</div>
+          </div>
+          <div class="samba-actions">
+            <button class="btn-edit" @click="openEditSambaDialog(item)">编辑</button>
+            <button class="btn-delete" @click="deleteSamba(item)">删除</button>
+          </div>
+        </div>
+      </div>
+      <div class="empty-tip" v-else>暂无Samba共享，点击上方按钮添加</div>
+    </div>
+
+    <!-- 数据管理 -->
     <div class="settings-section">
       <h2>数据管理</h2>
       <button class="scan-btn" @click="openScanDialog">扫描视频目录</button>
@@ -16,8 +47,8 @@
 
     <!-- 扫描弹窗 -->
     <div class="dialog-overlay" v-if="showScanDialog"
-         @mousedown="handleOverlayDown"
-         @click="handleOverlayClick">
+         @mousedown="handleScanOverlayDown"
+         @click="handleScanOverlayClick">
       <div class="dialog">
         <div class="dialog-header"><h3>扫描视频目录</h3></div>
         <div class="dialog-body">
@@ -32,12 +63,55 @@
         </div>
       </div>
     </div>
+
+    <!-- Samba添加/编辑弹窗 -->
+    <div class="dialog-overlay" v-if="showSambaDialog"
+         @mousedown="handleSambaOverlayDown"
+         @click="handleSambaOverlayClick">
+      <div class="dialog dialog-samba">
+        <div class="dialog-header">
+          <h3>{{ editingSamba ? '编辑Samba共享' : '添加Samba共享' }}</h3>
+        </div>
+        <div class="dialog-body">
+          <div class="form-group">
+            <label>名称 *</label>
+            <input v-model="sambaForm.name" placeholder="如: NAS视频库" />
+          </div>
+          <div class="form-group">
+            <label>路径 *</label>
+            <input v-model="sambaForm.path" placeholder="如: smb://192.168.1.100/video" />
+          </div>
+          <div class="form-group">
+            <label>用户名</label>
+            <input v-model="sambaForm.username" placeholder="可选" />
+          </div>
+          <div class="form-group">
+            <label>密码</label>
+            <input v-model="sambaForm.password" type="password" placeholder="可选" />
+          </div>
+          <div class="form-group">
+            <label>域</label>
+            <input v-model="sambaForm.domain" placeholder="可选" />
+          </div>
+          <div class="form-group form-check">
+            <label>
+              <input type="checkbox" v-model="sambaForm.isEnabled" />
+              启用此共享
+            </label>
+          </div>
+        </div>
+        <div class="dialog-footer">
+          <button class="btn btn-cancel" @click="showSambaDialog = false">取消</button>
+          <button class="btn btn-confirm" @click="saveSamba" :disabled="saving">保存</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { settingApi, videoApi } from '@/scripts/api'
+import { settingApi, videoApi, sambaApi } from '@/scripts/api'
 
 const settingsList = ref([
   { id: 'siteName', label: '网站名称', value: '', placeholder: '影视网站' }
@@ -47,17 +121,42 @@ const showScanDialog = ref(false)
 const scanDir = ref('')
 const scanning = ref(false)
 
-let mouseDownOnDialog = false
-function handleOverlayDown(e) {
+const sambaList = ref([])
+const showSambaDialog = ref(false)
+const editingSamba = ref(null)
+const saving = ref(false)
+const sambaForm = ref({
+  name: '',
+  path: '',
+  username: '',
+  password: '',
+  domain: '',
+  isEnabled: true
+})
+
+// 扫描弹窗点击穿透处理
+let mouseDownOnScanDialog = false
+function handleScanOverlayDown(e) {
   const dialog = e.currentTarget.querySelector('.dialog')
-  mouseDownOnDialog = dialog && dialog.contains(e.target)
+  mouseDownOnScanDialog = dialog && dialog.contains(e.target)
 }
-function handleOverlayClick() {
-  if (!mouseDownOnDialog) showScanDialog.value = false
+function handleScanOverlayClick() {
+  if (!mouseDownOnScanDialog) showScanDialog.value = false
+}
+
+// Samba弹窗点击穿透处理
+let mouseDownOnSambaDialog = false
+function handleSambaOverlayDown(e) {
+  const dialog = e.currentTarget.querySelector('.dialog')
+  mouseDownOnSambaDialog = dialog && dialog.contains(e.target)
+}
+function handleSambaOverlayClick() {
+  if (!mouseDownOnSambaDialog) showSambaDialog.value = false
 }
 
 onMounted(async () => {
   await loadSettings()
+  await loadSambaList()
 })
 
 const loadSettings = async () => {
@@ -77,11 +176,90 @@ const saveSetting = async (item) => {
   try {
     const res = await settingApi.save({ name: item.id, content: item.value })
     if (res.success) {
-      // 触发全局事件更新网站名称
       window.dispatchEvent(new CustomEvent('settingsUpdated', { detail: { siteName: item.value } }))
     }
   } catch (error) {
     console.error('保存失败:', error)
+  }
+}
+
+const loadSambaList = async () => {
+  try {
+    const res = await sambaApi.getList()
+    if (res.success) {
+      sambaList.value = res.data || []
+    }
+  } catch (error) {
+    console.error('加载Samba列表失败:', error)
+  }
+}
+
+const openAddSambaDialog = () => {
+  editingSamba.value = null
+  sambaForm.value = {
+    name: '',
+    path: '',
+    username: '',
+    password: '',
+    domain: '',
+    isEnabled: true
+  }
+  showSambaDialog.value = true
+}
+
+const openEditSambaDialog = (item) => {
+  editingSamba.value = item
+  sambaForm.value = {
+    name: item.name,
+    path: item.path,
+    username: item.username || '',
+    password: '',
+    domain: item.domain || '',
+    isEnabled: item.isEnabled
+  }
+  showSambaDialog.value = true
+}
+
+const saveSamba = async () => {
+  if (!sambaForm.value.name || !sambaForm.value.path) {
+    alert('名称和路径不能为空')
+    return
+  }
+
+  saving.value = true
+  try {
+    let res
+    if (editingSamba.value) {
+      res = await sambaApi.update(editingSamba.value.id, sambaForm.value)
+    } else {
+      res = await sambaApi.add(sambaForm.value)
+    }
+
+    if (res.success) {
+      showSambaDialog.value = false
+      await loadSambaList()
+    } else {
+      alert(res.message || '保存失败')
+    }
+  } catch (error) {
+    alert('保存失败: ' + error.message)
+  } finally {
+    saving.value = false
+  }
+}
+
+const deleteSamba = async (item) => {
+  if (!confirm(`确定删除 "${item.name}" 吗?`)) return
+
+  try {
+    const res = await sambaApi.delete(item.id)
+    if (res.success) {
+      await loadSambaList()
+    } else {
+      alert(res.message || '删除失败')
+    }
+  } catch (error) {
+    alert('删除失败: ' + error.message)
   }
 }
 
@@ -134,6 +312,23 @@ h1 {
   margin-bottom: 16px;
   padding-bottom: 8px;
   border-bottom: 1px solid #eee;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.add-btn {
+  font-size: 14px;
+  padding: 6px 16px;
+  background: #27ae60;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.add-btn:hover {
+  background: #219a52;
 }
 
 .setting-item {
@@ -173,6 +368,102 @@ h1 {
   background: #2980b9;
 }
 
+/* Samba列表样式 */
+.samba-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.samba-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.samba-info {
+  flex: 1;
+}
+
+.samba-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.samba-status {
+  font-size: 12px;
+  padding: 2px 8px;
+  background: #27ae60;
+  color: white;
+  border-radius: 12px;
+  font-weight: normal;
+}
+
+.samba-status.disabled {
+  background: #95a5a6;
+}
+
+.samba-path {
+  font-size: 14px;
+  color: #666;
+  font-family: monospace;
+  margin-bottom: 4px;
+}
+
+.samba-user {
+  font-size: 13px;
+  color: #888;
+}
+
+.samba-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-edit, .btn-delete {
+  padding: 6px 14px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.btn-edit {
+  background: #3498db;
+  color: white;
+}
+
+.btn-edit:hover {
+  background: #2980b9;
+}
+
+.btn-delete {
+  background: #e74c3c;
+  color: white;
+}
+
+.btn-delete:hover {
+  background: #c0392b;
+}
+
+.empty-tip {
+  color: #999;
+  font-size: 14px;
+  padding: 20px;
+  text-align: center;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
 .scan-btn {
   padding: 10px 24px;
   background: #e74c3c;
@@ -187,6 +478,7 @@ h1 {
   background: #c0392b;
 }
 
+/* 弹窗样式 */
 .dialog-overlay {
   position: fixed;
   top: 0;
@@ -207,6 +499,10 @@ h1 {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
 }
 
+.dialog-samba {
+  width: 520px;
+}
+
 .dialog-header {
   padding: 16px 20px;
   border-bottom: 1px solid #eee;
@@ -225,6 +521,11 @@ h1 {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  margin-bottom: 16px;
+}
+
+.form-group:last-child {
+  margin-bottom: 0;
 }
 
 .form-group label {
@@ -237,6 +538,17 @@ h1 {
   border: 1px solid #ddd;
   border-radius: 4px;
   font-size: 14px;
+}
+
+.form-check {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.form-check input {
+  width: 18px;
+  height: 18px;
 }
 
 .dialog-footer {

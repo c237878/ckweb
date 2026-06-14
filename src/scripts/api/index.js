@@ -48,4 +48,13 @@ export const settingApi = {
   delete: (id) => api.delete(`/systemsetting/${id}`)
 }
 
+// Samba共享相关API
+export const sambaApi = {
+  getList: () => api.get('/samba/list'),
+  getById: (id) => api.get(`/samba/${id}`),
+  add: (data) => api.post('/samba/add', data),
+  update: (id, data) => api.put(`/samba/${id}`, data),
+  delete: (id) => api.delete(`/samba/${id}`)
+}
+
 export default api
