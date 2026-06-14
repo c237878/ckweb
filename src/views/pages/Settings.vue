@@ -17,6 +17,9 @@
       <h2>
         Samba共享管理
         <button class="add-btn" @click="openAddSambaDialog">+ 添加共享</button>
+        <button class="import-btn" @click="importSystemShares" :disabled="importing">
+          {{ importing ? '导入中...' : '导入系统共享' }}
+        </button>
       </h2>
 
       <!-- 系统共享状态提示 -->
@@ -159,6 +162,7 @@ const systemShares = ref([])
 const showSambaDialog = ref(false)
 const editingSamba = ref(null)
 const saving = ref(false)
+const importing = ref(false)
 const sambaForm = ref({
   name: '',
   path: '',
@@ -233,6 +237,25 @@ const loadSambaList = async () => {
     }
   } catch (error) {
     console.error('加载Samba列表失败:', error)
+  }
+}
+
+const importSystemShares = async () => {
+  if (!confirm('确定导入系统现有的所有Samba共享到数据库吗？')) return
+  
+  importing.value = true
+  try {
+    const res = await sambaApi.importSystem()
+    if (res.success) {
+      alert(res.message || '导入成功')
+      await loadSambaList()
+    } else {
+      alert('导入失败：' + (res.message || '未知错误'))
+    }
+  } catch (error) {
+    alert('导入失败：' + error.message)
+  } finally {
+    importing.value = false
   }
 }
 
@@ -386,6 +409,26 @@ h1 {
 
 .add-btn:hover {
   background: #219a52;
+}
+
+.import-btn {
+  font-size: 14px;
+  padding: 6px 16px;
+  background: #3498db;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-left: 8px;
+}
+
+.import-btn:hover {
+  background: #2980b9;
+}
+
+.import-btn:disabled {
+  background: #bbb;
+  cursor: not-allowed;
 }
 
 .setting-item {
