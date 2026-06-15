@@ -49,10 +49,6 @@
                 </div>
                 <template v-if="!panelCollapsed">
                     <div class="action-section">
-                        <button class="action-btn like-btn" @click="handleLike" :class="{ liked: justLiked }">
-                            <span class="btn-icon">👍</span>
-                            <span>点赞 {{ likeCount > 0 ? likeCount : '' }}</span>
-                        </button>
                         <button class="action-btn like-btn" @click="handleLike">
                             <span class="btn-icon">❤️</span>
                             <span>点赞 ({{ likeCount }})</span>
