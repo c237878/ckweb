@@ -1,7 +1,7 @@
 <template>
   <div class="video-card" :class="[`mode-${mode}`, { selectable: selectable, selected }]" @click="handleClick">
-    <div v-if="selectable" class="select-checkbox" @click.stop>
-      <input type="checkbox" :checked="selected" @change="handleSelect" />
+    <div v-if="selectable" class="select-checkbox">
+      <input type="checkbox" :checked="selected" @change.stop="handleSelect" />
     </div>
     <div class="video-cover">
       <img v-if="video.hasCover" :src="`/api/video/cover/${video.id}`" :alt="video.name" @error="$event.target.style.display='none'" />
@@ -28,6 +28,7 @@
     </div>
     <!-- 完全模式才显示操作按钮 -->
     <div v-if="mode === 'full' && showActions" class="card-actions" @click.stop>
+      <button v-if="selectable || mode === 'full'" class="detail-btn" @click.stop="goToDetail">详情</button>
       <button class="edit-btn" @click.stop="handleEdit">编辑</button>
     </div>
   </div>
@@ -93,6 +94,7 @@ const handleEdit = () => {
   background: #fff;
   display: flex;
   flex-direction: column;
+  position: relative;
 }
 
 .video-card:hover {
@@ -101,12 +103,15 @@ const handleEdit = () => {
 }
 
 .video-card.selected {
-  outline: 3px solid #3498db;
-  outline-offset: -3px;
+  box-shadow: 0 0 0 3px #3498db;
 }
 
 .video-card.selectable {
   cursor: pointer;
+}
+
+.video-card.selected .video-cover {
+  border-color: #3498db;
 }
 
 /* 简介模式：更小巧 */
@@ -120,6 +125,8 @@ const handleEdit = () => {
   padding-top: 67.25%;
   background: #f0f0f0;
   overflow: hidden;
+  border: 2px solid transparent;
+  box-sizing: border-box;
 }
 
 .select-checkbox {
@@ -265,6 +272,22 @@ const handleEdit = () => {
 }
 
 .edit-btn:hover {
+  opacity: 0.8;
+}
+
+.detail-btn {
+  padding: 4px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: opacity 0.3s;
+  background: #2ecc71;
+  color: white;
+  margin-right: auto;
+}
+
+.detail-btn:hover {
   opacity: 0.8;
 }
 </style>
