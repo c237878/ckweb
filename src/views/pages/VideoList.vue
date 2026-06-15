@@ -14,13 +14,18 @@
       </div>
     </div>
     <div class="filters">
-      <select v-model="filters.category" @change="loadVideos">
-        <option value="">全部分类</option>
-        <option value="电影">电影</option>
-        <option value="电视剧">电视剧</option>
-        <option value="动漫">动漫</option>
-        <option value="其他">其他</option>
-      </select>
+      <div class="filter-item">
+        <select v-model="filters.category" @focus="loadCategories" @change="loadVideos">
+          <option value="">全部分类</option>
+          <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
+        </select>
+      </div>
+      <div class="filter-item">
+        <select v-model="filters.country" @focus="loadCountries" @change="loadVideos">
+          <option value="">全部国家</option>
+          <option v-for="c in countries" :key="c" :value="c">{{ c }}</option>
+        </select>
+      </div>
       <select v-model="filters.sambaDir" @change="loadVideos">
         <option value="">全部Samba目录</option>
         <option v-for="samba in sambaList" :key="samba.id" :value="samba.path">{{ samba.name }}</option>
@@ -65,8 +70,11 @@ const page = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
 const sambaList = ref([])
+const categories = ref([])
+const countries = ref([])
 const filters = ref({
   category: '',
+  country: '',
   sambaDir: ''
 })
 const showAddDialog = ref(false)
@@ -108,8 +116,7 @@ const batchDelete = async () => {
 }
 
 onMounted(async () => {
-  await loadSambaList()
-  await loadVideos()
+  await Promise.all([loadSambaList(), loadMeta(), loadVideos()])
 })
 
 const loadSambaList = async () => {
@@ -123,6 +130,26 @@ const loadSambaList = async () => {
   }
 }
 
+const loadMeta = async () => {
+  try {
+    const res = await videoApi.getMeta()
+    if (res.success) {
+      categories.value = res.categories || []
+      countries.value = res.countries || []
+    }
+  } catch (error) {
+    console.error('加载元数据失败:', error)
+  }
+}
+
+const loadCategories = async () => {
+  if (categories.value.length === 0) await loadMeta()
+}
+
+const loadCountries = async () => {
+  if (countries.value.length === 0) await loadMeta()
+}
+
 const loadVideos = async () => {
   try {
     const params = {
@@ -130,6 +157,7 @@ const loadVideos = async () => {
       pageSize: pageSize.value
     }
     if (filters.value.category) params.category = filters.value.category
+    if (filters.value.country) params.country = filters.value.country
     if (filters.value.sambaDir) params.sambaDir = filters.value.sambaDir
 
     const res = await videoApi.getList(params)
@@ -162,7 +190,7 @@ const handleSaveVideo = async (formData) => {
     }
     showAddDialog.value = false
     editingVideo.value = null
-    await loadVideos()
+    await Promise.all([loadVideos(), loadMeta()])
   } catch (error) {
     console.error('保存失败:', error)
   }

@@ -29,7 +29,8 @@ export const videoApi = {
   getScanStatus: (taskId) => api.get(`/video/scan/${taskId}`),
   getStreamUrl: (id) => `/api/video/stream/${id}`,
   getCoverUrl: (id) => `/api/video/cover/${id}`,
-  getMeta: () => api.get('/video/meta')
+  getMeta: () => api.get('/video/meta'),
+  like: (id) => api.post(`/video/${id}/like`)
 }
 
 // 演员相关API

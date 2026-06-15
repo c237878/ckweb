@@ -25,7 +25,6 @@
                         <span v-if="video.country" class="country-tag">{{ video.country }}</span>
                         <span v-if="video.year">{{ video.year }}年</span>
                         <span v-if="video.fileSize">{{ formatSize(video.fileSize) }}</span>
-                        <span v-if="video.playCount">{{ video.playCount }}次播放</span>
                     </div>
                     <div class="info-row3" v-if="video.sambaDir">
                         <span>所属Samba目录：{{ getSambaDisplayName(video.sambaDir) }} ({{ video.sambaDir }})</span>
@@ -50,6 +49,14 @@
                 </div>
                 <template v-if="!panelCollapsed">
                     <div class="action-section">
+                        <button class="action-btn like-btn" @click="handleLike" :class="{ liked: justLiked }">
+                            <span class="btn-icon">👍</span>
+                            <span>点赞 {{ likeCount > 0 ? likeCount : '' }}</span>
+                        </button>
+                        <button class="action-btn like-btn" @click="handleLike">
+                            <span class="btn-icon">❤️</span>
+                            <span>点赞 ({{ likeCount }})</span>
+                        </button>
                         <button class="action-btn" @click="rotateVideo">
                             <span class="btn-icon">🔄</span>
                             <span>旋转{{ rotation ? '（' + rotation + '°）' : '' }}</span>
@@ -103,6 +110,7 @@ const videoPlayer = ref(null)
 const showEditDialog = ref(false)
 const editingVideo = ref(null)
 const panelCollapsed = ref(false)
+const likeCount = ref(0)
 
 const videoNaturalWidth = ref(0)
 const videoNaturalHeight = ref(0)
@@ -152,6 +160,7 @@ const loadVideo = async () => {
         if (res.success) {
             video.value = res.data.video || res.data
             actors.value = res.data.actors || []
+            likeCount.value = res.data.likeCount || 0
         }
     } catch (error) {
         console.error('加载视频详情失败:', error)
@@ -211,6 +220,17 @@ const goToActor = (id) => {
 const goToVideo = (id) => {
     router.push(`/video/${id}`)
     window.scrollTo(0, 0)
+}
+
+const handleLike = async () => {
+    try {
+        const res = await videoApi.like(video.value.id)
+        if (res.success) {
+            likeCount.value = res.likeCount
+        }
+    } catch (error) {
+        console.error('点赞失败:', error)
+    }
 }
 
 const getSambaDisplayName = (path) => {
@@ -424,6 +444,15 @@ const formatSize = (bytes) => {
     border-color: #3498db;
     color: #3498db;
     background: #f0f8ff;
+}
+
+.action-btn.like-btn {
+    border-color: #e74c3c;
+    color: #e74c3c;
+}
+
+.action-btn.like-btn:hover {
+    background: #fdf2f2;
 }
 
 .btn-icon {

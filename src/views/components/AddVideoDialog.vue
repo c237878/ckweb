@@ -8,19 +8,47 @@
       <div class="form-item">
         <label>分类</label>
         <div class="combobox-wrap">
-          <input v-model="form.category" type="text" list="cat-list" placeholder="选择或输入分类" />
-          <datalist id="cat-list">
-            <option v-for="c in meta.categories" :key="c" :value="c" />
-          </datalist>
+          <input
+            v-model="form.category"
+            type="text"
+            placeholder="选择或输入分类"
+            @focus="showCatDropdown = true"
+            @blur="hideDropdown('cat')"
+          />
+          <div v-if="showCatDropdown" class="combobox-dropdown">
+            <div
+              v-for="c in filteredCategories"
+              :key="c"
+              class="combobox-option"
+              @mousedown.prevent="selectCategory(c)"
+            >
+              {{ c }}
+            </div>
+            <div v-if="filteredCategories.length === 0" class="combobox-empty">暂无已有分类</div>
+          </div>
         </div>
       </div>
       <div class="form-item">
         <label>国家</label>
         <div class="combobox-wrap">
-          <input v-model="form.country" type="text" list="country-list" placeholder="选择或输入国家" />
-          <datalist id="country-list">
-            <option v-for="c in meta.countries" :key="c" :value="c" />
-          </datalist>
+          <input
+            v-model="form.country"
+            type="text"
+            placeholder="选择或输入国家"
+            @focus="showCountryDropdown = true"
+            @blur="hideDropdown('country')"
+          />
+          <div v-if="showCountryDropdown" class="combobox-dropdown">
+            <div
+              v-for="c in filteredCountries"
+              :key="c"
+              class="combobox-option"
+              @mousedown.prevent="selectCountry(c)"
+            >
+              {{ c }}
+            </div>
+            <div v-if="filteredCountries.length === 0" class="combobox-empty">暂无已有国家</div>
+          </div>
         </div>
       </div>
       <div class="form-item">
@@ -48,16 +76,16 @@
             </span>
           </div>
           <div class="input-with-suggestions">
-            <input 
-              v-model="actorSearch" 
-              type="text" 
+            <input
+              v-model="actorSearch"
+              type="text"
               placeholder="搜索演员并添加"
               @input="searchActors"
             />
             <div v-if="matchedActors.length > 0" class="suggestions">
-              <div 
-                v-for="actor in matchedActors" 
-                :key="actor.id" 
+              <div
+                v-for="actor in matchedActors"
+                :key="actor.id"
                 class="suggestion-item"
                 @mousedown="addActor(actor)"
               >
@@ -75,7 +103,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { videoApi, actorApi, sambaApi } from '@/scripts/api'
 import Dialog from './Dialog.vue'
 
@@ -93,6 +121,22 @@ const actorSearch = ref('')
 const matchedActors = ref([])
 const meta = ref({ categories: [], countries: [] })
 
+const showCatDropdown = ref(false)
+const showCountryDropdown = ref(false)
+
+const filteredCategories = computed(() => {
+  // 获得焦点时显示全部已有值，输入后按关键词过滤
+  if (showCatDropdown.value) return meta.value.categories || []
+  if (!form.value.category) return meta.value.categories || []
+  return (meta.value.categories || []).filter(c => c.includes(form.value.category))
+})
+
+const filteredCountries = computed(() => {
+  if (showCountryDropdown.value) return meta.value.countries || []
+  if (!form.value.country) return meta.value.countries || []
+  return (meta.value.countries || []).filter(c => c.includes(form.value.country))
+})
+
 const form = ref({
   name: '',
   category: '',
@@ -101,6 +145,23 @@ const form = ref({
   coverPath: '',
   sambaDir: ''
 })
+
+const selectCategory = (val) => {
+  form.value.category = val
+  showCatDropdown.value = false
+}
+
+const selectCountry = (val) => {
+  form.value.country = val
+  showCountryDropdown.value = false
+}
+
+const hideDropdown = (type) => {
+  setTimeout(() => {
+    if (type === 'cat') showCatDropdown.value = false
+    if (type === 'country') showCountryDropdown.value = false
+  }, 200)
+}
 
 watch(() => props.visible, async (newVal) => {
   if (newVal) {
@@ -170,10 +231,6 @@ const loadVideoActors = async (videoId) => {
 const onSambaDirChange = () => {
   if (!form.value.sambaDir) return
   form.value.filePath = form.value.sambaDir + '/'
-  // 自动推导封面路径：同目录同名 .jpg
-  if (form.value.filePath.endsWith('/')) {
-    // 留空，让用户手动填或后续扩展
-  }
 }
 
 const searchActors = () => {
@@ -226,6 +283,10 @@ const handleDelete = () => { if (props.editingVideo?.id) emit('delete', props.ed
 .form-item input, .form-item select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
 .combobox-wrap { position: relative; }
 .combobox-wrap input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
+.combobox-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ddd; border-radius: 4px; max-height: 200px; overflow-y: auto; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+.combobox-option { padding: 10px; cursor: pointer; transition: background 0.2s; }
+.combobox-option:hover { background: #f5f5f5; }
+.combobox-empty { padding: 10px; color: #999; font-size: 13px; }
 .input-with-suggestions { position: relative; }
 .suggestions { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ddd; border-radius: 4px; max-height: 200px; overflow-y: auto; z-index: 10; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
 .suggestion-item { padding: 10px; cursor: pointer; transition: background 0.2s; }
