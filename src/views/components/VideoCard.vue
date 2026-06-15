@@ -110,10 +110,6 @@ const handleEdit = () => {
   cursor: pointer;
 }
 
-.video-card.selected .video-cover {
-  border-color: #3498db;
-}
-
 /* 简介模式：更小巧 */
 .mode-brief {
   font-size: 12px;
@@ -125,8 +121,6 @@ const handleEdit = () => {
   padding-top: 67.25%;
   background: #f0f0f0;
   overflow: hidden;
-  border: 2px solid transparent;
-  box-sizing: border-box;
 }
 
 .select-checkbox {
