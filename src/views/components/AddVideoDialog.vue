@@ -213,7 +213,7 @@ const handleSave = () => {
     actorIds: selectedActors.value.map(a => a.id)
   }
   
-  emit('save', formData)
+  emit('save', { id: props.editingVideo?.id, ...formData })
 }
 
 const handleCancel = () => {
