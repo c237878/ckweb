@@ -1,5 +1,8 @@
 <template>
-  <div class="video-card" :class="[`mode-${mode}`]" @click="goToDetail">
+  <div class="video-card" :class="[`mode-${mode}`, { selectable: selectable, selected }]" @click="handleClick">
+    <div v-if="selectable" class="select-checkbox" @click.stop>
+      <input type="checkbox" :checked="selected" @change="handleSelect" />
+    </div>
     <div class="video-cover">
       <img v-if="video.hasCover" :src="`/api/video/cover/${video.id}`" :alt="video.name" @error="$event.target.style.display='none'" />
       <div v-if="!video.hasCover" class="no-cover">{{ video.name?.charAt(0) || '?' }}</div>
@@ -59,6 +62,18 @@ const props = defineProps({
 const router = useRouter()
 const emit = defineEmits(['edit', 'select'])
 
+const handleClick = () => {
+  if (props.selectable) {
+    handleSelect()
+  } else {
+    goToDetail()
+  }
+}
+
+const handleSelect = () => {
+  emit('select', props.video.id)
+}
+
 const goToDetail = () => {
   router.push(`/video/${props.video.id}`)
 }
@@ -83,6 +98,15 @@ const handleEdit = () => {
 .video-card:hover {
   transform: translateY(-5px);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.video-card.selected {
+  outline: 3px solid #3498db;
+  outline-offset: -3px;
+}
+
+.video-card.selectable {
+  cursor: pointer;
 }
 
 /* 简介模式：更小巧 */
