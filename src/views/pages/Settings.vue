@@ -43,6 +43,9 @@
           <div class="samba-info">
             <div class="samba-name">
               {{ item.name }}
+              <span class="samba-status-badge" :class="item.source === 'docker' ? 'docker' : 'macos'">
+                {{ item.source === 'docker' ? 'Docker' : 'macOS' }}
+              </span>
               <span class="samba-status-badge" :class="{ active: item.smbShared, inactive: !item.smbShared && item.systemExists }">
                 {{ item.smbShared ? '已启用' : (!item.systemExists ? '未同步' : '已禁用') }}
               </span>
@@ -80,6 +83,13 @@
           <div class="form-group">
             <label>目录路径 *</label>
             <input v-model="sambaForm.path" placeholder="如: /Volumes/wdc4t/视频" />
+          </div>
+          <div class="form-group">
+            <label>共享来源 *</label>
+            <select v-model="sambaForm.source" class="form-select">
+              <option value="macos">macOS 原生 Samba (端口 445)</option>
+              <option value="docker">Docker Samba (端口 1445)</option>
+            </select>
           </div>
           <div class="form-group form-check">
             <label>
@@ -126,6 +136,7 @@ const importing = ref(false)
 const sambaForm = ref({
   name: '',
   path: '',
+  source: 'macos',
   smbEnabled: true,
   guestAccess: true,
   readOnly: false
@@ -211,6 +222,7 @@ const openAddSambaDialog = () => {
   sambaForm.value = {
     name: '',
     path: '',
+    source: 'macos',
     smbEnabled: true,
     guestAccess: true,
     readOnly: false
@@ -223,6 +235,7 @@ const openEditSambaDialog = (item) => {
   sambaForm.value = {
     name: item.name,
     path: item.path,
+    source: item.source || 'macos',
     smbEnabled: item.isEnabled,
     guestAccess: item.guestAccess,
     readOnly: item.readOnly
@@ -242,6 +255,7 @@ const saveSamba = async () => {
     const payload = {
       name: sambaForm.value.name,
       path: sambaForm.value.path,
+      source: sambaForm.value.source,
       isEnabled: sambaForm.value.smbEnabled,
       guestAccess: sambaForm.value.guestAccess,
       readOnly: sambaForm.value.readOnly
