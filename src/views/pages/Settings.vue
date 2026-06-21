@@ -14,7 +14,9 @@
       <div class="setting-item" v-for="item in settingsList" :key="item.id">
         <label>{{ item.label }}</label>
         <input v-model="item.value" :placeholder="item.placeholder" />
-        <button class="save-btn" @click="saveSetting(item)">保存</button>
+      </div>
+      <div class="section-actions">
+        <button class="save-btn" @click="saveBasicSettings" :disabled="savingBasic">保存基本信息</button>
       </div>
     </div>
 
@@ -79,6 +81,7 @@ const settingsList = ref([
   { id: 'siteName', label: '网站名称', value: '', placeholder: '影视网站' },
   { id: 'scanType', label: '扫描类型', value: '', placeholder: '如: .mp4,.mkv,.avi（多个后缀以逗号分隔）' }
 ])
+const savingBasic = ref(false)
 
 // 页面提示
 const pageTip = ref({ show: false, message: '', type: 'error' })
@@ -134,15 +137,26 @@ const loadSettings = async () => {
   }
 }
 
-const saveSetting = async (item) => {
+// 保存基本信息（全部字段一次性保存）
+// 只有网站名称变更时才通知 Header 更新标题
+const saveBasicSettings = async () => {
+  savingBasic.value = true
+  let siteNameChanged = false
   try {
-    const res = await settingApi.save({ name: item.id, content: item.value })
-    if (res.success) {
-      // 通知 AppHeader 更新标题（仅 siteName 时带 detail，否则广播事件让 Header 重新拉取）
+    for (const item of settingsList.value) {
+      const res = await settingApi.save({ name: item.id, content: item.value })
+      if (res.success && item.id === 'siteName') {
+        siteNameChanged = true
+      }
+    }
+    if (siteNameChanged) {
       window.dispatchEvent(new CustomEvent('settingsUpdated'))
     }
+    showPageTip('保存成功', 'success')
   } catch (error) {
-    console.error('保存失败:', error)
+    showPageTip('保存失败：' + error.message, 'error')
+  } finally {
+    savingBasic.value = false
   }
 }
 
@@ -278,6 +292,8 @@ h2 { margin-bottom: 16px; font-size: 18px; color: #555; display: flex; align-ite
 .setting-item input { flex: 1; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; }
 .save-btn { padding: 8px 16px; background: #42b883; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
 .save-btn:hover { background: #369870; }
+.save-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.section-actions { margin-top: 12px; display: flex; justify-content: flex-end; }
 .add-btn { padding: 6px 12px; background: #42b883; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
 .add-btn:hover { background: #369870; }
 .scan-all-btn { padding: 6px 12px; background: #1976d2; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
