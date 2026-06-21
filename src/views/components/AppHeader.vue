@@ -20,15 +20,6 @@ import { settingApi } from '@/scripts/api'
 
 const siteName = ref('影视网站')
 
-onMounted(async () => {
-  await loadSiteName()
-  window.addEventListener('settingsUpdated', handleSettingsUpdate)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('settingsUpdated', handleSettingsUpdate)
-})
-
 const loadSiteName = async () => {
   try {
     const res = await settingApi.getByName('siteName')
@@ -40,11 +31,19 @@ const loadSiteName = async () => {
   }
 }
 
-const handleSettingsUpdate = (event) => {
-  if (event.detail && event.detail.siteName) {
-    siteName.value = event.detail.siteName
-  }
+const handleSettingsUpdate = () => {
+  // 任意设置保存后都重新拉取网站名称
+  loadSiteName()
 }
+
+onMounted(() => {
+  loadSiteName()
+  window.addEventListener('settingsUpdated', handleSettingsUpdate)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('settingsUpdated', handleSettingsUpdate)
+})
 </script>
 
 <style scoped>

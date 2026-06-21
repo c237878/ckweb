@@ -23,6 +23,9 @@
       <h2>
         扫描目录
         <button class="add-btn" @click="openAddScanDirDialog">+ 添加目录</button>
+        <button class="scan-all-btn" @click="scanAllDirs" :disabled="scanning || scanDirList.length === 0">
+          {{ scanning ? '扫描中...' : '扫描全部' }}
+        </button>
       </h2>
       <div class="scan-list" v-if="scanDirList.length > 0">
         <div class="scan-item" v-for="item in scanDirList" :key="item.id">
@@ -33,7 +36,6 @@
             </div>
           </div>
           <div class="scan-actions">
-            <button class="btn-scan" @click="scanDir(item)">扫描</button>
             <button class="btn-edit" @click="openEditScanDirDialog(item)">编辑</button>
             <button class="btn-delete" @click="deleteScanDir(item)">删除</button>
           </div>
@@ -78,14 +80,14 @@ const settingsList = ref([
   { id: 'scanType', label: '扫描类型', value: '', placeholder: '如: .mp4,.mkv,.avi（多个后缀以逗号分隔）' }
 ])
 
-// 页面提示（替换 alert）
+// 页面提示
 const pageTip = ref({ show: false, message: '', type: 'error' })
 function showPageTip(msg, type = 'error') {
   pageTip.value = { show: true, message: msg, type }
   setTimeout(() => { pageTip.value.show = false }, 3000)
 }
 
-// 弹窗内提示（替换 alert）
+// 弹窗内提示
 const dialogTip = ref({ show: false, message: '' })
 function showDialogTip(msg) {
   dialogTip.value = { show: true, message: msg }
@@ -100,6 +102,7 @@ const showScanDirDialog = ref(false)
 const editingScanDir = ref(null)
 const scanDirForm = ref({ path: '', recursive: true })
 const saving = ref(false)
+const scanning = ref(false)
 
 // 弹窗点击穿透处理
 let mouseDownOnDialog = false
@@ -135,7 +138,8 @@ const saveSetting = async (item) => {
   try {
     const res = await settingApi.save({ name: item.id, content: item.value })
     if (res.success) {
-      window.dispatchEvent(new CustomEvent('settingsUpdated', { detail: { siteName: item.value } }))
+      // 通知 AppHeader 更新标题（仅 siteName 时带 detail，否则广播事件让 Header 重新拉取）
+      window.dispatchEvent(new CustomEvent('settingsUpdated'))
     }
   } catch (error) {
     console.error('保存失败:', error)
@@ -237,17 +241,29 @@ const deleteScanDir = async (item) => {
   }
 }
 
-const scanDir = async (item) => {
-  if (!confirm(`确定扫描目录 "${item.path}" 吗？`)) return
-  try {
-    const res = await videoApi.scan({ targetPath: item.path, recursive: item.recursive })
-    if (res.success) {
-      showPageTip(`扫描任务已启动！任务ID: ${res.data.taskId}`, 'success')
-    } else {
-      showPageTip('扫描失败：' + (res.message || '未知错误'), 'error')
+// 扫描所有目录
+const scanAllDirs = async () => {
+  if (scanDirList.value.length === 0) return
+  if (!confirm(`确定扫描全部 ${scanDirList.value.length} 个目录吗？`)) return
+  scanning.value = true
+  const results = []
+  for (const dir of scanDirList.value) {
+    try {
+      const res = await videoApi.scan({ targetPath: dir.path, recursive: dir.recursive })
+      results.push({ path: dir.path, success: res.success, taskId: res.data?.taskId, message: res.message })
+    } catch (error) {
+      results.push({ path: dir.path, success: false, message: error.message })
     }
-  } catch (error) {
-    showPageTip('扫描失败：' + error.message, 'error')
+  }
+  scanning.value = false
+  const successCount = results.filter(r => r.success).length
+  const taskIds = results.filter(r => r.success).map(r => r.taskId).join(', ')
+  if (successCount > 0) {
+    showPageTip(`扫描任务已启动 ${successCount}/${scanDirList.value.length}！任务ID: ${taskIds}`, 'success')
+  }
+  const failCount = results.filter(r => !r.success).length
+  if (failCount > 0) {
+    showPageTip(`${failCount} 个目录扫描失败，请检查后端日志`, 'error')
   }
 }
 </script>
@@ -255,7 +271,7 @@ const scanDir = async (item) => {
 <style scoped>
 .settings { padding: 20px; max-width: 900px; margin: 0 auto; }
 h1 { margin-bottom: 24px; color: #333; }
-h2 { margin-bottom: 16px; font-size: 18px; color: #555; display: flex; align-items: center; gap: 12px; }
+h2 { margin-bottom: 16px; font-size: 18px; color: #555; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .settings-section { background: #fff; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
 .setting-item { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
 .setting-item label { min-width: 100px; color: #666; }
@@ -264,6 +280,9 @@ h2 { margin-bottom: 16px; font-size: 18px; color: #555; display: flex; align-ite
 .save-btn:hover { background: #369870; }
 .add-btn { padding: 6px 12px; background: #42b883; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
 .add-btn:hover { background: #369870; }
+.scan-all-btn { padding: 6px 12px; background: #1976d2; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
+.scan-all-btn:hover:not(:disabled) { background: #1565c0; }
+.scan-all-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
 /* 页面提示 */
 .inline-tip {
@@ -299,11 +318,9 @@ h2 { margin-bottom: 16px; font-size: 18px; color: #555; display: flex; align-ite
 .scan-meta { margin-top: 4px; display: flex; gap: 8px; }
 .meta-tag { font-size: 12px; padding: 2px 6px; background: #e8f5e9; color: #2e7d32; border-radius: 3px; }
 .scan-actions { display: flex; gap: 8px; }
-.btn-scan, .btn-edit, .btn-delete { padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
-.btn-scan { background: #1976d2; color: #fff; }
+.btn-edit, .btn-delete { padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
 .btn-edit { background: #ff9800; color: #fff; }
 .btn-delete { background: #d32f2f; color: #fff; }
-.btn-scan:hover { background: #1565c0; }
 .btn-edit:hover { background: #f57c00; }
 .btn-delete:hover { background: #c62828; }
 
