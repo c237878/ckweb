@@ -15,21 +15,23 @@
     </div>
     <div class="filters">
       <div class="filter-item">
-        <select v-model="filters.category" @focus="loadCategories" @change="loadVideos">
+        <select v-model="filters.category" @change="loadVideos">
           <option value="">全部分类</option>
           <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
         </select>
       </div>
       <div class="filter-item">
-        <select v-model="filters.country" @focus="loadCountries" @change="loadVideos">
-          <option value="">全部国家</option>
+        <select v-model="filters.country" @change="loadVideos">
+          <option value="">全部地区</option>
           <option v-for="c in countries" :key="c" :value="c">{{ c }}</option>
         </select>
       </div>
-      <select v-model="filters.sambaDir" @change="loadVideos">
-        <option value="">全部Samba目录</option>
-        <option v-for="samba in sambaList" :key="samba.id" :value="samba.path">{{ samba.name }}</option>
-      </select>
+      <div class="filter-item">
+        <select v-model="filters.seriesId" @change="loadVideos">
+          <option value="">全部系列</option>
+          <option v-for="s in seriesList" :key="s.id" :value="s.id">{{ s.name }}</option>
+        </select>
+      </div>
     </div>
     <div class="video-grid">
       <VideoCard
@@ -61,21 +63,21 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { videoApi, sambaApi } from '@/scripts/api'
+import { videoApi } from '@/scripts/api'
 import VideoCard from '@/views/components/VideoCard.vue'
 import AddVideoDialog from '@/views/components/AddVideoDialog.vue'
 
 const videos = ref([])
 const page = ref(1)
-const pageSize = ref(20)
+const pageSize = ref(24)
 const total = ref(0)
-const sambaList = ref([])
 const categories = ref([])
 const countries = ref([])
+const seriesList = ref([])
 const filters = ref({
   category: '',
   country: '',
-  sambaDir: ''
+  seriesId: ''
 })
 const showAddDialog = ref(false)
 const editingVideo = ref(null)
@@ -116,19 +118,8 @@ const batchDelete = async () => {
 }
 
 onMounted(async () => {
-  await Promise.all([loadSambaList(), loadMeta(), loadVideos()])
+  await Promise.all([loadMeta(), loadVideos()])
 })
-
-const loadSambaList = async () => {
-  try {
-    const res = await sambaApi.getList()
-    if (res.success) {
-      sambaList.value = res.data || []
-    }
-  } catch (error) {
-    console.error('加载Samba列表失败:', error)
-  }
-}
 
 const loadMeta = async () => {
   try {
@@ -136,18 +127,11 @@ const loadMeta = async () => {
     if (res.success) {
       categories.value = res.categories || []
       countries.value = res.countries || []
+      seriesList.value = res.series || []
     }
   } catch (error) {
     console.error('加载元数据失败:', error)
   }
-}
-
-const loadCategories = async () => {
-  if (categories.value.length === 0) await loadMeta()
-}
-
-const loadCountries = async () => {
-  if (countries.value.length === 0) await loadMeta()
 }
 
 const loadVideos = async () => {
@@ -158,7 +142,7 @@ const loadVideos = async () => {
     }
     if (filters.value.category) params.category = filters.value.category
     if (filters.value.country) params.country = filters.value.country
-    if (filters.value.sambaDir) params.sambaDir = filters.value.sambaDir
+    if (filters.value.seriesId) params.seriesId = filters.value.seriesId
 
     const res = await videoApi.getList(params)
     if (res.success) {
@@ -259,9 +243,30 @@ const handleDeleteVideo = async (videoId) => {
 
 .video-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 16px;
   margin-bottom: 30px;
+}
+
+@media (max-width: 1200px) {
+  .video-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .video-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .list-header {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  .header-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
 }
 
 .pagination {

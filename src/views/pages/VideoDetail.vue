@@ -23,11 +23,11 @@
                     <div class="info-row2">
                         <span v-if="video.category" class="type-tag">{{ video.category }}</span>
                         <span v-if="video.country" class="country-tag">{{ video.country }}</span>
-                        <span v-if="video.year">{{ video.year }}年</span>
+                        <span v-if="video.code" class="code-tag">{{ video.code }}</span>
                         <span v-if="video.fileSize">{{ formatSize(video.fileSize) }}</span>
                     </div>
-                    <div class="info-row3" v-if="video.sambaDir">
-                        <span>所属Samba目录：{{ getSambaDisplayName(video.sambaDir) }} ({{ video.sambaDir }})</span>
+                    <div class="info-row3" v-if="video.seriesName">
+                        <span>系列：{{ video.seriesName }}</span>
                     </div>
                     <div class="info-row4" v-if="actors.length > 0">
                         <span>参演演员：</span>
@@ -38,7 +38,6 @@
                             @click="goToActor(actor.id)"
                         >{{ actor.name }}</a>
                     </div>
-                    <div class="info-row-note" v-if="video.note">{{ video.note }}</div>
                 </div>
             </div>
 
@@ -227,13 +226,6 @@ const handleLike = async () => {
     } catch (error) {
         console.error('点赞失败:', error)
     }
-}
-
-const getSambaDisplayName = (path) => {
-    if (!path) return ''
-    // 取最后一个路径段作为友好名称
-    const parts = path.split('/').filter(Boolean)
-    return parts[parts.length - 1] || path
 }
 
 const formatSize = (bytes) => {

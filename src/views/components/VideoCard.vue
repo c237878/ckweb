@@ -4,23 +4,28 @@
       <input type="checkbox" :checked="selected" @change.stop="handleSelect" />
     </div>
     <div class="video-cover">
-      <img v-if="video.hasCover" :src="`/api/video/cover/${video.id}`" :alt="video.name" @error="$event.target.style.display='none'" />
-      <div v-if="!video.hasCover" class="no-cover">{{ video.name?.charAt(0) || '?' }}</div>
+      <img v-if="video.coverPath" :src="`/api/video/cover/${video.id}`" :alt="video.name" @error="$event.target.style.display='none'" />
+      <div v-if="!video.coverPath" class="no-cover">{{ video.name?.charAt(0) || '?' }}</div>
     </div>
     <div class="video-body">
       <!-- 完全模式 / 展示模式 -->
       <template v-if="mode !== 'brief'">
         <div class="row1">
+          <span v-if="video.code" class="code">{{ video.code }}</span>
           <span class="name">{{ video.name }}</span>
         </div>
-        <div class="row2" v-if="video.category || video.country">
+        <div class="row2" v-if="video.category || video.country || video.seriesName">
+          <span v-if="video.seriesName" class="series-tag">{{ video.seriesName }}</span>
           <span v-if="video.category" class="type-tag">{{ video.category }}</span>
           <span v-if="video.country" class="country-tag">{{ video.country }}</span>
         </div>
       </template>
       <!-- 简介模式 -->
       <template v-else>
-        <div class="brief-name">{{ video.name }}</div>
+        <div class="brief-row">
+          <span v-if="video.code" class="brief-code">{{ video.code }}</span>
+          <span class="brief-name">{{ video.name }}</span>
+        </div>
         <div class="brief-actors" v-if="video.actors && video.actors.length > 0">
           {{ video.actors.map(a => a.name).join(', ') }}
         </div>
@@ -110,7 +115,6 @@ const handleEdit = () => {
   cursor: pointer;
 }
 
-/* 简介模式：更小巧 */
 .mode-brief {
   font-size: 12px;
 }
@@ -159,17 +163,6 @@ const handleEdit = () => {
   font-size: 14px;
 }
 
-.quality-badge {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  background: rgba(0, 0, 0, 0.6);
-  color: white;
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-}
-
 .video-body {
   padding: 12px 16px;
   flex: 1;
@@ -187,10 +180,13 @@ const handleEdit = () => {
 }
 
 .code {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: bold;
-  color: #333;
+  color: #1976d2;
   flex-shrink: 0;
+  background: #e3f2fd;
+  padding: 1px 6px;
+  border-radius: 3px;
 }
 
 .name {
@@ -205,31 +201,54 @@ const handleEdit = () => {
 .row2 {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   font-size: 12px;
   color: #666;
   overflow: hidden;
-  text-overflow: ellipsis;
+  flex-wrap: wrap;
+}
+
+.series-tag {
+  background: #fff3e0;
+  color: #e65100;
+  padding: 1px 6px;
+  border-radius: 3px;
   white-space: nowrap;
 }
 
 .type-tag {
+  background: #e8f5e9;
+  color: #2e7d32;
+  padding: 1px 6px;
+  border-radius: 3px;
   white-space: nowrap;
-  flex-shrink: 0;
 }
 
 .country-tag {
+  background: #f3e5f5;
+  color: #7b1fa2;
+  padding: 1px 6px;
+  border-radius: 3px;
   white-space: nowrap;
-  flex-shrink: 0;
 }
 
-.actors {
+.brief-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-/* 简介模式样式 */
+.brief-code {
+  font-size: 11px;
+  font-weight: bold;
+  color: #1976d2;
+  flex-shrink: 0;
+  background: #e3f2fd;
+  padding: 1px 4px;
+  border-radius: 2px;
+}
+
 .brief-name {
   font-size: 13px;
   font-weight: 600;

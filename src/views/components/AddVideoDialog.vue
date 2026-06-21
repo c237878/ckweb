@@ -6,6 +6,17 @@
         <input v-model="form.name" type="text" placeholder="影片名称（必填）" />
       </div>
       <div class="form-item">
+        <label>番号</label>
+        <input v-model="form.code" type="text" placeholder="如: ABC-123" />
+      </div>
+      <div class="form-item">
+        <label>所属系列</label>
+        <select v-model="form.seriesId">
+          <option value="">未选择</option>
+          <option v-for="s in seriesList" :key="s.id" :value="s.id">{{ s.name }}</option>
+        </select>
+      </div>
+      <div class="form-item">
         <label>分类</label>
         <div class="combobox-wrap">
           <input
@@ -29,12 +40,12 @@
         </div>
       </div>
       <div class="form-item">
-        <label>国家</label>
+        <label>地区</label>
         <div class="combobox-wrap">
           <input
             v-model="form.country"
             type="text"
-            placeholder="选择或输入国家"
+            placeholder="选择或输入地区"
             @focus="showCountryDropdown = true"
             @blur="hideDropdown('country')"
           />
@@ -47,16 +58,9 @@
             >
               {{ c }}
             </div>
-            <div v-if="filteredCountries.length === 0" class="combobox-empty">暂无已有国家</div>
+            <div v-if="filteredCountries.length === 0" class="combobox-empty">暂无已有地区</div>
           </div>
         </div>
-      </div>
-      <div class="form-item">
-        <label>所属Samba目录</label>
-        <select v-model="form.sambaDir" @change="onSambaDirChange">
-          <option value="">未选择</option>
-          <option v-for="samba in sambaList" :key="samba.id" :value="samba.path">{{ samba.name }} ({{ samba.path }})</option>
-        </select>
       </div>
       <div class="form-item">
         <label>文件路径</label>
@@ -104,7 +108,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { videoApi, actorApi, sambaApi } from '@/scripts/api'
+import { videoApi, actorApi } from '@/scripts/api'
 import Dialog from './Dialog.vue'
 
 const props = defineProps({
@@ -114,18 +118,18 @@ const props = defineProps({
 
 const emit = defineEmits(['save', 'cancel', 'delete'])
 
-const sambaList = ref([])
 const actorList = ref([])
 const selectedActors = ref([])
 const actorSearch = ref('')
 const matchedActors = ref([])
-const meta = ref({ categories: [], countries: [] })
+const meta = ref({ categories: [], countries: [], series: [] })
 
 const showCatDropdown = ref(false)
 const showCountryDropdown = ref(false)
 
+const seriesList = computed(() => meta.value.series || [])
+
 const filteredCategories = computed(() => {
-  // 获得焦点时显示全部已有值，输入后按关键词过滤
   if (showCatDropdown.value) return meta.value.categories || []
   if (!form.value.category) return meta.value.categories || []
   return (meta.value.categories || []).filter(c => c.includes(form.value.category))
@@ -139,11 +143,12 @@ const filteredCountries = computed(() => {
 
 const form = ref({
   name: '',
+  code: '',
   category: '',
   country: '',
+  seriesId: '',
   filePath: '',
-  coverPath: '',
-  sambaDir: ''
+  coverPath: ''
 })
 
 const selectCategory = (val) => {
@@ -163,87 +168,25 @@ const hideDropdown = (type) => {
   }, 200)
 }
 
-watch(() => props.visible, async (newVal) => {
-  if (newVal) {
-    await Promise.all([loadActors(), loadSambaList(), loadMeta()])
-    if (props.editingVideo) {
-      form.value = {
-        name: props.editingVideo.name || '',
-        category: props.editingVideo.category || '',
-        country: props.editingVideo.country || '',
-        filePath: props.editingVideo.filePath || '',
-        coverPath: props.editingVideo.coverPath || '',
-        sambaDir: props.editingVideo.sambaDir || ''
-      }
-      await loadVideoActors(props.editingVideo.id)
-    } else {
-      resetForm()
-    }
+const searchActors = async () => {
+  if (!actorSearch.value.trim()) {
+    matchedActors.value = []
+    return
   }
-})
-
-const loadMeta = async () => {
   try {
-    const res = await videoApi.getMeta()
+    const res = await actorApi.search(actorSearch.value.trim())
     if (res.success) {
-      meta.value = res
+      matchedActors.value = (res.data || []).filter(a => !selectedActors.value.some(s => s.id === a.id))
     }
-  } catch (e) {
-    console.error('加载元数据失败', e)
+  } catch (error) {
+    console.error('搜索演员失败:', error)
   }
-}
-
-const loadActors = async () => {
-  try {
-    const res = await actorApi.getList({ page: 1, pageSize: 1000 })
-    if (res.success) actorList.value = res.data || []
-  } catch (e) {
-    console.error('加载演员失败:', e)
-  }
-}
-
-const loadSambaList = async () => {
-  try {
-    const res = await sambaApi.getList()
-    if (res.success) sambaList.value = res.data || []
-  } catch (e) {
-    console.error('加载Samba列表失败:', e)
-  }
-}
-
-const loadVideoActors = async (videoId) => {
-  try {
-    const res = await videoApi.getDetail(videoId)
-    if (res.success && res.data && res.data.video) {
-      form.value.name = res.data.video.name || res.data.video.title || ''
-      form.value.category = res.data.video.category || ''
-      form.value.country = res.data.video.country || ''
-      form.value.filePath = res.data.video.filePath || ''
-      form.value.coverPath = res.data.video.coverPath || res.data.video.cover_path || ''
-      form.value.sambaDir = res.data.video.sambaDir || res.data.video.samba_dir || ''
-      selectedActors.value = res.data.actors || []
-    }
-  } catch (e) {
-    console.error('加载视频演员失败:', e)
-  }
-}
-
-const onSambaDirChange = () => {
-  if (!form.value.sambaDir) return
-  form.value.filePath = form.value.sambaDir + '/'
-}
-
-const searchActors = () => {
-  if (!actorSearch.value) { matchedActors.value = []; return }
-  const kw = actorSearch.value.toLowerCase()
-  matchedActors.value = actorList.value.filter(a =>
-    !selectedActors.value.find(s => s.id === a.id) &&
-    a.name.toLowerCase().includes(kw)
-  ).slice(0, 10)
 }
 
 const addActor = (actor) => {
-  if (!selectedActors.value.find(a => a.id === actor.id)) selectedActors.value.push(actor)
+  if (!selectedActors.value.some(a => a.id === actor.id)) {
+    selectedActors.value.push(actor)
+  }
   actorSearch.value = ''
   matchedActors.value = []
 }
@@ -252,50 +195,112 @@ const removeActor = (actorId) => {
   selectedActors.value = selectedActors.value.filter(a => a.id !== actorId)
 }
 
+const loadMeta = async () => {
+  try {
+    const res = await videoApi.getMeta()
+    if (res.success) {
+      meta.value = {
+        categories: res.categories || [],
+        countries: res.countries || [],
+        series: res.series || []
+      }
+    }
+  } catch (error) {
+    console.error('加载元数据失败:', error)
+  }
+}
+
+const loadActorList = async () => {
+  try {
+    const res = await actorApi.getList()
+    if (res.success) {
+      actorList.value = res.data || []
+    }
+  } catch (error) {
+    console.error('加载演员列表失败:', error)
+  }
+}
+
+watch(() => props.visible, async (val) => {
+  if (val) {
+    await Promise.all([loadMeta(), loadActorList()])
+    if (props.editingVideo) {
+      form.value = {
+        name: props.editingVideo.name || '',
+        code: props.editingVideo.code || '',
+        category: props.editingVideo.category || '',
+        country: props.editingVideo.country || '',
+        seriesId: props.editingVideo.seriesId || '',
+        filePath: props.editingVideo.filePath || props.editingVideo.videoUrl || '',
+        coverPath: props.editingVideo.coverPath || props.editingVideo.coverUrl || ''
+      }
+      selectedActors.value = props.editingVideo.actors || []
+    } else {
+      resetForm()
+    }
+  }
+})
+
 const resetForm = () => {
-  form.value = { name: '', category: '', country: '', filePath: '', coverPath: '', sambaDir: '' }
+  form.value = {
+    name: '',
+    code: '',
+    category: '',
+    country: '',
+    seriesId: '',
+    filePath: '',
+    coverPath: ''
+  }
   selectedActors.value = []
   actorSearch.value = ''
   matchedActors.value = []
 }
 
 const handleSave = () => {
-  if (!form.value.name) { alert('请填写影片名称'); return }
+  if (!form.value.name.trim()) {
+    alert('请输入影片名称')
+    return
+  }
   emit('save', {
     id: props.editingVideo?.id,
-    title: form.value.name,
+    name: form.value.name,
+    code: form.value.code,
     category: form.value.category,
     country: form.value.country,
+    seriesId: form.value.seriesId,
     filePath: form.value.filePath,
     coverPath: form.value.coverPath,
-    sambaDir: form.value.sambaDir,
     actorIds: selectedActors.value.map(a => a.id)
   })
 }
 
-const handleCancel = () => { resetForm(); emit('cancel') }
-const handleDelete = () => { if (props.editingVideo?.id) emit('delete', props.editingVideo.id) }
+const handleCancel = () => {
+  emit('cancel')
+}
+
+const handleDelete = () => {
+  emit('delete', props.editingVideo?.id)
+}
 </script>
 
 <style scoped>
-.form-item { margin-bottom: 20px; }
-.form-item label { display: block; margin-bottom: 8px; font-weight: bold; color: #333; }
-.form-item input, .form-item select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
+.form-item { margin-bottom: 16px; }
+.form-item label { display: block; margin-bottom: 6px; font-size: 14px; color: #666; }
+.form-item input, .form-item select { width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; box-sizing: border-box; }
 .combobox-wrap { position: relative; }
-.combobox-wrap input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
-.combobox-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ddd; border-radius: 4px; max-height: 200px; overflow-y: auto; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-.combobox-option { padding: 10px; cursor: pointer; transition: background 0.2s; }
+.combobox-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid #ddd; border-radius: 4px; margin-top: 4px; max-height: 200px; overflow-y: auto; z-index: 10; }
+.combobox-option { padding: 8px 12px; cursor: pointer; }
 .combobox-option:hover { background: #f5f5f5; }
-.combobox-empty { padding: 10px; color: #999; font-size: 13px; }
+.combobox-empty { padding: 8px 12px; color: #999; font-size: 13px; }
+.actor-selector { border: 1px solid #ddd; border-radius: 4px; padding: 8px; }
+.selected-actors { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.actor-tag { background: #e3f2fd; color: #1976d2; padding: 4px 8px; border-radius: 4px; font-size: 13px; display: flex; align-items: center; gap: 4px; }
+.remove-btn { background: none; border: none; color: #1976d2; cursor: pointer; font-size: 16px; line-height: 1; }
 .input-with-suggestions { position: relative; }
-.suggestions { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ddd; border-radius: 4px; max-height: 200px; overflow-y: auto; z-index: 10; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-.suggestion-item { padding: 10px; cursor: pointer; transition: background 0.2s; }
+.input-with-suggestions input { width: 100%; padding: 6px 10px; border: 1px solid #eee; border-radius: 3px; }
+.suggestions { position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid #ddd; border-radius: 4px; margin-top: 2px; max-height: 150px; overflow-y: auto; z-index: 10; }
+.suggestion-item { padding: 6px 10px; cursor: pointer; font-size: 13px; }
 .suggestion-item:hover { background: #f5f5f5; }
-.actor-selector { display: flex; flex-direction: column; gap: 10px; }
-.selected-actors { display: flex; flex-wrap: wrap; gap: 8px; }
-.actor-tag { display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px; background: #3498db; color: white; border-radius: 15px; font-size: 13px; }
-.remove-btn { background: none; border: none; color: white; font-size: 16px; cursor: pointer; padding: 0 5px; line-height: 1; }
-.remove-btn:hover { opacity: 0.8; }
-.delete-btn { padding: 10px 30px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; background: #e74c3c; color: white; margin-right: auto; }
-.delete-btn:hover { opacity: 0.8; }
+.delete-btn { padding: 8px 16px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; }
+.delete-btn:hover { background: #c0392b; }
 </style>

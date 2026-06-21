@@ -51,15 +51,29 @@ export const settingApi = {
   delete: (id) => api.delete(`/systemsetting/${id}`)
 }
 
-// Samba共享相关API
-export const sambaApi = {
-  getList: () => api.get('/samba/list'),
-  getSystemShares: () => api.get('/samba/system-shares'),
-  getById: (id) => api.get(`/samba/${id}`),
-  add: (data) => api.post('/samba/add', data),
-  update: (id, data) => api.put(`/samba/${id}`, data),
-  delete: (id) => api.delete(`/samba/${id}`),
-  importSystem: () => api.post('/samba/import-system')
+// 系列相关API
+export const seriesApi = {
+  getList: (params) => api.get('/series/list', { params }),
+  getDetail: (id) => api.get(`/series/${id}`),
+  add: (data) => api.post('/series', data),
+  update: (id, data) => api.put(`/series/${id}`, data),
+  delete: (id) => api.delete(`/series/${id}`)
+}
+
+// 扫描目录相关API
+export const scanDirectoryApi = {
+  getList: () => api.get('/scan-directory'),
+  add: (data) => api.post('/scan-directory', data),
+  update: (id, data) => api.put(`/scan-directory/${id}`, data),
+  delete: (id) => api.delete(`/scan-directory/${id}`)
+}
+
+// 视频类型相关API
+export const videoTypeApi = {
+  getList: () => api.get('/video-type'),
+  add: (data) => api.post('/video-type', data),
+  update: (id, data) => api.put(`/video-type/${id}`, data),
+  delete: (id) => api.delete(`/video-type/${id}`)
 }
 
 export default api
