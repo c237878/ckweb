@@ -2,42 +2,12 @@
   <Dialog :visible="visible" :title="editingVideo ? '编辑影片' : '添加影片'" @confirm="handleSave" @cancel="handleCancel">
     <template #content>
       <div class="form-item">
-        <label>名称 *</label>
-        <input v-model="form.name" type="text" placeholder="影片名称（必填）" />
-      </div>
-      <div class="form-item">
         <label>番号</label>
         <input v-model="form.code" type="text" placeholder="如: ABC-123" />
       </div>
       <div class="form-item">
-        <label>所属系列</label>
-        <select v-model="form.seriesId">
-          <option value="">未选择</option>
-          <option v-for="s in seriesList" :key="s.id" :value="s.id">{{ s.name }}</option>
-        </select>
-      </div>
-      <div class="form-item">
-        <label>分类</label>
-        <div class="combobox-wrap">
-          <input
-            v-model="form.category"
-            type="text"
-            placeholder="选择或输入分类"
-            @focus="showCatDropdown = true"
-            @blur="hideDropdown('cat')"
-          />
-          <div v-if="showCatDropdown" class="combobox-dropdown">
-            <div
-              v-for="c in filteredCategories"
-              :key="c"
-              class="combobox-option"
-              @mousedown.prevent="selectCategory(c)"
-            >
-              {{ c }}
-            </div>
-            <div v-if="filteredCategories.length === 0" class="combobox-empty">暂无已有分类</div>
-          </div>
-        </div>
+        <label>名称 *</label>
+        <input v-model="form.name" type="text" placeholder="影片名称（必填）" />
       </div>
       <div class="form-item">
         <label>地区</label>
@@ -63,11 +33,57 @@
         </div>
       </div>
       <div class="form-item">
-        <label>文件路径</label>
+        <label>分类</label>
+        <div class="combobox-wrap">
+          <input
+            v-model="form.category"
+            type="text"
+            placeholder="选择或输入分类"
+            @focus="showCatDropdown = true"
+            @blur="hideDropdown('cat')"
+          />
+          <div v-if="showCatDropdown" class="combobox-dropdown">
+            <div
+              v-for="c in filteredCategories"
+              :key="c"
+              class="combobox-option"
+              @mousedown.prevent="selectCategory(c)"
+            >
+              {{ c }}
+            </div>
+            <div v-if="filteredCategories.length === 0" class="combobox-empty">暂无已有分类</div>
+          </div>
+        </div>
+      </div>
+      <div class="form-item">
+        <label>所属系列</label>
+        <div class="combobox-wrap">
+          <input
+            v-model="seriesInput"
+            type="text"
+            placeholder="选择或输入系列名称"
+            @focus="showSeriesDropdown = true"
+            @blur="hideDropdown('series')"
+          />
+          <div v-if="showSeriesDropdown" class="combobox-dropdown">
+            <div
+              v-for="s in filteredSeries"
+              :key="s.id"
+              class="combobox-option"
+              @mousedown.prevent="selectSeries(s)"
+            >
+              {{ s.name }}
+            </div>
+            <div v-if="filteredSeries.length === 0" class="combobox-empty">暂无已有系列</div>
+          </div>
+        </div>
+      </div>
+      <div class="form-item">
+        <label>视频路径</label>
         <input v-model="form.filePath" type="text" placeholder="视频文件完整路径（如 /Volumes/disk1/movies/...）" />
       </div>
       <div class="form-item">
-        <label>封面图片路径</label>
+        <label>封面路径</label>
         <input v-model="form.coverPath" type="text" placeholder="封面图片路径（选填，如 /Volumes/disk1/cover.jpg）" />
       </div>
       <div class="form-item">
@@ -126,6 +142,9 @@ const meta = ref({ categories: [], countries: [], series: [] })
 
 const showCatDropdown = ref(false)
 const showCountryDropdown = ref(false)
+const showSeriesDropdown = ref(false)
+
+const seriesInput = ref('')
 
 const seriesList = computed(() => meta.value.series || [])
 
@@ -139,6 +158,12 @@ const filteredCountries = computed(() => {
   if (showCountryDropdown.value) return meta.value.countries || []
   if (!form.value.country) return meta.value.countries || []
   return (meta.value.countries || []).filter(c => c.includes(form.value.country))
+})
+
+const filteredSeries = computed(() => {
+  if (showSeriesDropdown.value) return seriesList.value
+  if (!seriesInput.value) return seriesList.value
+  return seriesList.value.filter(s => s.name.includes(seriesInput.value))
 })
 
 const form = ref({
@@ -161,10 +186,27 @@ const selectCountry = (val) => {
   showCountryDropdown.value = false
 }
 
+const selectSeries = (s) => {
+  form.value.seriesId = s.id
+  seriesInput.value = s.name
+  showSeriesDropdown.value = false
+}
+
 const hideDropdown = (type) => {
   setTimeout(() => {
     if (type === 'cat') showCatDropdown.value = false
     if (type === 'country') showCountryDropdown.value = false
+    if (type === 'series') {
+      showSeriesDropdown.value = false
+      // 如果输入了文字但没选中已有系列，则清空seriesId（允许自由输入，但seriesId只有选中已有才有效）
+      const matched = seriesList.value.find(s => s.name === seriesInput.value)
+      if (matched) {
+        form.value.seriesId = matched.id
+      } else {
+        // 自由输入不对应已有系列ID，保持seriesId为空
+        form.value.seriesId = ''
+      }
+    }
   }, 200)
 }
 
@@ -174,9 +216,9 @@ const searchActors = async () => {
     return
   }
   try {
-    const res = await actorApi.search(actorSearch.value.trim())
+    const res = await actorApi.getList({ keyword: actorSearch.value.trim(), pageSize: 50 })
     if (res.success) {
-      matchedActors.value = (res.data || []).filter(a => !selectedActors.value.some(s => s.id === a.id))
+      matchedActors.value = (res.data?.items || res.data || []).filter(a => !selectedActors.value.some(s => s.id === a.id))
     }
   } catch (error) {
     console.error('搜索演员失败:', error)
@@ -234,6 +276,12 @@ watch(() => props.visible, async (val) => {
         filePath: props.editingVideo.filePath || props.editingVideo.videoUrl || '',
         coverPath: props.editingVideo.coverPath || props.editingVideo.coverUrl || ''
       }
+      // 设置系列输入框显示名称
+      if (props.editingVideo.seriesId && props.editingVideo.seriesName) {
+        seriesInput.value = props.editingVideo.seriesName
+      } else {
+        seriesInput.value = ''
+      }
       selectedActors.value = props.editingVideo.actors || []
     } else {
       resetForm()
@@ -251,6 +299,7 @@ const resetForm = () => {
     filePath: '',
     coverPath: ''
   }
+  seriesInput.value = ''
   selectedActors.value = []
   actorSearch.value = ''
   matchedActors.value = []

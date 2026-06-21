@@ -34,6 +34,7 @@
           <div class="scan-info">
             <div class="scan-path">{{ item.path }}</div>
             <div class="scan-meta">
+              <span class="meta-tag" v-if="item.category">{{ item.category }}</span>
               <span class="meta-tag" v-if="item.recursive">递归</span>
             </div>
           </div>
@@ -58,6 +59,21 @@
           <div class="form-group">
             <label>目录路径 *</label>
             <input v-model="scanDirForm.path" placeholder="如: /Volumes/wdc4t/视频" />
+          </div>
+          <div class="form-group">
+            <label>分类</label>
+            <div class="combobox-wrap">
+              <input
+                v-model="scanDirForm.category"
+                placeholder="选择或输入分类"
+                @focus="showCatDropdown = true"
+                @blur="hideCatDropdown"
+              />
+              <div v-if="showCatDropdown" class="combobox-dropdown">
+                <div class="combobox-option" @mousedown.prevent="selectCat('')">（无分类）</div>
+                <div v-for="c in categories" :key="c" class="combobox-option" @mousedown.prevent="selectCat(c)">{{ c }}</div>
+              </div>
+            </div>
           </div>
           <div class="form-group form-check">
             <label><input type="checkbox" v-model="scanDirForm.recursive" /> 递归扫描子目录</label>
@@ -103,7 +119,21 @@ function clearDialogTip() {
 const scanDirList = ref([])
 const showScanDirDialog = ref(false)
 const editingScanDir = ref(null)
-const scanDirForm = ref({ path: '', recursive: true })
+const scanDirForm = ref({ path: '', recursive: true, category: '' })
+const showCatDropdown = ref(false)
+const categories = ref([])
+
+const hideCatDropdown = () => { setTimeout(() => { showCatDropdown.value = false }, 200) }
+const selectCat = (val) => { scanDirForm.value.category = val; showCatDropdown.value = false }
+
+const loadCategories = async () => {
+  try {
+    const res = await videoApi.getMeta()
+    if (res.success) categories.value = res.categories || []
+  } catch (error) {
+    console.error('加载分类失败:', error)
+  }
+}
 const saving = ref(false)
 const scanning = ref(false)
 
@@ -124,6 +154,7 @@ function closeScanDirDialog() {
 onMounted(async () => {
   await loadSettings()
   await loadScanDirList()
+  await loadCategories()
 })
 
 const loadSettings = async () => {
@@ -186,7 +217,7 @@ const loadScanDirList = async () => {
 
 const openAddScanDirDialog = () => {
   editingScanDir.value = null
-  scanDirForm.value = { path: '', recursive: true }
+  scanDirForm.value = { path: '', recursive: true, category: '' }
   clearDialogTip()
   showScanDirDialog.value = true
 }
@@ -195,7 +226,8 @@ const openEditScanDirDialog = (item) => {
   editingScanDir.value = item
   scanDirForm.value = {
     path: item.path,
-    recursive: item.recursive
+    recursive: item.recursive,
+    category: item.category || ''
   }
   clearDialogTip()
   showScanDirDialog.value = true
@@ -260,25 +292,17 @@ const scanAllDirs = async () => {
   if (scanDirList.value.length === 0) return
   if (!confirm(`确定扫描全部 ${scanDirList.value.length} 个目录吗？`)) return
   scanning.value = true
-  const results = []
-  for (const dir of scanDirList.value) {
-    try {
-      const res = await videoApi.scan({ targetPath: dir.path, recursive: dir.recursive })
-      results.push({ path: dir.path, success: res.success, taskId: res.data?.taskId, message: res.message })
-    } catch (error) {
-      results.push({ path: dir.path, success: false, message: error.message })
+  try {
+    const res = await videoApi.scanAll()
+    if (res.success) {
+      showPageTip(`扫描任务已启动！任务ID: ${res.data?.taskId}`, 'success')
+    } else {
+      showPageTip(res.message || '扫描失败', 'error')
     }
+  } catch (error) {
+    showPageTip('扫描失败: ' + error.message, 'error')
   }
   scanning.value = false
-  const successCount = results.filter(r => r.success).length
-  const taskIds = results.filter(r => r.success).map(r => r.taskId).join(', ')
-  if (successCount > 0) {
-    showPageTip(`扫描任务已启动 ${successCount}/${scanDirList.value.length}！任务ID: ${taskIds}`, 'success')
-  }
-  const failCount = results.filter(r => !r.success).length
-  if (failCount > 0) {
-    showPageTip(`${failCount} 个目录扫描失败，请检查后端日志`, 'error')
-  }
 }
 </script>
 
@@ -362,4 +386,10 @@ h2 { margin-bottom: 16px; font-size: 18px; color: #555; display: flex; align-ite
 
 /* 弹窗内提示 */
 .dialog-tip { color: #d32f2f; font-size: 13px; margin-right: auto; }
+
+/* Combobox */
+.combobox-wrap { position: relative; }
+.combobox-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid #ddd; border-radius: 4px; margin-top: 4px; max-height: 200px; overflow-y: auto; z-index: 10; }
+.combobox-option { padding: 8px 12px; cursor: pointer; }
+.combobox-option:hover { background: #f5f5f5; }
 </style>
