@@ -23,7 +23,6 @@
           <div class="scan-info">
             <div class="scan-path">{{ item.path }}</div>
             <div class="scan-meta">
-              <span class="meta-tag">{{ item.videoTypes || 'mp4' }}</span>
               <span class="meta-tag" v-if="item.recursive">递归</span>
               <span class="meta-tag" :class="{ disabled: !item.isEnabled }">
                 {{ item.isEnabled ? '已启用' : '已禁用' }}
@@ -40,27 +39,6 @@
       <div class="empty-tip" v-else>暂无扫描目录，点击上方按钮添加</div>
     </div>
 
-    <!-- 视频类型管理 -->
-    <div class="settings-section">
-      <h2>
-        视频类型
-        <button class="add-btn" @click="openAddVideoTypeDialog">+ 添加类型</button>
-      </h2>
-      <div class="type-list" v-if="videoTypeList.length > 0">
-        <div class="type-item" v-for="item in videoTypeList" :key="item.id">
-          <div class="type-info">
-            <span class="type-name">{{ item.name }}</span>
-            <span class="type-ext">{{ item.extensions }}</span>
-          </div>
-          <div class="type-actions">
-            <button class="btn-edit" @click="openEditVideoTypeDialog(item)">编辑</button>
-            <button class="btn-delete" @click="deleteVideoType(item)">删除</button>
-          </div>
-        </div>
-      </div>
-      <div class="empty-tip" v-else>暂无视频类型，点击上方按钮添加</div>
-    </div>
-
     <!-- 扫描目录弹窗 -->
     <div class="dialog-overlay" v-if="showScanDirDialog"
          @mousedown="handleScanDirOverlayDown"
@@ -73,10 +51,6 @@
           <div class="form-group">
             <label>目录路径 *</label>
             <input v-model="scanDirForm.path" placeholder="如: /Volumes/wdc4t/视频" />
-          </div>
-          <div class="form-group">
-            <label>视频类型（逗号分隔）</label>
-            <input v-model="scanDirForm.videoTypes" placeholder="如: mp4,mkv,avi" />
           </div>
           <div class="form-group form-check">
             <label><input type="checkbox" v-model="scanDirForm.recursive" /> 递归扫描子目录</label>
@@ -91,35 +65,6 @@
         </div>
       </div>
     </div>
-
-    <!-- 视频类型弹窗 -->
-    <div class="dialog-overlay" v-if="showVideoTypeDialog"
-         @mousedown="handleVideoTypeOverlayDown"
-         @click="handleVideoTypeOverlayClick">
-      <div class="dialog">
-        <div class="dialog-header">
-          <h3>{{ editingVideoType ? '编辑视频类型' : '添加视频类型' }}</h3>
-        </div>
-        <div class="dialog-body">
-          <div class="form-group">
-            <label>类型名称 *</label>
-            <input v-model="videoTypeForm.name" placeholder="如: mp4" />
-          </div>
-          <div class="form-group">
-            <label>扩展名（逗号分隔）</label>
-            <input v-model="videoTypeForm.extensions" placeholder="如: .mp4,.m4v" />
-          </div>
-          <div class="form-group">
-            <label>排序</label>
-            <input type="number" v-model.number="videoTypeForm.sortOrder" />
-          </div>
-        </div>
-        <div class="dialog-footer">
-          <button class="btn btn-cancel" @click="showVideoTypeDialog = false">取消</button>
-          <button class="btn btn-confirm" @click="saveVideoType" :disabled="saving">{{ saving ? '保存中...' : '保存' }}</button>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -128,20 +73,15 @@ import { ref, onMounted } from 'vue'
 import { settingApi, videoApi } from '@/scripts/api'
 
 const settingsList = ref([
-  { id: 'siteName', label: '网站名称', value: '', placeholder: '影视网站' }
+  { id: 'siteName', label: '网站名称', value: '', placeholder: '影视网站' },
+  { id: 'scanType', label: '扫描类型', value: '', placeholder: '如: .mp4,.mkv,.avi（多个后缀以逗号分隔）' }
 ])
 
 // 扫描目录
 const scanDirList = ref([])
 const showScanDirDialog = ref(false)
 const editingScanDir = ref(null)
-const scanDirForm = ref({ path: '', videoTypes: 'mp4', recursive: true, isEnabled: true })
-
-// 视频类型
-const videoTypeList = ref([])
-const showVideoTypeDialog = ref(false)
-const editingVideoType = ref(null)
-const videoTypeForm = ref({ name: '', extensions: '', sortOrder: 0 })
+const scanDirForm = ref({ path: '', recursive: true, isEnabled: true })
 
 const saving = ref(false)
 
@@ -154,18 +94,10 @@ function handleScanDirOverlayDown(e) {
 function handleScanDirOverlayClick() {
   if (!mouseDownOnDialog) showScanDirDialog.value = false
 }
-function handleVideoTypeOverlayDown(e) {
-  const dialog = e.currentTarget.querySelector('.dialog')
-  mouseDownOnDialog = dialog && dialog.contains(e.target)
-}
-function handleVideoTypeOverlayClick() {
-  if (!mouseDownOnDialog) showVideoTypeDialog.value = false
-}
 
 onMounted(async () => {
   await loadSettings()
   await loadScanDirList()
-  await loadVideoTypeList()
 })
 
 const loadSettings = async () => {
@@ -202,7 +134,7 @@ const loadScanDirList = async () => {
 
 const openAddScanDirDialog = () => {
   editingScanDir.value = null
-  scanDirForm.value = { path: '', videoTypes: 'mp4', recursive: true, isEnabled: true }
+  scanDirForm.value = { path: '', recursive: true, isEnabled: true }
   showScanDirDialog.value = true
 }
 
@@ -210,7 +142,6 @@ const openEditScanDirDialog = (item) => {
   editingScanDir.value = item
   scanDirForm.value = {
     path: item.path,
-    videoTypes: item.videoTypes,
     recursive: item.recursive,
     isEnabled: item.isEnabled
   }
@@ -275,77 +206,6 @@ const scanDir = async (item) => {
     alert('扫描失败：' + error.message)
   }
 }
-
-// 视频类型管理
-const loadVideoTypeList = async () => {
-  try {
-    const res = await fetch('/api/videotype').then(r => r.json())
-    if (res.success) videoTypeList.value = res.data || []
-  } catch (error) {
-    console.error('加载视频类型失败:', error)
-  }
-}
-
-const openAddVideoTypeDialog = () => {
-  editingVideoType.value = null
-  videoTypeForm.value = { name: '', extensions: '', sortOrder: 0 }
-  showVideoTypeDialog.value = true
-}
-
-const openEditVideoTypeDialog = (item) => {
-  editingVideoType.value = item
-  videoTypeForm.value = {
-    name: item.name,
-    extensions: item.extensions,
-    sortOrder: item.sortOrder
-  }
-  showVideoTypeDialog.value = true
-}
-
-const saveVideoType = async () => {
-  if (!videoTypeForm.value.name) {
-    alert('类型名称不能为空')
-    return
-  }
-  saving.value = true
-  try {
-    let res
-    if (editingVideoType.value) {
-      res = await fetch(`/api/videotype/${editingVideoType.value.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(videoTypeForm.value)
-      }).then(r => r.json())
-    } else {
-      res = await fetch('/api/videotype', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(videoTypeForm.value)
-      }).then(r => r.json())
-    }
-    if (res.success) {
-      showVideoTypeDialog.value = false
-      await loadVideoTypeList()
-    } else {
-      alert(res.message || '保存失败')
-    }
-  } catch (error) {
-    alert('保存失败: ' + error.message)
-  } finally {
-    saving.value = false
-  }
-}
-
-const deleteVideoType = async (item) => {
-  if (!confirm(`确定删除视频类型 "${item.name}" 吗？`)) return
-  try {
-    const res = await fetch(`/api/videotype/${item.id}`, { method: 'DELETE' }).then(r => r.json())
-    if (res.success) await loadVideoTypeList()
-    else alert(res.message || '删除失败')
-  } catch (error) {
-    alert('删除失败: ' + error.message)
-  }
-}
 </script>
 
 <style scoped>
@@ -361,16 +221,14 @@ h2 { margin-bottom: 16px; font-size: 18px; color: #555; display: flex; align-ite
 .add-btn { padding: 6px 12px; background: #42b883; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
 .add-btn:hover { background: #369870; }
 
-.scan-list, .type-list { margin-top: 12px; }
-.scan-item, .type-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; border: 1px solid #eee; border-radius: 6px; margin-bottom: 8px; }
-.scan-info, .type-info { flex: 1; }
+.scan-list { margin-top: 12px; }
+.scan-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; border: 1px solid #eee; border-radius: 6px; margin-bottom: 8px; }
+.scan-info { flex: 1; }
 .scan-path { font-weight: 500; color: #333; }
 .scan-meta { margin-top: 4px; display: flex; gap: 8px; }
 .meta-tag { font-size: 12px; padding: 2px 6px; background: #e8f5e9; color: #2e7d32; border-radius: 3px; }
 .meta-tag.disabled { background: #f5f5f5; color: #999; }
-.type-name { font-weight: 500; color: #333; }
-.type-ext { margin-left: 12px; color: #999; font-size: 13px; }
-.scan-actions, .type-actions { display: flex; gap: 8px; }
+.scan-actions { display: flex; gap: 8px; }
 .btn-scan, .btn-edit, .btn-delete { padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
 .btn-scan { background: #1976d2; color: #fff; }
 .btn-edit { background: #ff9800; color: #fff; }

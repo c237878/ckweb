@@ -68,12 +68,4 @@ export const scanDirectoryApi = {
   delete: (id) => api.delete(`/scan-directory/${id}`)
 }
 
-// 视频类型相关API
-export const videoTypeApi = {
-  getList: () => api.get('/video-type'),
-  add: (data) => api.post('/video-type', data),
-  update: (id, data) => api.put(`/video-type/${id}`, data),
-  delete: (id) => api.delete(`/video-type/${id}`)
-}
-
 export default api
