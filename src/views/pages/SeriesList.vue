@@ -5,43 +5,54 @@
       <button class="add-btn" @click="showAddDialog = true">添加系列</button>
     </div>
     <div class="filters">
-      <select v-model="filters.country" @change="loadSeries">
-        <option value="">全部类型</option>
-        <option v-for="country in existingCountries" :key="country" :value="country">
-          {{ country }}
-        </option>
-      </select>
+      <input
+        v-model="keyword"
+        placeholder="搜索系列..."
+        class="search-input"
+        @keyup.enter="loadSeries"
+      />
+      <button class="search-btn" @click="loadSeries">搜索</button>
     </div>
     <div class="series-grid">
       <div class="series-card" v-for="series in seriesList" :key="series.id">
-        <div class="card-body" @click="goToDetail(series.id)">
-          <div class="row1">
-            <span class="name">{{ series.name }}</span>
-            <span class="type-tag">{{ series.country || '未设置' }}</span>
-          </div>
-          <div class="row2">
-            <span v-if="series.alias" class="alias">{{ series.alias }}</span>
+        <div class="card-body" @click="goToVideos(series.id)">
+          <div class="series-name">{{ series.name }}</div>
+          <div class="series-info">
+            <span v-if="series.description" class="desc">{{ series.description }}</span>
             <span class="count">{{ series.videoCount || 0 }} 部影片</span>
           </div>
         </div>
         <div class="card-actions">
-          <button class="edit-btn" @click.stop="handleEditSeries(series)">编辑</button>
+          <button class="edit-btn" @click.stop="handleEdit(series)">编辑</button>
+          <button class="delete-btn" @click.stop="handleDelete(series.id)">删除</button>
         </div>
       </div>
     </div>
+    <div class="empty-hint" v-if="seriesList.length === 0 && !loading">暂无系列</div>
     <div class="pagination" v-if="total > pageSize">
       <button :disabled="page === 1" @click="changePage(page - 1)">上一页</button>
-      <span>第 {{ page }} 页</span>
+      <span>第 {{ page }} 页 / 共 {{ Math.ceil(total / pageSize) }} 页</span>
       <button :disabled="page * pageSize >= total" @click="changePage(page + 1)">下一页</button>
     </div>
 
-    <AddSeriesDialog
-      :visible="showAddDialog"
-      :editing-series="editingSeries"
-      @save="handleSaveSeries"
-      @cancel="showAddDialog = false; editingSeries = null"
-      @delete="handleDeleteSeries"
-    />
+    <!-- 添加/编辑弹窗 -->
+    <div class="dialog-overlay" v-if="showAddDialog" @mousedown="handleOverlayDown" @click="handleOverlayClick">
+      <div class="dialog">
+        <h3>{{ editingSeries ? '编辑系列' : '添加系列' }}</h3>
+        <div class="form-group">
+          <label>名称</label>
+          <input v-model="formData.name" placeholder="系列名称" />
+        </div>
+        <div class="form-group">
+          <label>描述</label>
+          <textarea v-model="formData.description" placeholder="系列描述（可选）" rows="3"></textarea>
+        </div>
+        <div class="dialog-actions">
+          <button class="cancel-btn" @click="showAddDialog = false; editingSeries = null">取消</button>
+          <button class="save-btn" @click="handleSave">保存</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -49,118 +60,98 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { seriesApi } from '@/scripts/api'
-import AddSeriesDialog from '@/views/components/AddSeriesDialog.vue'
 
 const router = useRouter()
 const seriesList = ref([])
-const existingCountries = ref([])
 const page = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
-const filters = ref({
-  country: ''
-})
+const keyword = ref('')
+const loading = ref(false)
 const showAddDialog = ref(false)
 const editingSeries = ref(null)
+const formData = ref({ name: '', description: '' })
 
-onMounted(async () => {
-  await Promise.all([
-    loadSeries(),
-    loadExistingCountries()
-  ])
-})
+let mouseDownOnDialog = false
 
 const loadSeries = async () => {
+  loading.value = true
   try {
-    const params = {
-      page: page.value,
-      pageSize: pageSize.value
-    }
-    if (filters.value.country) params.country = filters.value.country
-
-    const res = await seriesApi.getList(params)
+    const res = await seriesApi.getList({ page: page.value, pageSize: pageSize.value, keyword: keyword.value })
     if (res.success) {
-      seriesList.value = res.data
-      total.value = res.total
+      seriesList.value = res.data || []
+      total.value = res.total || 0
     }
   } catch (error) {
     console.error('加载系列失败:', error)
+  } finally {
+    loading.value = false
   }
 }
 
-const loadExistingCountries = async () => {
-  try {
-    const res = await seriesApi.getList({ page: 1, pageSize: 1000 })
-    if (res.success && res.data) {
-      const countries = new Set()
-      res.data.forEach(series => {
-        if (series.country) countries.add(series.country)
-      })
-      existingCountries.value = Array.from(countries)
-    }
-  } catch (error) {
-    console.error('加载类型列表失败:', error)
-  }
-}
-
-const changePage = (newPage) => {
-  page.value = newPage
+const changePage = (p) => {
+  page.value = p
   loadSeries()
 }
 
-const goToDetail = (id) => {
-  router.push(`/series/${id}`)
+const goToVideos = (seriesId) => {
+  router.push({ path: '/videos', query: { seriesId } })
 }
 
-const handleEditSeries = (series) => {
+const handleEdit = (series) => {
   editingSeries.value = series
+  formData.value = { name: series.name, description: series.description || '' }
   showAddDialog.value = true
 }
 
-const handleDeleteSeries = async (seriesId) => {
+const handleDelete = async (id) => {
+  if (!confirm('确定要删除此系列吗？')) return
   try {
-    const res = await seriesApi.delete(seriesId)
-    if (res.success) {
-      showAddDialog.value = false
-      editingSeries.value = null
-      alert('删除成功！')
-      await loadSeries()
-    } else {
-      alert('删除失败：' + res.message)
-    }
+    await seriesApi.delete(id)
+    await loadSeries()
   } catch (error) {
-    console.error('删除系列失败:', error)
-    alert('删除失败：' + error.message)
+    console.error('删除失败:', error)
   }
 }
 
-const handleSaveSeries = async (seriesData) => {
+const handleSave = async () => {
+  if (!formData.value.name.trim()) return
   try {
-    let res
     if (editingSeries.value) {
-      res = await seriesApi.update(editingSeries.value.id, seriesData)
+      await seriesApi.update(editingSeries.value.id, formData.value)
     } else {
-      res = await seriesApi.add(seriesData)
+      await seriesApi.add(formData.value)
     }
-
-    if (res.success) {
-      showAddDialog.value = false
-      editingSeries.value = null
-      await loadSeries()
-      alert(editingSeries.value ? '更新成功！' : '添加成功！')
-    } else {
-      alert('操作失败：' + res.message)
-    }
+    showAddDialog.value = false
+    editingSeries.value = null
+    formData.value = { name: '', description: '' }
+    await loadSeries()
   } catch (error) {
-    console.error('保存系列失败:', error)
-    alert('操作失败：' + error.message)
+    console.error('保存失败:', error)
   }
 }
+
+const handleOverlayDown = (e) => {
+  const dialog = e.currentTarget.querySelector('.dialog')
+  mouseDownOnDialog = dialog && dialog.contains(e.target)
+}
+const handleOverlayClick = () => {
+  if (!mouseDownOnDialog) {
+    showAddDialog.value = false
+    editingSeries.value = null
+  }
+}
+
+onMounted(() => {
+  loadSeries()
+})
 </script>
 
 <style scoped>
 .series-list {
-  padding: 20px 0;
+  padding: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
 .list-header {
@@ -170,161 +161,254 @@ const handleSaveSeries = async (seriesData) => {
   margin-bottom: 20px;
 }
 
-h1 {
-  margin: 0;
-  font-size: 22px;
+.list-header h1 {
+  font-size: 28px;
   color: #333;
+  margin: 0;
 }
 
 .add-btn {
-  padding: 8px 20px;
-  background: #e74c3c;
+  padding: 10px 20px;
+  background: #007bff;
   color: white;
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
   font-size: 14px;
-  transition: background 0.3s;
 }
 
 .add-btn:hover {
-  background: #c0392b;
+  background: #0056b3;
 }
 
 .filters {
   margin-bottom: 20px;
+  display: flex;
+  gap: 10px;
 }
 
-.filters select {
+.search-input {
   padding: 8px 12px;
   border: 1px solid #ddd;
-  border-radius: 4px;
+  border-radius: 6px;
   font-size: 14px;
-  color: #333;
+  flex: 1;
+  max-width: 300px;
+}
+
+.search-btn {
+  padding: 8px 16px;
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.search-btn:hover {
+  background: #0056b3;
 }
 
 .series-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: 16px;
   margin-bottom: 30px;
 }
 
 .series-card {
-  cursor: pointer;
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  transition: transform 0.3s;
   background: #fff;
-  display: flex;
-  flex-direction: column;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  transition: box-shadow 0.3s;
 }
 
 .series-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
 }
 
 .card-body {
   padding: 16px;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  cursor: pointer;
 }
 
-.row1 {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  overflow: hidden;
-}
-
-.name {
-  font-size: 16px;
+.series-name {
+  font-size: 18px;
   font-weight: bold;
   color: #333;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex: 1;
-  margin-right: 8px;
+  margin-bottom: 8px;
 }
 
-.type-tag {
-  font-size: 12px;
-  color: #666;
-  background: #f5f5f5;
-  padding: 2px 8px;
-  border-radius: 10px;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.row2 {
+.series-info {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.series-info .desc {
   font-size: 13px;
   color: #999;
+  line-height: 1.4;
 }
 
-.alias {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex: 1;
-  margin-right: 8px;
-  color: #999;
-}
-
-.count {
-  white-space: nowrap;
-  flex-shrink: 0;
-  color: #999;
+.series-info .count {
+  font-size: 13px;
+  color: #666;
 }
 
 .card-actions {
-  padding: 10px 16px;
-  border-top: 1px solid #f5f5f5;
   display: flex;
-  justify-content: flex-end;
+  gap: 8px;
+  padding: 0 16px 12px;
 }
 
-.edit-btn {
-  padding: 4px 16px;
-  border: none;
+.edit-btn, .delete-btn {
+  padding: 6px 14px;
+  border: 1px solid #ddd;
+  background: white;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 12px;
-  transition: opacity 0.3s;
-  background: #3498db;
-  color: white;
+  font-size: 13px;
 }
 
 .edit-btn:hover {
-  opacity: 0.8;
+  background: #f0f0f0;
+}
+
+.delete-btn {
+  color: #e74c3c;
+  border-color: #e74c3c;
+}
+
+.delete-btn:hover {
+  background: #e74c3c;
+  color: white;
+}
+
+.empty-hint {
+  text-align: center;
+  color: #999;
+  padding: 40px;
 }
 
 .pagination {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 20px;
+  gap: 15px;
+  margin-top: 30px;
 }
 
 .pagination button {
   padding: 8px 16px;
-  background: #e74c3c;
-  color: white;
-  border: none;
-  border-radius: 4px;
+  border: 1px solid #ddd;
+  background: white;
+  border-radius: 6px;
   cursor: pointer;
 }
 
+.pagination button:hover:not(:disabled) {
+  background: #f5f5f5;
+}
+
 .pagination button:disabled {
-  background: #ccc;
+  opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* 弹窗 */
+.dialog-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.dialog {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  width: 400px;
+  max-width: 90vw;
+}
+
+.dialog h3 {
+  margin: 0 0 20px;
+  font-size: 20px;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 14px;
+  font-weight: bold;
+  margin-bottom: 6px;
+  color: #333;
+}
+
+.form-group input,
+.form-group textarea {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.form-group textarea {
+  resize: vertical;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.cancel-btn {
+  padding: 8px 20px;
+  border: 1px solid #ddd;
+  background: white;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.save-btn {
+  padding: 8px 20px;
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.save-btn:hover {
+  background: #0056b3;
+}
+
+@media (max-width: 768px) {
+  .series-grid {
+    grid-template-columns: 1fr;
+  }
+  .list-header {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1200px) {
+  .series-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 </style>

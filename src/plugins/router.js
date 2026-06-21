@@ -4,6 +4,7 @@ import VideoList from '@/views/pages/VideoList.vue'
 import VideoDetail from '@/views/pages/VideoDetail.vue'
 import ActorList from '@/views/pages/ActorList.vue'
 import ActorDetail from '@/views/pages/ActorDetail.vue'
+import SeriesList from '@/views/pages/SeriesList.vue'
 import Settings from '@/views/pages/Settings.vue'
 
 const routes = [
@@ -31,6 +32,11 @@ const routes = [
     path: '/actor/:id',
     name: 'ActorDetail',
     component: ActorDetail
+  },
+  {
+    path: '/series',
+    name: 'SeriesList',
+    component: SeriesList
   },
   {
     path: '/settings',
