@@ -15,15 +15,15 @@
     </div>
     <div class="filters">
       <div class="filter-item">
-        <select v-model="filters.category" @change="loadVideos">
-          <option value="">全部分类</option>
-          <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
-        </select>
-      </div>
-      <div class="filter-item">
         <select v-model="filters.country" @change="loadVideos">
           <option value="">全部地区</option>
           <option v-for="c in countries" :key="c" :value="c">{{ c }}</option>
+        </select>
+      </div>
+      <div class="filter-item">
+        <select v-model="filters.category" @change="loadVideos">
+          <option value="">全部分类</option>
+          <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
         </select>
       </div>
       <div class="filter-item">
@@ -243,15 +243,9 @@ const handleDeleteVideo = async (videoId) => {
 
 .video-grid {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 16px;
   margin-bottom: 30px;
-}
-
-@media (max-width: 1200px) {
-  .video-grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
 }
 
 @media (max-width: 768px) {

@@ -17,15 +17,17 @@
       <div class="actor-card" v-for="actor in actors" :key="actor.id">
         <div class="card-body" @click="goToDetail(actor.id)">
           <div class="row1">
-            <span class="name">{{ actor.name }}</span>
-            <span class="count">{{ actor.videoCount || 0 }} 部</span>
+            <div class="left">
+              <span class="name">{{ actor.name }}</span>
+            </div>
+            <div class="right">
+              <span class="count">{{ actor.videoCount || 0 }} 部</span>
+              <span class="like-count">♥ {{ actor.likeCount || 0 }}</span>
+            </div>
           </div>
           <div class="row2">
             <span class="info-item" v-if="actor.alias">别名：{{ actor.alias }}</span>
             <span class="info-item" v-if="actor.country">地区：{{ actor.country }}</span>
-          </div>
-          <div class="row3">
-            <span class="like-count">♥ {{ actor.likeCount || 0 }}</span>
           </div>
         </div>
         <div class="card-actions">
@@ -244,17 +246,29 @@ h1 {
   text-overflow: ellipsis;
   white-space: nowrap;
   flex: 1;
-  margin-right: 8px;
+}
+
+.row1 .right {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 5px;
+  overflow: hidden;
 }
 
 .count {
   font-size: 12px;
-  color: #999;
+  color: #000;
   background: #f5f5f5;
   padding: 2px 8px;
   border-radius: 10px;
   white-space: nowrap;
   flex-shrink: 0;
+}
+
+.like-count {
+  font-size: 12px;
+  color: #e74c3c;
 }
 
 .row2 {
@@ -267,16 +281,6 @@ h1 {
 
 .info-item {
   white-space: nowrap;
-}
-
-.row3 {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.like-count {
-  font-size: 12px;
-  color: #e74c3c;
 }
 
 .card-actions {

@@ -15,9 +15,9 @@
           <span class="name">{{ video.name }}</span>
         </div>
         <div class="row2" v-if="video.category || video.country || video.seriesName">
-          <span v-if="video.seriesName" class="series-tag">{{ video.seriesName }}</span>
-          <span v-if="video.category" class="type-tag">{{ video.category }}</span>
           <span v-if="video.country" class="country-tag">{{ video.country }}</span>
+          <span v-if="video.category" class="type-tag">{{ video.category }}</span>
+          <span v-if="video.seriesName" class="series-tag">{{ video.seriesName }}</span>
         </div>
       </template>
       <!-- 简介模式 -->
