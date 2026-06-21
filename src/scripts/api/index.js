@@ -53,7 +53,7 @@ export const settingApi = {
 
 // 系列相关API
 export const seriesApi = {
-  getList: (params) => api.get('/series/list', { params }),
+  getList: (params) => api.get('/series', { params }),
   getDetail: (id) => api.get(`/series/${id}`),
   add: (data) => api.post('/series', data),
   update: (id, data) => api.put(`/series/${id}`, data),
