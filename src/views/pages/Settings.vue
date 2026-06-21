@@ -2,6 +2,12 @@
   <div class="settings">
     <h1>系统设置</h1>
 
+    <!-- 页面提示 -->
+    <div v-if="pageTip.show" class="inline-tip" :class="pageTip.type">
+      <span>{{ pageTip.message }}</span>
+      <span class="tip-close" @click="pageTip.show = false">×</span>
+    </div>
+
     <!-- 基本信息 -->
     <div class="settings-section">
       <h2>基本信息</h2>
@@ -27,9 +33,18 @@
             </div>
           </div>
           <div class="scan-actions">
-            <button class="btn-scan" @click="scanDir(item)">扫描</button>
-            <button class="btn-edit" @click="openEditScanDirDialog(item)">编辑</button>
-            <button class="btn-delete" @click="deleteScanDir(item)">删除</button>
+            <!-- 确认操作行 -->
+            <template v-if="confirmingItem && confirmingItem.id === item.id">
+              <span class="confirm-text">{{ confirmAction === 'delete' ? '确定删除？' : '确定扫描？' }}</span>
+              <button class="btn-confirm-action" @click="confirmAction === 'delete' ? doDelete(item) : doScan(item)">确定</button>
+              <button class="btn-cancel-action" @click="confirmingItem = null">取消</button>
+            </template>
+            <!-- 正常操作行 -->
+            <template v-else>
+              <button class="btn-scan" @click="requestConfirm(item, 'scan')">扫描</button>
+              <button class="btn-edit" @click="openEditScanDirDialog(item)">编辑</button>
+              <button class="btn-delete" @click="requestConfirm(item, 'delete')">删除</button>
+            </template>
           </div>
         </div>
       </div>
@@ -54,7 +69,8 @@
           </div>
         </div>
         <div class="dialog-footer">
-          <button class="btn btn-cancel" @click="showScanDirDialog = false">取消</button>
+          <span v-if="dialogTip.show" class="dialog-tip">{{ dialogTip.message }}</span>
+          <button class="btn btn-cancel" @click="closeScanDirDialog">取消</button>
           <button class="btn btn-confirm" @click="saveScanDir" :disabled="saving">{{ saving ? '保存中...' : '保存' }}</button>
         </div>
       </div>
@@ -71,12 +87,35 @@ const settingsList = ref([
   { id: 'scanType', label: '扫描类型', value: '', placeholder: '如: .mp4,.mkv,.avi（多个后缀以逗号分隔）' }
 ])
 
+// 页面提示
+const pageTip = ref({ show: false, message: '', type: 'error' })
+function showPageTip(msg, type = 'error') {
+  pageTip.value = { show: true, message: msg, type }
+  setTimeout(() => { pageTip.value.show = false }, 3000)
+}
+
+// 弹窗内提示
+const dialogTip = ref({ show: false, message: '' })
+function showDialogTip(msg) {
+  dialogTip.value = { show: true, message: msg }
+}
+function clearDialogTip() {
+  dialogTip.value.show = false
+}
+
+// 行内确认
+const confirmingItem = ref(null)
+const confirmAction = ref('')
+function requestConfirm(item, action) {
+  confirmingItem.value = item
+  confirmAction.value = action
+}
+
 // 扫描目录
 const scanDirList = ref([])
 const showScanDirDialog = ref(false)
 const editingScanDir = ref(null)
 const scanDirForm = ref({ path: '', recursive: true })
-
 const saving = ref(false)
 
 // 弹窗点击穿透处理
@@ -87,6 +126,10 @@ function handleScanDirOverlayDown(e) {
 }
 function handleScanDirOverlayClick() {
   if (!mouseDownOnDialog) showScanDirDialog.value = false
+}
+function closeScanDirDialog() {
+  showScanDirDialog.value = false
+  clearDialogTip()
 }
 
 onMounted(async () => {
@@ -143,6 +186,7 @@ const loadScanDirList = async () => {
 const openAddScanDirDialog = () => {
   editingScanDir.value = null
   scanDirForm.value = { path: '', recursive: true }
+  clearDialogTip()
   showScanDirDialog.value = true
 }
 
@@ -152,17 +196,18 @@ const openEditScanDirDialog = (item) => {
     path: item.path,
     recursive: item.recursive
   }
+  clearDialogTip()
   showScanDirDialog.value = true
 }
 
 const saveScanDir = async () => {
+  clearDialogTip()
   if (!scanDirForm.value.path) {
-    alert('目录路径不能为空')
+    showDialogTip('目录路径不能为空')
     return
   }
-  // 校验目录是否存在
   if (!await checkDirExists(scanDirForm.value.path)) {
-    alert('目录路径不存在，请检查后重试')
+    showDialogTip('目录路径不存在，请检查后重试')
     return
   }
   saving.value = true
@@ -185,37 +230,39 @@ const saveScanDir = async () => {
       showScanDirDialog.value = false
       await loadScanDirList()
     } else {
-      alert(res.message || '保存失败')
+      showDialogTip(res.message || '保存失败')
     }
   } catch (error) {
-    alert('保存失败: ' + error.message)
+    showDialogTip('保存失败: ' + error.message)
   } finally {
     saving.value = false
   }
 }
 
-const deleteScanDir = async (item) => {
-  if (!confirm(`确定删除扫描目录 "${item.path}" 吗？`)) return
+const doDelete = async (item) => {
   try {
     const res = await fetch(`/api/scandirectory/${item.id}`, { method: 'DELETE' }).then(r => r.json())
-    if (res.success) await loadScanDirList()
-    else alert(res.message || '删除失败')
+    if (res.success) {
+      showPageTip('删除成功', 'success')
+      await loadScanDirList()
+    } else {
+      showPageTip(res.message || '删除失败', 'error')
+    }
   } catch (error) {
-    alert('删除失败: ' + error.message)
+    showPageTip('删除失败: ' + error.message, 'error')
   }
 }
 
-const scanDir = async (item) => {
-  if (!confirm(`确定扫描目录 "${item.path}" 吗？`)) return
+const doScan = async (item) => {
   try {
     const res = await videoApi.scan({ targetPath: item.path, recursive: item.recursive })
     if (res.success) {
-      alert(`扫描任务已启动！任务ID: ${res.data.taskId}`)
+      showPageTip(`扫描任务已启动！任务ID: ${res.data.taskId}`, 'success')
     } else {
-      alert('扫描失败：' + (res.message || '未知错误'))
+      showPageTip('扫描失败：' + (res.message || '未知错误'), 'error')
     }
   } catch (error) {
-    alert('扫描失败：' + error.message)
+    showPageTip('扫描失败：' + error.message, 'error')
   }
 }
 </script>
@@ -233,13 +280,40 @@ h2 { margin-bottom: 16px; font-size: 18px; color: #555; display: flex; align-ite
 .add-btn { padding: 6px 12px; background: #42b883; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
 .add-btn:hover { background: #369870; }
 
+/* 页面提示 */
+.inline-tip {
+  padding: 10px 16px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+}
+.inline-tip.error {
+  background: #ffebee;
+  color: #c62828;
+  border: 1px solid #ef9a9a;
+}
+.inline-tip.success {
+  background: #e8f5e9;
+  color: #2e7d32;
+  border: 1px solid #a5d6a7;
+}
+.tip-close {
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: bold;
+  margin-left: 16px;
+}
+
 .scan-list { margin-top: 12px; }
 .scan-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; border: 1px solid #eee; border-radius: 6px; margin-bottom: 8px; }
 .scan-info { flex: 1; }
 .scan-path { font-weight: 500; color: #333; }
 .scan-meta { margin-top: 4px; display: flex; gap: 8px; }
 .meta-tag { font-size: 12px; padding: 2px 6px; background: #e8f5e9; color: #2e7d32; border-radius: 3px; }
-.scan-actions { display: flex; gap: 8px; }
+.scan-actions { display: flex; gap: 8px; align-items: center; }
 .btn-scan, .btn-edit, .btn-delete { padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
 .btn-scan { background: #1976d2; color: #fff; }
 .btn-edit { background: #ff9800; color: #fff; }
@@ -248,6 +322,11 @@ h2 { margin-bottom: 16px; font-size: 18px; color: #555; display: flex; align-ite
 .btn-edit:hover { background: #f57c00; }
 .btn-delete:hover { background: #c62828; }
 
+/* 行内确认 */
+.confirm-text { font-size: 13px; color: #d32f2f; margin-right: 8px; }
+.btn-confirm-action { padding: 4px 10px; background: #d32f2f; color: #fff; border: none; border-radius: 4px; font-size: 12px; cursor: pointer; }
+.btn-cancel-action { padding: 4px 10px; background: #f5f5f5; color: #666; border: none; border-radius: 4px; font-size: 12px; cursor: pointer; }
+
 .empty-tip { color: #999; font-size: 14px; padding: 20px; text-align: center; }
 
 .dialog-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
@@ -255,7 +334,7 @@ h2 { margin-bottom: 16px; font-size: 18px; color: #555; display: flex; align-ite
 .dialog-header { padding: 16px 20px; border-bottom: 1px solid #eee; }
 .dialog-header h3 { margin: 0; font-size: 16px; }
 .dialog-body { padding: 20px; }
-.dialog-footer { padding: 16px 20px; border-top: 1px solid #eee; display: flex; justify-content: flex-end; gap: 12px; }
+.dialog-footer { padding: 16px 20px; border-top: 1px solid #eee; display: flex; justify-content: flex-end; align-items: center; gap: 12px; }
 .form-group { margin-bottom: 16px; }
 .form-group label { display: block; margin-bottom: 6px; color: #666; font-size: 14px; }
 .form-group input, .form-group select { width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; }
@@ -267,4 +346,7 @@ h2 { margin-bottom: 16px; font-size: 18px; color: #555; display: flex; align-ite
 .btn-cancel:hover { background: #eee; }
 .btn-confirm:hover { background: #369870; }
 .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* 弹窗内提示 */
+.dialog-tip { color: #d32f2f; font-size: 13px; margin-right: auto; }
 </style>
