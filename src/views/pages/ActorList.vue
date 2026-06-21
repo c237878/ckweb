@@ -20,8 +20,12 @@
             <span class="name">{{ actor.name }}</span>
             <span class="count">{{ actor.videoCount || 0 }} 部</span>
           </div>
-          <div class="row2" v-if="actor.bio">
-            <span class="bio">{{ actor.bio }}</span>
+          <div class="row2">
+            <span class="info-item" v-if="actor.alias">别名：{{ actor.alias }}</span>
+            <span class="info-item" v-if="actor.country">地区：{{ actor.country }}</span>
+          </div>
+          <div class="row3">
+            <span class="like-count">♥ {{ actor.likeCount || 0 }}</span>
           </div>
         </div>
         <div class="card-actions">
@@ -207,14 +211,13 @@ h1 {
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  transition: transform 0.3s;
+  transition: box-shadow 0.3s;
   background: #fff;
   display: flex;
   flex-direction: column;
 }
 
 .actor-card:hover {
-  transform: translateY(-3px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
@@ -255,17 +258,25 @@ h1 {
 }
 
 .row2 {
-  font-size: 13px;
-  color: #999;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 12px;
+  color: #888;
 }
 
-.bio {
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  line-height: 1.4;
-  word-break: break-all;
+.info-item {
+  white-space: nowrap;
+}
+
+.row3 {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.like-count {
+  font-size: 12px;
+  color: #e74c3c;
 }
 
 .card-actions {

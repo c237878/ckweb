@@ -12,8 +12,12 @@
           <input v-model="form.name" placeholder="演员姓名" />
         </div>
         <div class="form-group">
-          <label>简介</label>
-          <textarea v-model="form.bio" placeholder="演员简介（选填）" rows="3"></textarea>
+          <label>别名</label>
+          <input v-model="form.alias" placeholder="别名（选填）" />
+        </div>
+        <div class="form-group">
+          <label>国家/地区</label>
+          <input v-model="form.country" placeholder="国家或地区（选填）" />
         </div>
       </div>
       <div class="dialog-footer">
@@ -40,7 +44,8 @@ const emit = defineEmits(['save', 'cancel', 'delete'])
 const isEdit = ref(false)
 const form = ref({
   name: '',
-  bio: ''
+  alias: '',
+  country: ''
 })
 
 let mouseDownOnDialog = false
@@ -62,11 +67,12 @@ watch(() => props.visible, (val) => {
       isEdit.value = true
       form.value = {
         name: props.editingActor.name || '',
-        bio: props.editingActor.bio || ''
+        alias: props.editingActor.alias || '',
+        country: props.editingActor.country || ''
       }
     } else {
       isEdit.value = false
-      form.value = { name: '', bio: '' }
+      form.value = { name: '', alias: '', country: '' }
     }
   }
 })

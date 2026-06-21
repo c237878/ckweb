@@ -26,29 +26,43 @@
           <option v-for="c in countries" :key="c" :value="c">{{ c }}</option>
         </select>
       </div>
-      <div class="filter-item">
-        <select v-model="filters.seriesId" @change="loadVideos">
-          <option value="">全部系列</option>
-          <option v-for="s in seriesList" :key="s.id" :value="s.id">{{ s.name }}</option>
-        </select>
+    </div>
+    <div class="content-with-sidebar">
+      <div class="main-area">
+        <div class="video-grid">
+          <VideoCard
+            v-for="video in videos"
+            :key="video.id"
+            :video="video"
+            :show-actions="true"
+            :selectable="true"
+            :selected="selectedIds.includes(video.id)"
+            @edit="handleEditVideo"
+            @select="handleSelectVideo"
+          />
+        </div>
+        <div class="pagination" v-if="total > pageSize">
+          <button :disabled="page === 1" @click="changePage(page - 1)">上一页</button>
+          <span>第 {{ page }} 页 / 共 {{ Math.ceil(total / pageSize) }} 页 ({{ total }} 部)</span>
+          <button :disabled="page * pageSize >= total" @click="changePage(page + 1)">下一页</button>
+        </div>
       </div>
-    </div>
-    <div class="video-grid">
-      <VideoCard
-        v-for="video in videos"
-        :key="video.id"
-        :video="video"
-        :show-actions="true"
-        :selectable="true"
-        :selected="selectedIds.includes(video.id)"
-        @edit="handleEditVideo"
-        @select="handleSelectVideo"
-      />
-    </div>
-    <div class="pagination" v-if="total > pageSize">
-      <button :disabled="page === 1" @click="changePage(page - 1)">上一页</button>
-      <span>第 {{ page }} 页 / 共 {{ Math.ceil(total / pageSize) }} 页 ({{ total }} 部)</span>
-      <button :disabled="page * pageSize >= total" @click="changePage(page + 1)">下一页</button>
+
+      <div class="series-sidebar">
+        <div class="sidebar-title">影视系列</div>
+        <div
+          class="sidebar-item"
+          :class="{ active: filters.seriesId === '' }"
+          @click="filters.seriesId = ''; loadVideos()"
+        >全部系列</div>
+        <div
+          v-for="s in seriesList"
+          :key="s.id"
+          class="sidebar-item"
+          :class="{ active: filters.seriesId === s.id }"
+          @click="filters.seriesId = s.id; loadVideos()"
+        >{{ s.name }}</div>
+      </div>
     </div>
 
     <AddVideoDialog
@@ -241,11 +255,65 @@ const handleDeleteVideo = async (videoId) => {
   min-width: 150px;
 }
 
+.content-with-sidebar {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.main-area {
+  flex: 1;
+  min-width: 0;
+}
+
 .video-grid {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
   gap: 16px;
   margin-bottom: 30px;
+}
+
+.series-sidebar {
+  width: 180px;
+  flex-shrink: 0;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 12px 0;
+  position: sticky;
+  top: 20px;
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+}
+
+.sidebar-title {
+  font-size: 14px;
+  font-weight: bold;
+  color: #333;
+  padding: 4px 16px 8px;
+  border-bottom: 1px solid #f0f0f0;
+  margin-bottom: 4px;
+}
+
+.sidebar-item {
+  padding: 8px 16px;
+  font-size: 13px;
+  color: #666;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.2s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-item:hover {
+  background: #f5f5f5;
+}
+
+.sidebar-item.active {
+  color: #3498db;
+  font-weight: bold;
 }
 
 @media (max-width: 1200px) {
@@ -255,6 +323,30 @@ const handleDeleteVideo = async (videoId) => {
 }
 
 @media (max-width: 768px) {
+  .content-with-sidebar {
+    flex-direction: column;
+  }
+  .series-sidebar {
+    width: 100%;
+    position: static;
+    max-height: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 8px;
+  }
+  .sidebar-title {
+    width: 100%;
+    padding: 0 0 4px;
+    border-bottom: none;
+    margin-bottom: 0;
+  }
+  .sidebar-item {
+    padding: 4px 10px;
+    background: #f5f5f5;
+    border-radius: 4px;
+    font-size: 12px;
+  }
   .video-grid {
     grid-template-columns: repeat(2, 1fr);
   }

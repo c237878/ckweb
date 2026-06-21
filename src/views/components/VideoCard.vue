@@ -95,7 +95,7 @@ const handleEdit = () => {
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  transition: transform 0.3s, box-shadow 0.3s;
+  transition: box-shadow 0.3s;
   background: #fff;
   display: flex;
   flex-direction: column;
@@ -103,8 +103,7 @@ const handleEdit = () => {
 }
 
 .video-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
 }
 
 .video-card.selected {
