@@ -24,9 +24,6 @@
             <div class="scan-path">{{ item.path }}</div>
             <div class="scan-meta">
               <span class="meta-tag" v-if="item.recursive">递归</span>
-              <span class="meta-tag" :class="{ disabled: !item.isEnabled }">
-                {{ item.isEnabled ? '已启用' : '已禁用' }}
-              </span>
             </div>
           </div>
           <div class="scan-actions">
@@ -55,9 +52,6 @@
           <div class="form-group form-check">
             <label><input type="checkbox" v-model="scanDirForm.recursive" /> 递归扫描子目录</label>
           </div>
-          <div class="form-group form-check">
-            <label><input type="checkbox" v-model="scanDirForm.isEnabled" /> 启用此目录</label>
-          </div>
         </div>
         <div class="dialog-footer">
           <button class="btn btn-cancel" @click="showScanDirDialog = false">取消</button>
@@ -81,7 +75,7 @@ const settingsList = ref([
 const scanDirList = ref([])
 const showScanDirDialog = ref(false)
 const editingScanDir = ref(null)
-const scanDirForm = ref({ path: '', recursive: true, isEnabled: true })
+const scanDirForm = ref({ path: '', recursive: true })
 
 const saving = ref(false)
 
@@ -122,6 +116,20 @@ const saveSetting = async (item) => {
   }
 }
 
+// 校验目录是否存在
+const checkDirExists = async (path) => {
+  try {
+    const res = await fetch('/api/scandirectory/check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path })
+    }).then(r => r.json())
+    return res.success && res.exists
+  } catch {
+    return false
+  }
+}
+
 // 扫描目录管理
 const loadScanDirList = async () => {
   try {
@@ -134,7 +142,7 @@ const loadScanDirList = async () => {
 
 const openAddScanDirDialog = () => {
   editingScanDir.value = null
-  scanDirForm.value = { path: '', recursive: true, isEnabled: true }
+  scanDirForm.value = { path: '', recursive: true }
   showScanDirDialog.value = true
 }
 
@@ -142,8 +150,7 @@ const openEditScanDirDialog = (item) => {
   editingScanDir.value = item
   scanDirForm.value = {
     path: item.path,
-    recursive: item.recursive,
-    isEnabled: item.isEnabled
+    recursive: item.recursive
   }
   showScanDirDialog.value = true
 }
@@ -151,6 +158,11 @@ const openEditScanDirDialog = (item) => {
 const saveScanDir = async () => {
   if (!scanDirForm.value.path) {
     alert('目录路径不能为空')
+    return
+  }
+  // 校验目录是否存在
+  if (!await checkDirExists(scanDirForm.value.path)) {
+    alert('目录路径不存在，请检查后重试')
     return
   }
   saving.value = true
@@ -227,7 +239,6 @@ h2 { margin-bottom: 16px; font-size: 18px; color: #555; display: flex; align-ite
 .scan-path { font-weight: 500; color: #333; }
 .scan-meta { margin-top: 4px; display: flex; gap: 8px; }
 .meta-tag { font-size: 12px; padding: 2px 6px; background: #e8f5e9; color: #2e7d32; border-radius: 3px; }
-.meta-tag.disabled { background: #f5f5f5; color: #999; }
 .scan-actions { display: flex; gap: 8px; }
 .btn-scan, .btn-edit, .btn-delete { padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
 .btn-scan { background: #1976d2; color: #fff; }
