@@ -33,18 +33,9 @@
             </div>
           </div>
           <div class="scan-actions">
-            <!-- 确认操作行 -->
-            <template v-if="confirmingItem && confirmingItem.id === item.id">
-              <span class="confirm-text">{{ confirmAction === 'delete' ? '确定删除？' : '确定扫描？' }}</span>
-              <button class="btn-confirm-action" @click="confirmAction === 'delete' ? doDelete(item) : doScan(item)">确定</button>
-              <button class="btn-cancel-action" @click="confirmingItem = null">取消</button>
-            </template>
-            <!-- 正常操作行 -->
-            <template v-else>
-              <button class="btn-scan" @click="requestConfirm(item, 'scan')">扫描</button>
-              <button class="btn-edit" @click="openEditScanDirDialog(item)">编辑</button>
-              <button class="btn-delete" @click="requestConfirm(item, 'delete')">删除</button>
-            </template>
+            <button class="btn-scan" @click="scanDir(item)">扫描</button>
+            <button class="btn-edit" @click="openEditScanDirDialog(item)">编辑</button>
+            <button class="btn-delete" @click="deleteScanDir(item)">删除</button>
           </div>
         </div>
       </div>
@@ -87,28 +78,20 @@ const settingsList = ref([
   { id: 'scanType', label: '扫描类型', value: '', placeholder: '如: .mp4,.mkv,.avi（多个后缀以逗号分隔）' }
 ])
 
-// 页面提示
+// 页面提示（替换 alert）
 const pageTip = ref({ show: false, message: '', type: 'error' })
 function showPageTip(msg, type = 'error') {
   pageTip.value = { show: true, message: msg, type }
   setTimeout(() => { pageTip.value.show = false }, 3000)
 }
 
-// 弹窗内提示
+// 弹窗内提示（替换 alert）
 const dialogTip = ref({ show: false, message: '' })
 function showDialogTip(msg) {
   dialogTip.value = { show: true, message: msg }
 }
 function clearDialogTip() {
   dialogTip.value.show = false
-}
-
-// 行内确认
-const confirmingItem = ref(null)
-const confirmAction = ref('')
-function requestConfirm(item, action) {
-  confirmingItem.value = item
-  confirmAction.value = action
 }
 
 // 扫描目录
@@ -239,7 +222,8 @@ const saveScanDir = async () => {
   }
 }
 
-const doDelete = async (item) => {
+const deleteScanDir = async (item) => {
+  if (!confirm(`确定删除扫描目录 "${item.path}" 吗？`)) return
   try {
     const res = await fetch(`/api/scandirectory/${item.id}`, { method: 'DELETE' }).then(r => r.json())
     if (res.success) {
@@ -253,7 +237,8 @@ const doDelete = async (item) => {
   }
 }
 
-const doScan = async (item) => {
+const scanDir = async (item) => {
+  if (!confirm(`确定扫描目录 "${item.path}" 吗？`)) return
   try {
     const res = await videoApi.scan({ targetPath: item.path, recursive: item.recursive })
     if (res.success) {
@@ -313,7 +298,7 @@ h2 { margin-bottom: 16px; font-size: 18px; color: #555; display: flex; align-ite
 .scan-path { font-weight: 500; color: #333; }
 .scan-meta { margin-top: 4px; display: flex; gap: 8px; }
 .meta-tag { font-size: 12px; padding: 2px 6px; background: #e8f5e9; color: #2e7d32; border-radius: 3px; }
-.scan-actions { display: flex; gap: 8px; align-items: center; }
+.scan-actions { display: flex; gap: 8px; }
 .btn-scan, .btn-edit, .btn-delete { padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
 .btn-scan { background: #1976d2; color: #fff; }
 .btn-edit { background: #ff9800; color: #fff; }
@@ -321,11 +306,6 @@ h2 { margin-bottom: 16px; font-size: 18px; color: #555; display: flex; align-ite
 .btn-scan:hover { background: #1565c0; }
 .btn-edit:hover { background: #f57c00; }
 .btn-delete:hover { background: #c62828; }
-
-/* 行内确认 */
-.confirm-text { font-size: 13px; color: #d32f2f; margin-right: 8px; }
-.btn-confirm-action { padding: 4px 10px; background: #d32f2f; color: #fff; border: none; border-radius: 4px; font-size: 12px; cursor: pointer; }
-.btn-cancel-action { padding: 4px 10px; background: #f5f5f5; color: #666; border: none; border-radius: 4px; font-size: 12px; cursor: pointer; }
 
 .empty-tip { color: #999; font-size: 14px; padding: 20px; text-align: center; }
 
