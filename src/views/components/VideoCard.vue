@@ -3,38 +3,32 @@
     <div v-if="selectable" class="select-checkbox">
       <input type="checkbox" :checked="selected" @change.stop="handleSelect" />
     </div>
+    <!-- 第一行：封面图片 -->
     <div class="video-cover">
       <img v-if="video.coverPath" :src="`/api/video/cover/${video.id}`" :alt="video.name" @error="$event.target.style.display='none'" />
       <div v-if="!video.coverPath" class="no-cover">{{ video.name?.charAt(0) || '?' }}</div>
     </div>
     <div class="video-body">
-      <!-- 完全模式 / 展示模式 -->
-      <template v-if="mode !== 'brief'">
-        <div class="row1">
-          <span v-if="video.code" class="code">{{ video.code }}</span>
-          <span class="name">{{ video.name }}</span>
-        </div>
-        <div class="row2" v-if="video.category || video.country || video.seriesName">
-          <span v-if="video.country" class="country-tag">{{ video.country }}</span>
-          <span v-if="video.category" class="type-tag">{{ video.category }}</span>
-          <span v-if="video.seriesName" class="series-tag">{{ video.seriesName }}</span>
-        </div>
-      </template>
-      <!-- 简介模式 -->
-      <template v-else>
-        <div class="brief-row">
-          <span v-if="video.code" class="brief-code">{{ video.code }}</span>
-          <span class="brief-name">{{ video.name }}</span>
-        </div>
-        <div class="brief-actors" v-if="video.actors && video.actors.length > 0">
-          {{ video.actors.map(a => a.name).join(', ') }}
-        </div>
-      </template>
+      <!-- 第二行：影片名称（加粗，有番号组合显示） -->
+      <div class="row1">
+        <span v-if="video.code" class="code">{{ video.code }}</span>
+        <span class="name">{{ video.name }}</span>
+      </div>
+      <!-- 第三行：地区、分类、获赞总数（>0显示） -->
+      <div class="row2">
+        <span v-if="video.country" class="country-tag">{{ video.country }}</span>
+        <span v-if="video.category" class="type-tag">{{ video.category }}</span>
+        <span v-if="video.likeCount > 0" class="like-count">♥ {{ video.likeCount }}</span>
+      </div>
+      <!-- 第四行：所属系列（点击跳转系列详情页） -->
+      <div class="row3" v-if="video.seriesName">
+        <span class="series-tag clickable" @click.stop="goToSeries(video.seriesId)">{{ video.seriesName }}</span>
+      </div>
     </div>
-    <!-- 完全模式才显示操作按钮 -->
+    <!-- 第五行：操作按钮 -->
     <div v-if="mode === 'full' && showActions" class="card-actions" @click.stop>
-      <button v-if="selectable || mode === 'full'" class="detail-btn" @click.stop="goToDetail">详情</button>
       <button class="edit-btn" @click.stop="handleEdit">编辑</button>
+      <button class="detail-btn" @click.stop="goToDetail">详情</button>
     </div>
   </div>
 </template>
@@ -84,6 +78,13 @@ const goToDetail = () => {
   router.push(`/video/${props.video.id}`)
 }
 
+const goToSeries = (seriesId) => {
+  if (seriesId) {
+    router.push(`/series`)
+    // 或者将来有系列详情页的话：router.push(`/series/${seriesId}`)
+  }
+}
+
 const handleEdit = () => {
   emit('edit', props.video)
 }
@@ -112,10 +113,6 @@ const handleEdit = () => {
 
 .video-card.selectable {
   cursor: pointer;
-}
-
-.mode-brief {
-  font-size: 12px;
 }
 
 .video-cover {
@@ -171,6 +168,7 @@ const handleEdit = () => {
   min-width: 0;
 }
 
+/* 第二行：名称 + 番号 */
 .row1 {
   display: flex;
   align-items: center;
@@ -197,6 +195,7 @@ const handleEdit = () => {
   white-space: nowrap;
 }
 
+/* 第三行：地区、分类、获赞 */
 .row2 {
   display: flex;
   align-items: center;
@@ -207,12 +206,29 @@ const handleEdit = () => {
   flex-wrap: wrap;
 }
 
+.like-count {
+  font-size: 12px;
+  color: #e74c3c;
+  background: #fce4ec;
+  padding: 1px 6px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
 .series-tag {
   background: #fff3e0;
   color: #e65100;
   padding: 1px 6px;
   border-radius: 3px;
   white-space: nowrap;
+}
+
+.clickable {
+  cursor: pointer;
+}
+
+.clickable:hover {
+  background: #ffe0b2;
 }
 
 .type-tag {
@@ -231,38 +247,13 @@ const handleEdit = () => {
   white-space: nowrap;
 }
 
-.brief-row {
+/* 第四行：所属系列 */
+.row3 {
   display: flex;
   align-items: center;
   gap: 6px;
-  overflow: hidden;
-}
-
-.brief-code {
-  font-size: 11px;
-  font-weight: bold;
-  color: #1976d2;
-  flex-shrink: 0;
-  background: #e3f2fd;
-  padding: 1px 4px;
-  border-radius: 2px;
-}
-
-.brief-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: #333;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.brief-actors {
-  font-size: 11px;
-  color: #999;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: 12px;
+  color: #666;
 }
 
 .card-actions {

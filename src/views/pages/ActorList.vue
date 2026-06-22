@@ -16,29 +16,31 @@
     <div class="actor-grid">
       <div class="actor-card" v-for="actor in actors" :key="actor.id">
         <div class="card-body" @click="goToDetail(actor.id)">
+          <!-- 第一行：姓名 + 右侧信息 -->
           <div class="row1">
-            <div class="left">
-              <span class="name">{{ actor.name }}</span>
-            </div>
-            <div class="right">
-              <span class="count">{{ actor.videoCount || 0 }} 部</span>
-              <span class="like-count">♥ {{ actor.likeCount || 0 }}</span>
+            <span class="name">{{ actor.name }}</span>
+            <div class="right-info">
+              <span v-if="actor.likeCount > 0" class="like-count">♥ {{ actor.likeCount }}</span>
+              <span v-if="actor.videoCount > 0" class="count">{{ actor.videoCount }} 部</span>
+              <span v-if="actor.country" class="country">{{ actor.country }}</span>
             </div>
           </div>
-          <div class="row2">
-            <span class="info-item" v-if="actor.alias">别名：{{ actor.alias }}</span>
-            <span class="info-item" v-if="actor.country">地区：{{ actor.country }}</span>
+          <!-- 第二行：简介 -->
+          <div class="row2" v-if="actor.bio">
+            {{ actor.bio }}
           </div>
         </div>
-        <div class="card-actions">
+        <!-- 第三行：操作按钮 -->
+        <div class="row3">
           <button class="edit-btn" @click.stop="handleEditActor(actor)">编辑</button>
+          <button class="detail-btn" @click.stop="goToDetail(actor.id)">详情</button>
         </div>
       </div>
     </div>
     <div class="empty-hint" v-if="actors.length === 0 && !loading">暂无演员</div>
     <div class="pagination" v-if="total > pageSize">
       <button :disabled="page === 1" @click="changePage(page - 1)">上一页</button>
-      <span>第 {{ page }} 页</span>
+      <span>第 {{ page }} 页 / 共 {{ Math.ceil(total / pageSize) }} 页</span>
       <button :disabled="page * pageSize >= total" @click="changePage(page + 1)">下一页</button>
     </div>
 
@@ -228,17 +230,17 @@ h1 {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 8px;
 }
 
+/* 第一行：姓名 + 右侧信息 */
 .row1 {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  overflow: hidden;
+  margin-bottom: 8px;
 }
 
-.name {
+.row1 .name {
   font-size: 16px;
   font-weight: bold;
   color: #333;
@@ -246,24 +248,15 @@ h1 {
   text-overflow: ellipsis;
   white-space: nowrap;
   flex: 1;
+  min-width: 0;
 }
 
-.row1 .right {
+.row1 .right-info {
   display: flex;
-  justify-content: flex-end;
   align-items: center;
-  gap: 5px;
-  overflow: hidden;
-}
-
-.count {
-  font-size: 12px;
-  color: #000;
-  background: #f5f5f5;
-  padding: 2px 8px;
-  border-radius: 10px;
-  white-space: nowrap;
+  gap: 6px;
   flex-shrink: 0;
+  margin-left: 8px;
 }
 
 .like-count {
@@ -271,38 +264,67 @@ h1 {
   color: #e74c3c;
 }
 
-.row2 {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 12px;
+.count {
   font-size: 12px;
-  color: #888;
-}
-
-.info-item {
+  color: #666;
+  background: #f5f5f5;
+  padding: 2px 8px;
+  border-radius: 10px;
   white-space: nowrap;
 }
 
-.card-actions {
-  padding: 10px 16px;
-  border-top: 1px solid #f5f5f5;
+.country {
+  font-size: 12px;
+  color: #7b1fa2;
+  background: #f3e5f5;
+  padding: 2px 8px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+/* 第二行：简介 */
+.row2 {
+  font-size: 13px;
+  color: #999;
+  line-height: 1.5;
+  word-break: break-all;
+  margin-bottom: 12px;
+}
+
+/* 第三行：操作按钮 */
+.row3 {
   display: flex;
   justify-content: flex-end;
+  gap: 8px;
+  padding: 0 16px 12px;
 }
 
 .edit-btn {
-  padding: 4px 16px;
-  border: none;
+  padding: 5px 12px;
+  border: 1px solid #ddd;
+  background: white;
   border-radius: 4px;
   cursor: pointer;
   font-size: 12px;
-  background: #3498db;
-  color: white;
-  transition: opacity 0.3s;
 }
 
 .edit-btn:hover {
-  opacity: 0.8;
+  background: #f0f0f0;
+}
+
+.detail-btn {
+  padding: 5px 12px;
+  border: 1px solid #28a745;
+  background: white;
+  color: #28a745;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.detail-btn:hover {
+  background: #28a745;
+  color: white;
 }
 
 .empty-hint {

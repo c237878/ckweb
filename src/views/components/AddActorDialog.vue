@@ -17,7 +17,11 @@
         </div>
         <div class="form-group">
           <label>国家/地区</label>
-          <input v-model="form.country" placeholder="国家或地区（选填）" />
+          <input v-model="form.country" placeholder="国家/地区（选填）" />
+        </div>
+        <div class="form-group">
+          <label>简介</label>
+          <textarea v-model="form.bio" placeholder="简介（选填）" rows="4"></textarea>
         </div>
       </div>
       <div class="dialog-footer">
@@ -45,7 +49,8 @@ const isEdit = ref(false)
 const form = ref({
   name: '',
   alias: '',
-  country: ''
+  country: '',
+  bio: ''
 })
 
 let mouseDownOnDialog = false
@@ -68,11 +73,12 @@ watch(() => props.visible, (val) => {
       form.value = {
         name: props.editingActor.name || '',
         alias: props.editingActor.alias || '',
-        country: props.editingActor.country || ''
+        country: props.editingActor.country || '',
+        bio: props.editingActor.bio || ''
       }
     } else {
       isEdit.value = false
-      form.value = { name: '', alias: '', country: '' }
+      form.value = { name: '', alias: '', country: '', bio: '' }
     }
   }
 })
@@ -154,20 +160,24 @@ const handleDelete = () => {
 }
 
 .form-group input,
-.form-group textarea,
-.form-group select {
+.form-group textarea {
   padding: 8px 12px;
   border: 1px solid #ddd;
   border-radius: 4px;
   font-size: 14px;
   outline: none;
   transition: border-color 0.2s;
+  font-family: inherit;
 }
 
 .form-group input:focus,
-.form-group textarea:focus,
-.form-group select:focus {
+.form-group textarea:focus {
   border-color: #3498db;
+}
+
+.form-group textarea {
+  resize: vertical;
+  min-height: 80px;
 }
 
 .dialog-footer {

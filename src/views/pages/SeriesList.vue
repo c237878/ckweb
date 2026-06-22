@@ -15,16 +15,26 @@
     </div>
     <div class="series-grid">
       <div class="series-card" v-for="series in seriesList" :key="series.id">
-        <div class="card-body" @click="goToVideos(series.id)">
-          <div class="series-name">{{ series.name }}</div>
-          <div class="series-info">
-            <span v-if="series.description" class="desc">{{ series.description }}</span>
-            <span class="count">{{ series.videoCount || 0 }} 部影片</span>
+        <div class="card-body">
+          <!-- 第一行：名称 + 右侧信息 -->
+          <div class="row1">
+            <span class="name">{{ series.name }}</span>
+            <div class="right-info">
+              <span v-if="series.likeCount > 0" class="like-count">♥ {{ series.likeCount }}</span>
+              <span v-if="series.videoCount > 0" class="count">{{ series.videoCount }} 部</span>
+              <span v-if="series.country" class="country">{{ series.country }}</span>
+            </div>
+          </div>
+          <!-- 第二行：别名 -->
+          <div class="row2" v-if="series.alias">
+            {{ series.alias }}
           </div>
         </div>
-        <div class="card-actions">
+        <!-- 第三行：操作按钮 -->
+        <div class="row3">
+          <button v-if="series.link" class="link-btn" @click.stop="openLink(series.link)">链接</button>
           <button class="edit-btn" @click.stop="handleEdit(series)">编辑</button>
-          <button class="delete-btn" @click.stop="handleDelete(series.id)">删除</button>
+          <button class="detail-btn" @click.stop="goToVideos(series.id)">详情</button>
         </div>
       </div>
     </div>
@@ -40,12 +50,20 @@
       <div class="dialog">
         <h3>{{ editingSeries ? '编辑系列' : '添加系列' }}</h3>
         <div class="form-group">
-          <label>名称</label>
+          <label>名称 <span class="required">*</span></label>
           <input v-model="formData.name" placeholder="系列名称" />
         </div>
         <div class="form-group">
-          <label>描述</label>
-          <textarea v-model="formData.description" placeholder="系列描述（可选）" rows="3"></textarea>
+          <label>别名</label>
+          <input v-model="formData.alias" placeholder="别名（选填）" />
+        </div>
+        <div class="form-group">
+          <label>国家/地区</label>
+          <input v-model="formData.country" placeholder="国家/地区（选填）" />
+        </div>
+        <div class="form-group">
+          <label>链接</label>
+          <input v-model="formData.link" placeholder="链接地址（选填）" />
         </div>
         <div class="dialog-actions">
           <button class="cancel-btn" @click="showAddDialog = false; editingSeries = null">取消</button>
@@ -70,7 +88,7 @@ const keyword = ref('')
 const loading = ref(false)
 const showAddDialog = ref(false)
 const editingSeries = ref(null)
-const formData = ref({ name: '', description: '' })
+const formData = ref({ name: '', alias: '', country: '', link: '' })
 
 let mouseDownOnDialog = false
 
@@ -98,9 +116,18 @@ const goToVideos = (seriesId) => {
   router.push({ path: '/videos', query: { seriesId } })
 }
 
+const openLink = (link) => {
+  if (link) window.open(link, '_blank')
+}
+
 const handleEdit = (series) => {
   editingSeries.value = series
-  formData.value = { name: series.name, description: series.description || '' }
+  formData.value = {
+    name: series.name || '',
+    alias: series.alias || '',
+    country: series.country || '',
+    link: series.link || ''
+  }
   showAddDialog.value = true
 }
 
@@ -124,7 +151,7 @@ const handleSave = async () => {
     }
     showAddDialog.value = false
     editingSeries.value = null
-    formData.value = { name: '', description: '' }
+    formData.value = { name: '', alias: '', country: '', link: '' }
     await loadSeries()
   } catch (error) {
     console.error('保存失败:', error)
@@ -205,7 +232,7 @@ onMounted(() => {
   cursor: pointer;
 }
 
-.search-btn:hover {
+.search-search-btn:hover {
   background: #0056b3;
 }
 
@@ -221,68 +248,122 @@ onMounted(() => {
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   overflow: hidden;
-  transition: box-shadow 0.3s;
-}
-
-.series-card:hover {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
 }
 
 .card-body {
   padding: 16px;
-  cursor: pointer;
+  flex: 1;
 }
 
-.series-name {
-  font-size: 18px;
-  font-weight: bold;
-  color: #333;
+/* 第一行：名称 + 右侧信息 */
+.row1 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 8px;
 }
 
-.series-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+.row1 .name {
+  font-size: 16px;
+  font-weight: bold;
+  color: #333;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
 }
 
-.series-info .desc {
+.row1 .right-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+
+.like-count {
+  font-size: 12px;
+  color: #e74c3c;
+}
+
+.count {
+  font-size: 12px;
+  color: #666;
+  background: #f5f5f5;
+  padding: 2px 8px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+.country {
+  font-size: 12px;
+  color: #7b1fa2;
+  background: #f3e5f5;
+  padding: 2px 8px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+/* 第二行：别名 */
+.row2 {
   font-size: 13px;
   color: #999;
-  line-height: 1.4;
+  line-height: 1.5;
+  word-break: break-all;
+  margin-bottom: 12px;
 }
 
-.series-info .count {
-  font-size: 13px;
-  color: #666;
-}
-
-.card-actions {
+/* 第三行：操作按钮 */
+.row3 {
   display: flex;
+  justify-content: flex-end;
   gap: 8px;
   padding: 0 16px 12px;
 }
 
-.edit-btn, .delete-btn {
-  padding: 6px 14px;
+.link-btn {
+  padding: 5px 12px;
+  border: 1px solid #17a2b8;
+  background: white;
+  color: #17a2b8;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.link-btn:hover {
+  background: #17a2b8;
+  color: white;
+}
+
+.edit-btn {
+  padding: 5px 12px;
   border: 1px solid #ddd;
   background: white;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .edit-btn:hover {
   background: #f0f0f0;
 }
 
-.delete-btn {
-  color: #e74c3c;
-  border-color: #e74c3c;
+.detail-btn {
+  padding: 5px 12px;
+  border: 1px solid #28a745;
+  background: white;
+  color: #28a745;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
 }
 
-.delete-btn:hover {
-  background: #e74c3c;
+.detail-btn:hover {
+  background: #28a745;
   color: white;
 }
 
@@ -353,18 +434,17 @@ onMounted(() => {
   color: #333;
 }
 
-.form-group input,
-.form-group textarea {
+.required {
+  color: #e74c3c;
+}
+
+.form-group input {
   width: 100%;
   padding: 10px;
   border: 1px solid #ddd;
   border-radius: 6px;
   font-size: 14px;
   box-sizing: border-box;
-}
-
-.form-group textarea {
-  resize: vertical;
 }
 
 .dialog-actions {
