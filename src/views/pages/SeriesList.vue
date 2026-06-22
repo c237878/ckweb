@@ -2,7 +2,7 @@
   <div class="series-list">
     <div class="list-header">
       <h1>影视系列</h1>
-      <button class="add-btn" @click="showAddDialog = true">添加系列</button>
+      <button class="add-btn" @click="handleAdd">添加系列</button>
     </div>
     <div class="filters">
       <input
@@ -16,26 +16,26 @@
     <div class="series-grid">
       <div class="series-card" v-for="series in seriesList" :key="series.id">
         <div class="card-body">
-          <!-- 第一行：名称 + 右侧信息 -->
-          <div class="row1">
+          <!-- 第一行：名称(加粗, flex:1) + 获赞数 + 影片数 + 国家(紫色tag) -->
+          <div class="info-row">
             <span class="name">{{ series.name }}</span>
-            <div class="right-info">
+            <div class="right-tags">
               <span v-if="series.likeCount > 0" class="like-count">♥ {{ series.likeCount }}</span>
-              <span v-if="series.videoCount > 0" class="count">{{ series.videoCount }} 部</span>
-              <span v-if="series.country" class="country">{{ series.country }}</span>
+              <span v-if="series.videoCount > 0" class="video-count">{{ series.videoCount }} 部</span>
+              <span v-if="series.country" class="country-tag">{{ series.country }}</span>
             </div>
           </div>
-          <!-- 第二行：别名 -->
-          <div class="row2" v-if="series.alias">
-            {{ series.alias }}
+          <!-- 第二行：别名（灰色小字，ellipsis 单行溢出） -->
+          <div class="info-row alias-row" v-if="series.alias">
+            <span class="alias">{{ series.alias }}</span>
           </div>
         </div>
-        <!-- 第三行：操作按钮 -->
-        <div class="row3">
-          <button v-if="series.link" class="link-btn" @click.stop="openLink(series.link)">链接</button>
-          <button class="edit-btn" @click.stop="handleEdit(series)">编辑</button>
-          <button class="detail-btn" @click.stop="goToVideos(series.id)">详情</button>
-        </div>
+        <!-- 第三行：CardActions -->
+        <CardActions>
+          <button v-if="series.link" class="btn" @click.stop="openLink(series.link)">链接</button>
+          <button class="btn btn-primary" @click.stop="handleEdit(series)">编辑</button>
+          <button class="btn btn-success" @click.stop="goToVideos(series.id)">详情</button>
+        </CardActions>
       </div>
     </div>
     <div class="empty-hint" v-if="seriesList.length === 0 && !loading">暂无系列</div>
@@ -45,32 +45,13 @@
       <button :disabled="page * pageSize >= total" @click="changePage(page + 1)">下一页</button>
     </div>
 
-    <!-- 添加/编辑弹窗 -->
-    <div class="dialog-overlay" v-if="showAddDialog" @mousedown="handleOverlayDown" @click="handleOverlayClick">
-      <div class="dialog">
-        <h3>{{ editingSeries ? '编辑系列' : '添加系列' }}</h3>
-        <div class="form-group">
-          <label>名称 <span class="required">*</span></label>
-          <input v-model="formData.name" placeholder="系列名称" />
-        </div>
-        <div class="form-group">
-          <label>别名</label>
-          <input v-model="formData.alias" placeholder="别名（选填）" />
-        </div>
-        <div class="form-group">
-          <label>国家/地区</label>
-          <input v-model="formData.country" placeholder="国家/地区（选填）" />
-        </div>
-        <div class="form-group">
-          <label>链接</label>
-          <input v-model="formData.link" placeholder="链接地址（选填）" />
-        </div>
-        <div class="dialog-actions">
-          <button class="cancel-btn" @click="showAddDialog = false; editingSeries = null">取消</button>
-          <button class="save-btn" @click="handleSave">保存</button>
-        </div>
-      </div>
-    </div>
+    <!-- 使用 AddSeriesDialog 弹窗 -->
+    <AddSeriesDialog
+      :visible="showDialog"
+      :editing-series="editingSeries"
+      @save="handleSave"
+      @cancel="handleCancel"
+    />
   </div>
 </template>
 
@@ -78,6 +59,8 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { seriesApi } from '@/scripts/api'
+import CardActions from '@/views/components/CardActions.vue'
+import AddSeriesDialog from '@/views/components/AddSeriesDialog.vue'
 
 const router = useRouter()
 const seriesList = ref([])
@@ -86,11 +69,8 @@ const pageSize = ref(20)
 const total = ref(0)
 const keyword = ref('')
 const loading = ref(false)
-const showAddDialog = ref(false)
+const showDialog = ref(false)
 const editingSeries = ref(null)
-const formData = ref({ name: '', alias: '', country: '', link: '' })
-
-let mouseDownOnDialog = false
 
 const loadSeries = async () => {
   loading.value = true
@@ -120,53 +100,25 @@ const openLink = (link) => {
   if (link) window.open(link, '_blank')
 }
 
-const handleEdit = (series) => {
-  editingSeries.value = series
-  formData.value = {
-    name: series.name || '',
-    alias: series.alias || '',
-    country: series.country || '',
-    link: series.link || ''
-  }
-  showAddDialog.value = true
+const handleAdd = () => {
+  editingSeries.value = null
+  showDialog.value = true
 }
 
-const handleDelete = async (id) => {
-  if (!confirm('确定要删除此系列吗？')) return
-  try {
-    await seriesApi.delete(id)
-    await loadSeries()
-  } catch (error) {
-    console.error('删除失败:', error)
-  }
+const handleEdit = (series) => {
+  editingSeries.value = series
+  showDialog.value = true
 }
 
 const handleSave = async () => {
-  if (!formData.value.name.trim()) return
-  try {
-    if (editingSeries.value) {
-      await seriesApi.update(editingSeries.value.id, formData.value)
-    } else {
-      await seriesApi.add(formData.value)
-    }
-    showAddDialog.value = false
-    editingSeries.value = null
-    formData.value = { name: '', alias: '', country: '', link: '' }
-    await loadSeries()
-  } catch (error) {
-    console.error('保存失败:', error)
-  }
+  showDialog.value = false
+  editingSeries.value = null
+  await loadSeries()
 }
 
-const handleOverlayDown = (e) => {
-  const dialog = e.currentTarget.querySelector('.dialog')
-  mouseDownOnDialog = dialog && dialog.contains(e.target)
-}
-const handleOverlayClick = () => {
-  if (!mouseDownOnDialog) {
-    showAddDialog.value = false
-    editingSeries.value = null
-  }
+const handleCancel = () => {
+  showDialog.value = false
+  editingSeries.value = null
 }
 
 onMounted(() => {
@@ -232,7 +184,7 @@ onMounted(() => {
   cursor: pointer;
 }
 
-.search-search-btn:hover {
+.search-btn:hover {
   background: #0056b3;
 }
 
@@ -255,116 +207,81 @@ onMounted(() => {
 .card-body {
   padding: 16px;
   flex: 1;
-}
-
-/* 第一行：名称 + 右侧信息 */
-.row1 {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
+  flex-direction: column;
+  gap: 6px;
 }
 
-.row1 .name {
+/* 统一信息行样式 */
+.info-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+}
+
+/* 第一行：名称 */
+.info-row .name {
   font-size: 16px;
   font-weight: bold;
   color: #333;
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  flex: 1;
-  min-width: 0;
 }
 
-.row1 .right-info {
+/* 右侧标签组 */
+.right-tags {
   display: flex;
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
-  margin-left: 8px;
 }
 
+/* 获赞数 */
 .like-count {
   font-size: 12px;
   color: #e74c3c;
+  background: #fce4ec;
+  padding: 2px 6px;
+  border-radius: 3px;
+  white-space: nowrap;
 }
 
-.count {
+/* 影片数 */
+.video-count {
   font-size: 12px;
   color: #666;
   background: #f5f5f5;
-  padding: 2px 8px;
-  border-radius: 10px;
+  padding: 2px 6px;
+  border-radius: 3px;
   white-space: nowrap;
 }
 
-.country {
-  font-size: 12px;
-  color: #7b1fa2;
+/* 国家 tag - 紫色 */
+.country-tag {
   background: #f3e5f5;
-  padding: 2px 8px;
-  border-radius: 10px;
+  color: #7b1fa2;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 12px;
   white-space: nowrap;
 }
 
-/* 第二行：别名 */
-.row2 {
+/* 第二行：别名（单行溢出省略号） */
+.alias-row {
+  overflow: hidden;
+}
+
+.alias-row .alias {
   font-size: 13px;
   color: #999;
-  line-height: 1.5;
-  word-break: break-all;
-  margin-bottom: 12px;
-}
-
-/* 第三行：操作按钮 */
-.row3 {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  padding: 0 16px 12px;
-}
-
-.link-btn {
-  padding: 5px 12px;
-  border: 1px solid #17a2b8;
-  background: white;
-  color: #17a2b8;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 12px;
-}
-
-.link-btn:hover {
-  background: #17a2b8;
-  color: white;
-}
-
-.edit-btn {
-  padding: 5px 12px;
-  border: 1px solid #ddd;
-  background: white;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 12px;
-}
-
-.edit-btn:hover {
-  background: #f0f0f0;
-}
-
-.detail-btn {
-  padding: 5px 12px;
-  border: 1px solid #28a745;
-  background: white;
-  color: #28a745;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 12px;
-}
-
-.detail-btn:hover {
-  background: #28a745;
-  color: white;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
 }
 
 .empty-hint {
@@ -396,83 +313,6 @@ onMounted(() => {
 .pagination button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-}
-
-/* 弹窗 */
-.dialog-overlay {
-  position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
-}
-
-.dialog {
-  background: white;
-  border-radius: 12px;
-  padding: 24px;
-  width: 400px;
-  max-width: 90vw;
-}
-
-.dialog h3 {
-  margin: 0 0 20px;
-  font-size: 20px;
-}
-
-.form-group {
-  margin-bottom: 16px;
-}
-
-.form-group label {
-  display: block;
-  font-size: 14px;
-  font-weight: bold;
-  margin-bottom: 6px;
-  color: #333;
-}
-
-.required {
-  color: #e74c3c;
-}
-
-.form-group input {
-  width: 100%;
-  padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  font-size: 14px;
-  box-sizing: border-box;
-}
-
-.dialog-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 20px;
-}
-
-.cancel-btn {
-  padding: 8px 20px;
-  border: 1px solid #ddd;
-  background: white;
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-.save-btn {
-  padding: 8px 20px;
-  background: #007bff;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-.save-btn:hover {
-  background: #0056b3;
 }
 
 @media (max-width: 768px) {

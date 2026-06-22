@@ -9,32 +9,33 @@
       <div v-if="!video.coverPath" class="no-cover">{{ video.name?.charAt(0) || '?' }}</div>
     </div>
     <div class="video-body">
-      <!-- 第二行：影片名称（加粗，有番号组合显示） -->
-      <div class="row1">
-        <span v-if="video.code" class="code">{{ video.code }}</span>
+      <!-- 第二行：番号(code, 蓝色tag) + 名称(name, 加粗) -->
+      <div class="info-row">
+        <span v-if="video.code" class="code-tag">{{ video.code }}</span>
         <span class="name">{{ video.name }}</span>
       </div>
-      <!-- 第三行：地区、分类、获赞总数（>0显示） -->
-      <div class="row2">
+      <!-- 第三行：国家(tag, 紫色) + 分类(tag, 绿色) + 获赞数(红心) -->
+      <div class="info-row">
         <span v-if="video.country" class="country-tag">{{ video.country }}</span>
         <span v-if="video.category" class="type-tag">{{ video.category }}</span>
         <span v-if="video.likeCount > 0" class="like-count">♥ {{ video.likeCount }}</span>
       </div>
-      <!-- 第四行：所属系列（点击跳转系列详情页） -->
-      <div class="row3" v-if="video.seriesName">
+      <!-- 第四行：所属系列名称（可点击，橙色tag） -->
+      <div class="info-row" v-if="video.seriesName">
         <span class="series-tag clickable" @click.stop="goToSeries(video.seriesId)">{{ video.seriesName }}</span>
       </div>
     </div>
     <!-- 第五行：操作按钮 -->
-    <div v-if="mode === 'full' && showActions" class="card-actions" @click.stop>
-      <button class="edit-btn" @click.stop="handleEdit">编辑</button>
-      <button class="detail-btn" @click.stop="goToDetail">详情</button>
-    </div>
+    <CardActions v-if="mode === 'full' && showActions" @click.stop>
+      <button class="btn btn-success" @click.stop="goToDetail">详情</button>
+      <button class="btn btn-primary" @click.stop="handleEdit">编辑</button>
+    </CardActions>
   </div>
 </template>
 
 <script setup>
 import { useRouter } from 'vue-router'
+import CardActions from './CardActions.vue'
 
 const props = defineProps({
   video: {
@@ -118,7 +119,7 @@ const handleEdit = () => {
 .video-cover {
   position: relative;
   width: 100%;
-  padding-top: 67.25%;
+  padding-top: 66.56%; /* 3:2 比例 */
   background: #f0f0f0;
   overflow: hidden;
 }
@@ -168,58 +169,64 @@ const handleEdit = () => {
   min-width: 0;
 }
 
-/* 第二行：名称 + 番号 */
-.row1 {
+/* 统一信息行样式 - 每一行都是 flex + gap */
+.info-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   overflow: hidden;
 }
 
-.code {
-  font-size: 13px;
-  font-weight: bold;
-  color: #1976d2;
-  flex-shrink: 0;
-  background: #e3f2fd;
-  padding: 1px 6px;
-  border-radius: 3px;
-}
-
-.name {
+/* 第二行：名称样式 */
+.info-row .name {
   font-size: 14px;
   font-weight: bold;
   color: #333;
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* 第三行：地区、分类、获赞 */
-.row2 {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+/* 番号 tag - 蓝色 */
+.code-tag {
   font-size: 12px;
-  color: #666;
-  overflow: hidden;
-  flex-wrap: wrap;
+  font-weight: bold;
+  color: #1976d2;
+  flex-shrink: 0;
+  background: #e3f2fd;
+  padding: 2px 6px;
+  border-radius: 3px;
 }
 
-.like-count {
-  font-size: 12px;
-  color: #e74c3c;
-  background: #fce4ec;
-  padding: 1px 6px;
+/* 国家 tag - 紫色 */
+.country-tag {
+  background: #f3e5f5;
+  color: #7b1fa2;
+  padding: 2px 6px;
   border-radius: 3px;
+  font-size: 12px;
   white-space: nowrap;
 }
 
+/* 分类 tag - 绿色 */
+.type-tag {
+  background: #e8f5e9;
+  color: #2e7d32;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* 系列 tag - 橙色 */
 .series-tag {
   background: #fff3e0;
   color: #e65100;
-  padding: 1px 6px;
+  padding: 2px 6px;
   border-radius: 3px;
+  font-size: 12px;
   white-space: nowrap;
 }
 
@@ -231,66 +238,13 @@ const handleEdit = () => {
   background: #ffe0b2;
 }
 
-.type-tag {
-  background: #e8f5e9;
-  color: #2e7d32;
-  padding: 1px 6px;
+/* 获赞数 */
+.like-count {
+  font-size: 12px;
+  color: #e74c3c;
+  background: #fce4ec;
+  padding: 2px 6px;
   border-radius: 3px;
   white-space: nowrap;
-}
-
-.country-tag {
-  background: #f3e5f5;
-  color: #7b1fa2;
-  padding: 1px 6px;
-  border-radius: 3px;
-  white-space: nowrap;
-}
-
-/* 第四行：所属系列 */
-.row3 {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: #666;
-}
-
-.card-actions {
-  padding: 8px 16px;
-  display: flex;
-  justify-content: flex-end;
-  border-top: 1px solid #f5f5f5;
-}
-
-.edit-btn {
-  padding: 4px 16px;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 12px;
-  transition: opacity 0.3s;
-  background: #3498db;
-  color: white;
-}
-
-.edit-btn:hover {
-  opacity: 0.8;
-}
-
-.detail-btn {
-  padding: 4px 16px;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 12px;
-  transition: opacity 0.3s;
-  background: #2ecc71;
-  color: white;
-  margin-right: auto;
-}
-
-.detail-btn:hover {
-  opacity: 0.8;
 }
 </style>

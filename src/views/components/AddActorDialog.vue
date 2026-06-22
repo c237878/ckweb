@@ -25,10 +25,11 @@
         </div>
       </div>
       <div class="dialog-footer">
-        <button v-if="isEdit" class="btn btn-delete" @click="handleDelete">删除</button>
+        <button v-if="isEdit" class="btn btn-danger" @click="handleDelete">删除</button>
+        <div class="spacer"></div>
         <div class="right-btns">
-          <button class="btn btn-cancel" @click="handleCancel">取消</button>
-          <button class="btn btn-confirm" @click="handleSave">保存</button>
+          <button class="btn" @click="handleCancel">取消</button>
+          <button class="btn btn-primary" @click="handleSave">保存</button>
         </div>
       </div>
     </div>
@@ -188,36 +189,48 @@ const handleDelete = () => {
   align-items: center;
 }
 
+.spacer {
+  flex: 1;
+}
+
 .right-btns {
   display: flex;
   gap: 8px;
 }
 
+/* 统一按钮样式 - 与 CardActions 保持一致 */
 .btn {
   padding: 8px 20px;
-  border: none;
+  border: 1px solid #ddd;
+  background: #fff;
   border-radius: 4px;
   cursor: pointer;
   font-size: 14px;
-  transition: opacity 0.2s;
+  color: #333;
+  transition: all 0.2s;
 }
 
 .btn:hover {
-  opacity: 0.8;
+  background: #f5f5f5;
 }
 
-.btn-cancel {
-  background: #ddd;
-  color: #333;
-}
-
-.btn-confirm {
+.btn-primary {
   background: #3498db;
-  color: white;
+  color: #fff;
+  border-color: #3498db;
 }
 
-.btn-delete {
+.btn-primary:hover {
+  background: #2980b9;
+}
+
+.btn-danger {
   background: #e74c3c;
-  color: white;
+  color: #fff;
+  border-color: #e74c3c;
+}
+
+.btn-danger:hover {
+  background: #c0392b;
 }
 </style>

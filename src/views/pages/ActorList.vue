@@ -2,7 +2,7 @@
   <div class="actor-list">
     <div class="list-header">
       <h1>演员列表</h1>
-      <button class="add-btn" @click="showAddDialog = true">添加演员</button>
+      <button class="add-btn" @click="handleAdd">添加演员</button>
     </div>
     <div class="filters">
       <input
@@ -16,25 +16,25 @@
     <div class="actor-grid">
       <div class="actor-card" v-for="actor in actors" :key="actor.id">
         <div class="card-body" @click="goToDetail(actor.id)">
-          <!-- 第一行：姓名 + 右侧信息 -->
-          <div class="row1">
+          <!-- 第一行：姓名(加粗, flex:1) + 获赞数 + 影片数 + 国家(紫色tag) -->
+          <div class="info-row">
             <span class="name">{{ actor.name }}</span>
-            <div class="right-info">
+            <div class="right-tags">
               <span v-if="actor.likeCount > 0" class="like-count">♥ {{ actor.likeCount }}</span>
-              <span v-if="actor.videoCount > 0" class="count">{{ actor.videoCount }} 部</span>
-              <span v-if="actor.country" class="country">{{ actor.country }}</span>
+              <span v-if="actor.videoCount > 0" class="video-count">{{ actor.videoCount }} 部</span>
+              <span v-if="actor.country" class="country-tag">{{ actor.country }}</span>
             </div>
           </div>
-          <!-- 第二行：简介 -->
-          <div class="row2" v-if="actor.bio">
-            {{ actor.bio }}
+          <!-- 第二行：简介（灰色小字，单行溢出省略号） -->
+          <div class="info-row bio-row" v-if="actor.bio">
+            <span class="bio">{{ actor.bio }}</span>
           </div>
         </div>
-        <!-- 第三行：操作按钮 -->
-        <div class="row3">
-          <button class="edit-btn" @click.stop="handleEditActor(actor)">编辑</button>
-          <button class="detail-btn" @click.stop="goToDetail(actor.id)">详情</button>
-        </div>
+        <!-- 第三行：CardActions -->
+        <CardActions>
+          <button class="btn btn-primary" @click.stop="handleEdit(actor)">编辑</button>
+          <button class="btn btn-success" @click.stop="goToDetail(actor.id)">详情</button>
+        </CardActions>
       </div>
     </div>
     <div class="empty-hint" v-if="actors.length === 0 && !loading">暂无演员</div>
@@ -44,12 +44,13 @@
       <button :disabled="page * pageSize >= total" @click="changePage(page + 1)">下一页</button>
     </div>
 
+    <!-- 使用 AddActorDialog 弹窗 -->
     <AddActorDialog
-      :visible="showAddDialog"
+      :visible="showDialog"
       :editing-actor="editingActor"
-      @save="handleSaveActor"
-      @cancel="showAddDialog = false; editingActor = null"
-      @delete="handleDeleteActor"
+      @save="handleSave"
+      @cancel="handleCancel"
+      @delete="handleDelete"
     />
   </div>
 </template>
@@ -58,6 +59,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { actorApi } from '@/scripts/api'
+import CardActions from '@/views/components/CardActions.vue'
 import AddActorDialog from '@/views/components/AddActorDialog.vue'
 
 const router = useRouter()
@@ -67,7 +69,7 @@ const page = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
 const loading = ref(false)
-const showAddDialog = ref(false)
+const showDialog = ref(false)
 const editingActor = ref(null)
 
 onMounted(() => {
@@ -104,41 +106,31 @@ const goToDetail = (id) => {
   router.push(`/actor/${id}`)
 }
 
-const handleEditActor = (actor) => {
+const handleAdd = () => {
+  editingActor.value = null
+  showDialog.value = true
+}
+
+const handleEdit = (actor) => {
   editingActor.value = actor
-  showAddDialog.value = true
+  showDialog.value = true
 }
 
-const handleDeleteActor = async (actorId) => {
-  try {
-    const res = await actorApi.delete(actorId)
-    if (res.success) {
-      showAddDialog.value = false
-      editingActor.value = null
-      await loadActors()
-    }
-  } catch (error) {
-    console.error('删除演员失败:', error)
-  }
+const handleSave = async () => {
+  showDialog.value = false
+  editingActor.value = null
+  await loadActors()
 }
 
-const handleSaveActor = async (actorData) => {
-  try {
-    let res
-    if (editingActor.value) {
-      res = await actorApi.update(editingActor.value.id, actorData)
-    } else {
-      res = await actorApi.add(actorData)
-    }
+const handleCancel = () => {
+  showDialog.value = false
+  editingActor.value = null
+}
 
-    if (res.success) {
-      showAddDialog.value = false
-      editingActor.value = null
-      await loadActors()
-    }
-  } catch (error) {
-    console.error('保存演员失败:', error)
-  }
+const handleDelete = async () => {
+  showDialog.value = false
+  editingActor.value = null
+  await loadActors()
 }
 </script>
 
@@ -230,101 +222,79 @@ h1 {
   flex: 1;
   display: flex;
   flex-direction: column;
+  gap: 6px;
 }
 
-/* 第一行：姓名 + 右侧信息 */
-.row1 {
+/* 统一信息行样式 */
+.info-row {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
+  gap: 6px;
+  overflow: hidden;
 }
 
-.row1 .name {
+/* 第一行：姓名 */
+.info-row .name {
   font-size: 16px;
   font-weight: bold;
   color: #333;
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  flex: 1;
-  min-width: 0;
 }
 
-.row1 .right-info {
+/* 右侧标签组 */
+.right-tags {
   display: flex;
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
-  margin-left: 8px;
 }
 
+/* 获赞数 */
 .like-count {
   font-size: 12px;
   color: #e74c3c;
+  background: #fce4ec;
+  padding: 2px 6px;
+  border-radius: 3px;
+  white-space: nowrap;
 }
 
-.count {
+/* 影片数 */
+.video-count {
   font-size: 12px;
   color: #666;
   background: #f5f5f5;
-  padding: 2px 8px;
-  border-radius: 10px;
+  padding: 2px 6px;
+  border-radius: 3px;
   white-space: nowrap;
 }
 
-.country {
-  font-size: 12px;
-  color: #7b1fa2;
+/* 国家 tag - 紫色 */
+.country-tag {
   background: #f3e5f5;
-  padding: 2px 8px;
-  border-radius: 10px;
+  color: #7b1fa2;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 12px;
   white-space: nowrap;
 }
 
-/* 第二行：简介 */
-.row2 {
+/* 第二行：简介（单行溢出省略号） */
+.bio-row {
+  overflow: hidden;
+}
+
+.bio-row .bio {
   font-size: 13px;
   color: #999;
-  line-height: 1.5;
-  word-break: break-all;
-  margin-bottom: 12px;
-}
-
-/* 第三行：操作按钮 */
-.row3 {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  padding: 0 16px 12px;
-}
-
-.edit-btn {
-  padding: 5px 12px;
-  border: 1px solid #ddd;
-  background: white;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 12px;
-}
-
-.edit-btn:hover {
-  background: #f0f0f0;
-}
-
-.detail-btn {
-  padding: 5px 12px;
-  border: 1px solid #28a745;
-  background: white;
-  color: #28a745;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 12px;
-}
-
-.detail-btn:hover {
-  background: #28a745;
-  color: white;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
 }
 
 .empty-hint {

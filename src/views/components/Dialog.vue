@@ -77,20 +77,22 @@ const handleCancel = () => {
 .dialog-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 15px;
+  align-items: center;
+  gap: 6px;
   margin-top: 25px;
   padding-top: 15px;
   border-top: 1px solid #eee;
 }
 
-.cancel-btn,
-.confirm-btn {
-  padding: 10px 30px;
+/* 统一按钮样式 - 与 CardActions 保持一致 */
+.dialog-actions :deep(button),
+.dialog-actions button {
+  padding: 10px 24px;
   border: none;
   border-radius: 4px;
   cursor: pointer;
   font-size: 14px;
-  transition: opacity 0.3s;
+  transition: all 0.2s;
 }
 
 .cancel-btn {
@@ -98,13 +100,16 @@ const handleCancel = () => {
   color: white;
 }
 
+.cancel-btn:hover {
+  background: #7f8c8d;
+}
+
 .confirm-btn {
   background: #e74c3c;
   color: white;
 }
 
-.cancel-btn:hover,
 .confirm-btn:hover {
-  opacity: 0.8;
+  background: #c0392b;
 }
 </style>
