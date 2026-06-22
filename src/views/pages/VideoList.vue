@@ -13,50 +13,45 @@
         <button class="add-btn" @click="showAddDialog = true">添加影片</button>
       </div>
     </div>
+
     <div class="filters">
-      <div class="filter-item">
-        <select v-model="filters.country" @change="loadVideos">
-          <option value="">全部地区</option>
-          <option v-for="c in countries" :key="c" :value="c">{{ c }}</option>
-        </select>
-      </div>
-      <div class="filter-item">
-        <select v-model="filters.category" @change="loadVideos">
-          <option value="">全部分类</option>
-          <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
-        </select>
-      </div>
-      <div class="filter-item">
-        <select v-model="filters.seriesId" @change="loadVideos">
-          <option value="">全部系列</option>
-          <option v-for="s in seriesList" :key="s.id" :value="s.id">{{ s.name }}</option>
-        </select>
-      </div>
-      <div class="filter-item">
-        <input
-          v-model="filters.keyword"
-          type="text"
-          placeholder="搜索影片名称或番号..."
-          @keyup.enter="loadVideos"
-        />
-        <button class="search-btn" @click="loadVideos">搜索</button>
-      </div>
+      <select v-model="filters.country" @change="loadVideos">
+        <option value="">全部地区</option>
+        <option v-for="c in countries" :key="c" :value="c">{{ c }}</option>
+      </select>
+      <select v-model="filters.category" @change="loadVideos">
+        <option value="">全部分类</option>
+        <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
+      </select>
+      <select v-model="filters.seriesId" @change="loadVideos">
+        <option value="">全部系列</option>
+        <option v-for="s in seriesList" :key="s.id" :value="s.id">{{ s.name }}</option>
+      </select>
+      <input
+        v-model="filters.keyword"
+        type="text"
+        placeholder="搜索影片名称或番号..."
+        @keyup.enter="loadVideos"
+      />
+      <button class="search-btn" @click="loadVideos">搜索</button>
     </div>
+
     <div class="video-grid">
-          <VideoCard
-            v-for="video in videos"
-            :key="video.id"
-            :video="video"
-            :show-actions="true"
-            :selectable="true"
-            :selected="selectedIds.includes(video.id)"
-            @edit="handleEditVideo"
-            @select="handleSelectVideo"
-          />
+      <VideoCard
+        v-for="video in videos"
+        :key="video.id"
+        :video="video"
+        :show-actions="true"
+        :selectable="true"
+        :selected="selectedIds.includes(video.id)"
+        @edit="handleEditVideo"
+        @select="handleSelectVideo"
+      />
     </div>
+
     <div class="pagination" v-if="total > pageSize">
       <button :disabled="page === 1" @click="changePage(page - 1)">上一页</button>
-      <span>第 {{ page }} 页 / 共 {{ Math.ceil(total / pageSize) }} 页 ({{ total }} 部)</span>
+      <span>第 {{ page }} 页 / 共 {{ Math.ceil(total / pageSize) }} 页（共 {{ total }} 条）</span>
       <button :disabled="page * pageSize >= total" @click="changePage(page + 1)">下一页</button>
     </div>
 
@@ -250,7 +245,7 @@ const handleDeleteVideo = async (videoId) => {
 .filters {
   margin-bottom: 20px;
   display: flex;
-  gap: 10px;
+  gap: 6px;
   flex-wrap: wrap;
   align-items: center;
 }
@@ -261,6 +256,8 @@ const handleDeleteVideo = async (videoId) => {
   border: 1px solid #ddd;
   border-radius: 6px;
   font-size: 14px;
+  height: 38px;
+  box-sizing: border-box;
 }
 
 .filters input[type="text"] {
@@ -275,9 +272,10 @@ const handleDeleteVideo = async (videoId) => {
   border-radius: 6px;
   cursor: pointer;
   font-size: 14px;
+  height: 38px;
+  box-sizing: border-box;
   transition: background 0.2s;
 }
-
 .search-btn:hover {
   background: #2980b9;
 }

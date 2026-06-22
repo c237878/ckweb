@@ -15,17 +15,16 @@
     </div>
 
     <div class="filters">
-      <input
-        v-model="keyword"
-        placeholder="搜索系列..."
-        type="text"
-        class="filter-input"
-        @keyup.enter="loadSeries"
-      />
       <select v-model="filters.country" @change="loadSeries">
         <option value="">全部地区</option>
         <option v-for="c in countries" :key="c" :value="c">{{ c }}</option>
       </select>
+      <input
+        v-model="keyword"
+        placeholder="搜索系列..."
+        type="text"
+        @keyup.enter="loadSeries"
+      />
       <button class="search-btn" @click="loadSeries">搜索</button>
     </div>
 
@@ -36,25 +35,27 @@
         :key="series.id"
         :class="{ selected: selectedIds.includes(series.id) }"
       >
-        <div class="card-checkbox-col" v-if="selectedIds.length > 0">
-          <input
-            type="checkbox"
-            class="card-checkbox"
-            :checked="selectedIds.includes(series.id)"
-            @change="handleSelect(series)"
-          />
-        </div>
-        <div class="card-body" @click="goToVideos(series.id)">
-          <div class="info-row">
-            <span class="name">{{ series.name }}</span>
-            <div class="right-tags">
-              <span v-if="series.likeCount > 0" class="like-count">♥ {{ series.likeCount }}</span>
-              <span v-if="series.videoCount > 0" class="video-count">{{ series.videoCount }} 部</span>
-              <span v-if="series.country" class="country-tag">{{ series.country }}</span>
-            </div>
+        <div class="card-main">
+          <div class="card-checkbox-col" v-if="selectedIds.length > 0">
+            <input
+              type="checkbox"
+              class="card-checkbox"
+              :checked="selectedIds.includes(series.id)"
+              @change="handleSelect(series)"
+            />
           </div>
-          <div class="info-row alias-row" v-if="series.alias">
-            <span class="alias">{{ series.alias }}</span>
+          <div class="card-body" @click="goToVideos(series.id)">
+            <div class="info-row">
+              <span class="name">{{ series.name }}</span>
+              <div class="right-tags">
+                <span v-if="series.likeCount > 0" class="like-count">♥ {{ series.likeCount }}</span>
+                <span v-if="series.videoCount > 0" class="video-count">{{ series.videoCount }} 部</span>
+                <span v-if="series.country" class="country-tag">{{ series.country }}</span>
+              </div>
+            </div>
+            <div class="info-row alias-row" v-if="series.alias">
+              <span class="alias">{{ series.alias }}</span>
+            </div>
           </div>
         </div>
         <CardActions>
@@ -69,7 +70,7 @@
 
     <div class="pagination" v-if="total > pageSize">
       <button :disabled="page === 1" @click="changePage(page - 1)">上一页</button>
-      <span>第 {{ page }} 页 / 共 {{ Math.ceil(total / pageSize) }} 页</span>
+      <span>第 {{ page }} 页 / 共 {{ Math.ceil(total / pageSize) }} 页（共 {{ total }} 条）</span>
       <button :disabled="page * pageSize >= total" @click="changePage(page + 1)">下一页</button>
     </div>
 
@@ -184,7 +185,17 @@ const handleEdit = (series) => {
   showDialog.value = true
 }
 
-const handleSave = async () => {
+const handleSave = async (formData) => {
+  try {
+    if (formData.id) {
+      await seriesApi.update(formData.id, formData)
+    } else {
+      await seriesApi.add(formData)
+    }
+  } catch (error) {
+    alert('保存失败：' + (error.message || error))
+    return
+  }
   showDialog.value = false
   editingSeries.value = null
   await loadSeries()
@@ -290,24 +301,23 @@ onMounted(async () => {
 .filters {
   margin-bottom: 20px;
   display: flex;
-  gap: 10px;
+  gap: 6px;
   flex-wrap: wrap;
   align-items: center;
 }
 
-.filter-input {
+.filters select,
+.filters input[type="text"] {
   padding: 8px 12px;
   border: 1px solid #ddd;
   border-radius: 6px;
   font-size: 14px;
-  min-width: 200px;
+  height: 38px;
+  box-sizing: border-box;
 }
 
-.filters select {
-  padding: 8px 12px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  font-size: 14px;
+.filters input[type="text"] {
+  min-width: 200px;
 }
 
 .search-btn {
@@ -318,9 +328,10 @@ onMounted(async () => {
   border-radius: 6px;
   cursor: pointer;
   font-size: 14px;
+  height: 38px;
+  box-sizing: border-box;
   transition: background 0.2s;
 }
-
 .search-btn:hover {
   background: #2980b9;
 }
@@ -338,7 +349,7 @@ onMounted(async () => {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   overflow: hidden;
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   align-items: stretch;
   transition: border 0.2s, background 0.2s;
 }
@@ -346,6 +357,14 @@ onMounted(async () => {
 .series-card.selected {
   background: #e3f2fd;
   border: 2px solid #2196f3;
+}
+
+.card-main {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  flex: 1;
+  cursor: pointer;
 }
 
 .card-checkbox-col {

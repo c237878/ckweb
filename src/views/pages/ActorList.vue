@@ -15,17 +15,16 @@
     </div>
 
     <div class="filters">
-      <input
-        v-model="keyword"
-        placeholder="搜索演员..."
-        type="text"
-        class="filter-input"
-        @keyup.enter="loadActors"
-      />
       <select v-model="filters.country" @change="loadActors">
         <option value="">全部地区</option>
         <option v-for="c in countries" :key="c" :value="c">{{ c }}</option>
       </select>
+      <input
+        v-model="keyword"
+        placeholder="搜索演员..."
+        type="text"
+        @keyup.enter="loadActors"
+      />
       <button class="search-btn" @click="loadActors">搜索</button>
     </div>
 
@@ -36,25 +35,27 @@
         :key="actor.id"
         :class="{ selected: selectedIds.includes(actor.id) }"
       >
-        <div class="card-checkbox-col" v-if="selectedIds.length > 0">
-          <input
-            type="checkbox"
-            class="card-checkbox"
-            :checked="selectedIds.includes(actor.id)"
-            @change="handleSelect(actor)"
-          />
-        </div>
-        <div class="card-body" @click="goToDetail(actor.id)">
-          <div class="info-row">
-            <span class="name">{{ actor.name }}</span>
-            <div class="right-tags">
-              <span v-if="actor.likeCount > 0" class="like-count">♥ {{ actor.likeCount }}</span>
-              <span v-if="actor.videoCount > 0" class="video-count">{{ actor.videoCount }} 部</span>
-              <span v-if="actor.country" class="country-tag">{{ actor.country }}</span>
-            </div>
+        <div class="card-main">
+          <div class="card-checkbox-col" v-if="selectedIds.length > 0">
+            <input
+              type="checkbox"
+              class="card-checkbox"
+              :checked="selectedIds.includes(actor.id)"
+              @change="handleSelect(actor)"
+            />
           </div>
-          <div class="info-row bio-row" v-if="actor.bio">
-            <span class="bio">{{ actor.bio }}</span>
+          <div class="card-body" @click="goToDetail(actor.id)">
+            <div class="info-row">
+              <span class="name">{{ actor.name }}</span>
+              <div class="right-tags">
+                <span v-if="actor.likeCount > 0" class="like-count">♥ {{ actor.likeCount }}</span>
+                <span v-if="actor.videoCount > 0" class="video-count">{{ actor.videoCount }} 部</span>
+                <span v-if="actor.country" class="country-tag">{{ actor.country }}</span>
+              </div>
+            </div>
+            <div class="info-row bio-row" v-if="actor.bio">
+              <span class="bio">{{ actor.bio }}</span>
+            </div>
           </div>
         </div>
         <CardActions>
@@ -68,7 +69,7 @@
 
     <div class="pagination" v-if="total > pageSize">
       <button :disabled="page === 1" @click="changePage(page - 1)">上一页</button>
-      <span>第 {{ page }} 页 / 共 {{ Math.ceil(total / pageSize) }} 页</span>
+      <span>第 {{ page }} 页 / 共 {{ Math.ceil(total / pageSize) }} 页（共 {{ total }} 条）</span>
       <button :disabled="page * pageSize >= total" @click="changePage(page + 1)">下一页</button>
     </div>
 
@@ -290,26 +291,25 @@ onMounted(async () => {
 }
 
 .filters {
-  display: flex;
-  gap: 10px;
   margin-bottom: 20px;
+  display: flex;
+  gap: 6px;
   flex-wrap: wrap;
   align-items: center;
 }
 
-.filter-input {
+.filters select,
+.filters input[type="text"] {
   padding: 8px 12px;
   border: 1px solid #ddd;
   border-radius: 6px;
   font-size: 14px;
-  min-width: 200px;
+  height: 38px;
+  box-sizing: border-box;
 }
 
-.filters select {
-  padding: 8px 12px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  font-size: 14px;
+.filters input[type="text"] {
+  min-width: 200px;
 }
 
 .search-btn {
@@ -320,9 +320,10 @@ onMounted(async () => {
   border-radius: 6px;
   cursor: pointer;
   font-size: 14px;
+  height: 38px;
+  box-sizing: border-box;
   transition: background 0.2s;
 }
-
 .search-btn:hover {
   background: #2980b9;
 }
@@ -341,7 +342,7 @@ onMounted(async () => {
   transition: box-shadow 0.3s, border 0.2s, background 0.2s;
   background: #fff;
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   align-items: stretch;
 }
 
@@ -352,6 +353,14 @@ onMounted(async () => {
 
 .actor-card:hover {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.card-main {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  flex: 1;
+  cursor: pointer;
 }
 
 .card-checkbox-col {
