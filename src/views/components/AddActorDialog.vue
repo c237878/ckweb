@@ -16,8 +16,20 @@
           <input v-model="form.alias" placeholder="别名（选填）" />
         </div>
         <div class="form-group">
-          <label>国家/地区</label>
-          <input v-model="form.country" placeholder="国家/地区（选填）" />
+          <label>地区</label>
+          <div class="combobox-wrap">
+            <input
+              v-model="form.country"
+              type="text"
+              placeholder="选择或输入地区"
+              @focus="showCountryDropdown = true"
+              @blur="hideCountryDropdown"
+            />
+            <div v-if="showCountryDropdown" class="combobox-dropdown">
+              <div class="combobox-option" @mousedown.prevent="selectCountry('')">（无地区）</div>
+              <div v-for="c in countries" :key="c" class="combobox-option" @mousedown.prevent="selectCountry(c)">{{ c }}</div>
+            </div>
+          </div>
         </div>
         <div class="form-group">
           <label>简介</label>
@@ -38,6 +50,7 @@
 
 <script setup>
 import { ref, watch } from 'vue'
+import { videoApi } from '@/scripts/api'
 
 const props = defineProps({
   visible: Boolean,
@@ -47,6 +60,8 @@ const props = defineProps({
 const emit = defineEmits(['save', 'cancel', 'delete'])
 
 const isEdit = ref(false)
+const countries = ref([])
+const showCountryDropdown = ref(false)
 const form = ref({
   name: '',
   alias: '',
@@ -67,8 +82,16 @@ function handleOverlayClick() {
   }
 }
 
-watch(() => props.visible, (val) => {
+const loadCountries = async () => {
+  try {
+    const res = await videoApi.getMeta()
+    if (res.success) countries.value = res.countries || []
+  } catch (e) { console.error('加载地区列表失败', e) }
+}
+
+watch(() => props.visible, async (val) => {
   if (val) {
+    await loadCountries()
     if (props.editingActor) {
       isEdit.value = true
       form.value = {
@@ -94,6 +117,14 @@ const handleSave = () => {
 
 const handleCancel = () => {
   emit('cancel')
+}
+
+const selectCountry = (val) => {
+  form.value.country = val
+  showCountryDropdown.value = false
+}
+const hideCountryDropdown = () => {
+  setTimeout(() => { showCountryDropdown.value = false }, 200)
 }
 
 const handleDelete = () => {
@@ -179,6 +210,35 @@ const handleDelete = () => {
 .form-group textarea {
   resize: vertical;
   min-height: 80px;
+}
+
+/* Combobox */
+.combobox-wrap {
+  position: relative;
+}
+
+.combobox-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  margin-top: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 10;
+}
+
+.combobox-option {
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.combobox-option:hover {
+  background: #f5f5f5;
 }
 
 .dialog-footer {

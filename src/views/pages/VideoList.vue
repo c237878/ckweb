@@ -32,6 +32,15 @@
           <option v-for="s in seriesList" :key="s.id" :value="s.id">{{ s.name }}</option>
         </select>
       </div>
+      <div class="filter-item">
+        <input
+          v-model="filters.keyword"
+          type="text"
+          placeholder="搜索影片名称或番号..."
+          @keyup.enter="loadVideos"
+        />
+        <button class="search-btn" @click="loadVideos">搜索</button>
+      </div>
     </div>
     <div class="video-grid">
           <VideoCard
@@ -63,7 +72,7 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { videoApi } from '@/scripts/api'
+import { videoApi, settingApi } from '@/scripts/api'
 import VideoCard from '@/views/components/VideoCard.vue'
 import AddVideoDialog from '@/views/components/AddVideoDialog.vue'
 
@@ -118,6 +127,14 @@ const batchDelete = async () => {
 }
 
 onMounted(async () => {
+  try {
+    const res = await settingApi.getByName('pageSize')
+    if (res.success && res.data) {
+      pageSize.value = Number(res.data) || 24
+    }
+  } catch (e) {
+    console.warn('读取 pageSize 设置失败，使用默认值 24')
+  }
   await Promise.all([loadMeta(), loadVideos()])
 })
 
@@ -135,6 +152,7 @@ const loadMeta = async () => {
 }
 
 const loadVideos = async () => {
+  page.value = 1
   try {
     const params = {
       page: page.value,
@@ -143,6 +161,7 @@ const loadVideos = async () => {
     if (filters.value.category) params.category = filters.value.category
     if (filters.value.country) params.country = filters.value.country
     if (filters.value.seriesId) params.seriesId = filters.value.seriesId
+    if (filters.value.keyword) params.keyword = filters.value.keyword
 
     const res = await videoApi.getList(params)
     if (res.success) {
@@ -215,30 +234,52 @@ const handleDeleteVideo = async (videoId) => {
 
 .add-btn {
   padding: 10px 20px;
-  background: #007bff;
+  background: #3498db;
   color: white;
   border: none;
   border-radius: 6px;
   cursor: pointer;
   font-size: 14px;
+  transition: background 0.2s;
 }
 
 .add-btn:hover {
-  background: #0056b3;
+  background: #2980b9;
 }
 
 .filters {
   margin-bottom: 20px;
   display: flex;
   gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
 }
 
-.filters select {
+.filters select,
+.filters input[type="text"] {
   padding: 8px 12px;
   border: 1px solid #ddd;
   border-radius: 6px;
   font-size: 14px;
-  min-width: 150px;
+}
+
+.filters input[type="text"] {
+  min-width: 200px;
+}
+
+.search-btn {
+  padding: 8px 16px;
+  background: #3498db;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.2s;
+}
+
+.search-btn:hover {
+  background: #2980b9;
 }
 
 .video-grid {

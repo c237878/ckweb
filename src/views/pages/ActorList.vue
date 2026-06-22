@@ -2,21 +2,49 @@
   <div class="actor-list">
     <div class="list-header">
       <h1>演员列表</h1>
-      <button class="add-btn" @click="handleAdd">添加演员</button>
+      <div class="header-actions">
+        <label v-if="selectedIds.length > 0" class="select-all">
+          <input type="checkbox" :checked="isAllSelected" @change="toggleSelectAll" />
+          全选
+        </label>
+        <button v-if="selectedIds.length > 0" class="batch-delete-btn" @click="batchDelete">
+          批量删除 ({{ selectedIds.length }})
+        </button>
+        <button class="add-btn" @click="handleAdd">添加演员</button>
+      </div>
     </div>
+
     <div class="filters">
       <input
         v-model="keyword"
         placeholder="搜索演员..."
-        class="search-input"
+        type="text"
+        class="filter-input"
         @keyup.enter="loadActors"
       />
+      <select v-model="filters.country" @change="loadActors">
+        <option value="">全部地区</option>
+        <option v-for="c in countries" :key="c" :value="c">{{ c }}</option>
+      </select>
       <button class="search-btn" @click="loadActors">搜索</button>
     </div>
+
     <div class="actor-grid">
-      <div class="actor-card" v-for="actor in actors" :key="actor.id">
+      <div
+        class="actor-card"
+        v-for="actor in actors"
+        :key="actor.id"
+        :class="{ selected: selectedIds.includes(actor.id) }"
+      >
+        <div class="card-checkbox-col" v-if="selectedIds.length > 0">
+          <input
+            type="checkbox"
+            class="card-checkbox"
+            :checked="selectedIds.includes(actor.id)"
+            @change="handleSelect(actor)"
+          />
+        </div>
         <div class="card-body" @click="goToDetail(actor.id)">
-          <!-- 第一行：姓名(加粗, flex:1) + 获赞数 + 影片数 + 国家(紫色tag) -->
           <div class="info-row">
             <span class="name">{{ actor.name }}</span>
             <div class="right-tags">
@@ -25,26 +53,25 @@
               <span v-if="actor.country" class="country-tag">{{ actor.country }}</span>
             </div>
           </div>
-          <!-- 第二行：简介（灰色小字，单行溢出省略号） -->
           <div class="info-row bio-row" v-if="actor.bio">
             <span class="bio">{{ actor.bio }}</span>
           </div>
         </div>
-        <!-- 第三行：CardActions -->
         <CardActions>
           <button class="btn btn-primary" @click.stop="handleEdit(actor)">编辑</button>
           <button class="btn btn-success" @click.stop="goToDetail(actor.id)">详情</button>
         </CardActions>
       </div>
     </div>
+
     <div class="empty-hint" v-if="actors.length === 0 && !loading">暂无演员</div>
+
     <div class="pagination" v-if="total > pageSize">
       <button :disabled="page === 1" @click="changePage(page - 1)">上一页</button>
       <span>第 {{ page }} 页 / 共 {{ Math.ceil(total / pageSize) }} 页</span>
       <button :disabled="page * pageSize >= total" @click="changePage(page + 1)">下一页</button>
     </div>
 
-    <!-- 使用 AddActorDialog 弹窗 -->
     <AddActorDialog
       :visible="showDialog"
       :editing-actor="editingActor"
@@ -56,9 +83,9 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { actorApi } from '@/scripts/api'
+import { actorApi, videoApi, settingApi } from '@/scripts/api'
 import CardActions from '@/views/components/CardActions.vue'
 import AddActorDialog from '@/views/components/AddActorDialog.vue'
 
@@ -66,24 +93,61 @@ const router = useRouter()
 const actors = ref([])
 const keyword = ref('')
 const page = ref(1)
-const pageSize = ref(20)
+const pageSize = ref(24)
 const total = ref(0)
 const loading = ref(false)
 const showDialog = ref(false)
 const editingActor = ref(null)
+const countries = ref([])
+const filters = ref({ country: '' })
+const selectedIds = ref([])
 
-onMounted(() => {
-  loadActors()
+const isAllSelected = computed(() => {
+  return actors.value.length > 0 && selectedIds.value.length === actors.value.length
 })
 
+const toggleSelectAll = () => {
+  if (isAllSelected.value) {
+    selectedIds.value = []
+  } else {
+    selectedIds.value = actors.value.map(a => a.id)
+  }
+}
+
+const handleSelect = (actor) => {
+  const idx = selectedIds.value.indexOf(actor.id)
+  if (idx > -1) {
+    selectedIds.value.splice(idx, 1)
+  } else {
+    selectedIds.value.push(actor.id)
+  }
+}
+
+const batchDelete = async () => {
+  if (!confirm(`确定要删除选中的 ${selectedIds.value.length} 个演员吗？`)) return
+  try {
+    for (const id of selectedIds.value) {
+      await actorApi.delete(id)
+    }
+    selectedIds.value = []
+    await loadActors()
+    alert('批量删除成功！')
+  } catch (error) {
+    console.error('批量删除失败:', error)
+    alert('批量删除失败：' + error.message)
+  }
+}
+
 const loadActors = async () => {
+  page.value = 1
   loading.value = true
   try {
     const params = {
       page: page.value,
-      pageSize: pageSize.value
+      pageSize: pageSize.value,
+      keyword: keyword.value
     }
-    if (keyword.value) params.keyword = keyword.value
+    if (filters.value.country) params.country = filters.value.country
 
     const res = await actorApi.getList(params)
     if (res.success) {
@@ -132,11 +196,33 @@ const handleDelete = async () => {
   editingActor.value = null
   await loadActors()
 }
+
+onMounted(async () => {
+  try {
+    const res = await settingApi.getByName('pageSize')
+    if (res.success && res.data) {
+      pageSize.value = Number(res.data) || 24
+    }
+  } catch (e) {
+    console.warn('读取 pageSize 设置失败，使用默认值 24')
+  }
+  try {
+    const metaRes = await videoApi.getMeta()
+    if (metaRes.success) {
+      countries.value = metaRes.countries || []
+    }
+  } catch (e) {
+    console.warn('加载地区列表失败', e)
+  }
+  await loadActors()
+})
 </script>
 
 <style scoped>
 .actor-list {
   padding: 20px 0;
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
 .list-header {
@@ -146,39 +232,84 @@ const handleDelete = async () => {
   margin-bottom: 20px;
 }
 
-h1 {
+.list-header h1 {
   margin: 0;
-  font-size: 22px;
+  font-size: 28px;
   color: #333;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .add-btn {
-  padding: 8px 20px;
-  background: #e74c3c;
+  padding: 10px 20px;
+  background: #3498db;
   color: white;
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
   font-size: 14px;
-  transition: background 0.3s;
+  transition: background 0.2s;
 }
 
 .add-btn:hover {
+  background: #2980b9;
+}
+
+.select-all {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #666;
+}
+
+.select-all input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.batch-delete-btn {
+  padding: 8px 16px;
+  background: #e74c3c;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.2s;
+}
+
+.batch-delete-btn:hover {
   background: #c0392b;
 }
 
 .filters {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   margin-bottom: 20px;
+  flex-wrap: wrap;
+  align-items: center;
 }
 
-.search-input {
+.filter-input {
   padding: 8px 12px;
   border: 1px solid #ddd;
-  border-radius: 4px;
+  border-radius: 6px;
   font-size: 14px;
-  width: 200px;
+  min-width: 200px;
+}
+
+.filters select {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
 }
 
 .search-btn {
@@ -186,9 +317,10 @@ h1 {
   background: #3498db;
   color: white;
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
   font-size: 14px;
+  transition: background 0.2s;
 }
 
 .search-btn:hover {
@@ -203,18 +335,36 @@ h1 {
 }
 
 .actor-card {
-  cursor: pointer;
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  transition: box-shadow 0.3s;
+  transition: box-shadow 0.3s, border 0.2s, background 0.2s;
   background: #fff;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: stretch;
+}
+
+.actor-card.selected {
+  background: #e3f2fd;
+  border: 2px solid #2196f3;
 }
 
 .actor-card:hover {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.card-checkbox-col {
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  flex-shrink: 0;
+}
+
+.card-checkbox {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
 }
 
 .card-body {
@@ -223,9 +373,10 @@ h1 {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-width: 0;
+  cursor: pointer;
 }
 
-/* 统一信息行样式 */
 .info-row {
   display: flex;
   align-items: center;
@@ -233,7 +384,6 @@ h1 {
   overflow: hidden;
 }
 
-/* 第一行：姓名 */
 .info-row .name {
   font-size: 16px;
   font-weight: bold;
@@ -245,7 +395,6 @@ h1 {
   white-space: nowrap;
 }
 
-/* 右侧标签组 */
 .right-tags {
   display: flex;
   align-items: center;
@@ -253,7 +402,6 @@ h1 {
   flex-shrink: 0;
 }
 
-/* 获赞数 */
 .like-count {
   font-size: 12px;
   color: #e74c3c;
@@ -263,7 +411,6 @@ h1 {
   white-space: nowrap;
 }
 
-/* 影片数 */
 .video-count {
   font-size: 12px;
   color: #666;
@@ -273,7 +420,6 @@ h1 {
   white-space: nowrap;
 }
 
-/* 国家 tag - 紫色 */
 .country-tag {
   background: #f3e5f5;
   color: #7b1fa2;
@@ -283,7 +429,6 @@ h1 {
   white-space: nowrap;
 }
 
-/* 第二行：简介（单行溢出省略号） */
 .bio-row {
   overflow: hidden;
 }
@@ -308,20 +453,30 @@ h1 {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 20px;
+  gap: 15px;
 }
 
 .pagination button {
   padding: 8px 16px;
-  background: #e74c3c;
-  color: white;
-  border: none;
-  border-radius: 4px;
+  border: 1px solid #ddd;
+  background: #fff;
+  border-radius: 6px;
   cursor: pointer;
+  font-size: 14px;
+  transition: background 0.2s;
+}
+
+.pagination button:hover:not(:disabled) {
+  background: #f5f5f5;
 }
 
 .pagination button:disabled {
-  background: #ccc;
+  opacity: 0.5;
   cursor: not-allowed;
+}
+
+.pagination span {
+  font-size: 14px;
+  color: #666;
 }
 </style>

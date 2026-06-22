@@ -10,12 +10,12 @@
         <input v-model="form.alias" type="text" placeholder="系列别名（可选）" />
       </div>
       <div class="form-item">
-        <label>类型</label>
+        <label>地区</label>
         <div class="input-with-suggestions">
           <input 
             v-model="form.country" 
             type="text" 
-            placeholder="选择或输入类型"
+            placeholder="选择或输入地区"
             @input="filterCountries"
             @focus="showCountrySuggestions = true"
             @blur="hideCountrySuggestions"
