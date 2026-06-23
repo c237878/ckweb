@@ -48,10 +48,10 @@
             <div class="info-row">
               <span class="name">{{ actor.name }}</span>
               <div class="right-tags">
-                <span v-if="actor.likeCount > 0" class="like-count">♥ {{ actor.likeCount }}</span>
-                <span v-if="actor.videoCount > 0" class="video-count">{{ actor.videoCount }} 部</span>
-                <span v-if="actor.country" class="country-tag">{{ actor.country }}</span>
-              </div>
+                  <span v-if="actor.country" class="country-tag">{{ actor.country }}</span>
+                  <span v-if="actor.likeCount > 0" class="like-count">♥ {{ actor.likeCount }}</span>
+                  <span v-if="actor.videoCount > 0" class="video-count">{{ actor.videoCount }} 部</span>
+                </div>
             </div>
             <div class="info-row bio-row" v-if="actor.bio">
               <span class="bio">{{ actor.bio }}</span>
@@ -67,7 +67,7 @@
 
     <div class="empty-hint" v-if="actors.length === 0 && !loading">暂无演员</div>
 
-    <div class="pagination" v-if="total > pageSize">
+    <div class="pagination" v-if="total > 0">
       <button :disabled="page === 1" @click="changePage(page - 1)">上一页</button>
       <span>第 {{ page }} 页 / 共 {{ Math.ceil(total / pageSize) }} 页（共 {{ total }} 条）</span>
       <button :disabled="page * pageSize >= total" @click="changePage(page + 1)">下一页</button>
@@ -86,7 +86,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { actorApi, videoApi, settingApi } from '@/scripts/api'
+import { actorApi, settingApi } from '@/scripts/api'
 import CardActions from '@/views/components/CardActions.vue'
 import AddActorDialog from '@/views/components/AddActorDialog.vue'
 
@@ -208,9 +208,11 @@ onMounted(async () => {
     console.warn('读取 pageSize 设置失败，使用默认值 24')
   }
   try {
-    const metaRes = await videoApi.getMeta()
-    if (metaRes.success) {
-      countries.value = metaRes.countries || []
+    const metaRes = await actorApi.getList({ page: 1, pageSize: 1000 })
+    if (metaRes.success && metaRes.data) {
+      const unique = new Set()
+      metaRes.data.forEach(a => { if (a.country) unique.add(a.country) })
+      countries.value = Array.from(unique).sort()
     }
   } catch (e) {
     console.warn('加载地区列表失败', e)

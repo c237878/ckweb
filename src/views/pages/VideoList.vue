@@ -49,7 +49,7 @@
       />
     </div>
 
-    <div class="pagination" v-if="total > pageSize">
+    <div class="pagination" v-if="total > 0">
       <button :disabled="page === 1" @click="changePage(page - 1)">上一页</button>
       <span>第 {{ page }} 页 / 共 {{ Math.ceil(total / pageSize) }} 页（共 {{ total }} 条）</span>
       <button :disabled="page * pageSize >= total" @click="changePage(page + 1)">下一页</button>

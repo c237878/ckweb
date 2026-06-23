@@ -68,7 +68,7 @@
 
     <div class="empty-hint" v-if="seriesList.length === 0 && !loading">暂无系列</div>
 
-    <div class="pagination" v-if="total > pageSize">
+    <div class="pagination" v-if="total > 0">
       <button :disabled="page === 1" @click="changePage(page - 1)">上一页</button>
       <span>第 {{ page }} 页 / 共 {{ Math.ceil(total / pageSize) }} 页（共 {{ total }} 条）</span>
       <button :disabled="page * pageSize >= total" @click="changePage(page + 1)">下一页</button>
@@ -86,7 +86,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { seriesApi, videoApi, settingApi } from '@/scripts/api'
+import { seriesApi, settingApi } from '@/scripts/api'
 import CardActions from '@/views/components/CardActions.vue'
 import AddSeriesDialog from '@/views/components/AddSeriesDialog.vue'
 
@@ -216,9 +216,11 @@ onMounted(async () => {
     console.warn('读取 pageSize 设置失败，使用默认值 24')
   }
   try {
-    const metaRes = await videoApi.getMeta()
-    if (metaRes.success) {
-      countries.value = metaRes.countries || []
+    const metaRes = await seriesApi.getList({ page: 1, pageSize: 1000 })
+    if (metaRes.success && metaRes.data) {
+      const unique = new Set()
+      metaRes.data.forEach(s => { if (s.country) unique.add(s.country) })
+      countries.value = Array.from(unique).sort()
     }
   } catch (e) {
     console.warn('加载地区列表失败', e)
