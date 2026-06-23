@@ -15,7 +15,7 @@
     </div>
 
     <div class="filters">
-      <select v-model="filters.country" @change="loadSeries">
+      <select v-model="filters.country" @change="page = 1; loadSeries()">
         <option value="">全部地区</option>
         <option v-for="c in countries" :key="c" :value="c">{{ c }}</option>
       </select>

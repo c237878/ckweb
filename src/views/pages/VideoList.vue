@@ -15,15 +15,15 @@
     </div>
 
     <div class="filters">
-      <select v-model="filters.country" @change="loadVideos">
+      <select v-model="filters.country" @change="page = 1; loadVideos()">
         <option value="">全部地区</option>
         <option v-for="c in countries" :key="c" :value="c">{{ c }}</option>
       </select>
-      <select v-model="filters.category" @change="loadVideos">
+      <select v-model="filters.category" @change="page = 1; loadVideos()">
         <option value="">全部分类</option>
         <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
       </select>
-      <select v-model="filters.seriesId" @change="loadVideos">
+      <select v-model="filters.seriesId" @change="page = 1; loadVideos()">
         <option value="">全部系列</option>
         <option v-for="s in seriesList" :key="s.id" :value="s.id">{{ s.name }}</option>
       </select>
