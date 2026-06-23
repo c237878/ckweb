@@ -134,7 +134,6 @@ const batchDelete = async () => {
     }
     selectedIds.value = []
     await loadSeries()
-    alert('批量删除成功！')
   } catch (error) {
     console.error('批量删除失败:', error)
     alert('批量删除失败：' + error.message)

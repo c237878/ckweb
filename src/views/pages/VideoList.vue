@@ -114,7 +114,6 @@ const batchDelete = async () => {
     await videoApi.batchDelete(selectedIds.value)
     selectedIds.value = []
     await loadVideos()
-    alert('批量删除成功！')
   } catch (error) {
     console.error('批量删除失败:', error)
     alert('批量删除失败：' + error.message)
