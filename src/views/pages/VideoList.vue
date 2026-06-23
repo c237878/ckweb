@@ -147,7 +147,6 @@ const loadMeta = async () => {
 }
 
 const loadVideos = async () => {
-  page.value = 1
   try {
     const params = {
       page: page.value,
