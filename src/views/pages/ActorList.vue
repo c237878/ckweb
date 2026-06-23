@@ -201,10 +201,16 @@ const handleCancel = () => {
   editingActor.value = null
 }
 
-const handleDelete = async () => {
-  showDialog.value = false
-  editingActor.value = null
-  await loadActors()
+const handleDelete = async (id) => {
+  if (!confirm('确定要删除该演员吗？')) return
+  try {
+    await actorApi.delete(id || editingActor.value?.id)
+    showDialog.value = false
+    editingActor.value = null
+    await loadActors()
+  } catch (error) {
+    alert('删除失败：' + (error.message || error))
+  }
 }
 
 onMounted(async () => {

@@ -79,6 +79,7 @@
       :editing-series="editingSeries"
       @save="handleSave"
       @cancel="handleCancel"
+      @delete="handleSeriesDelete"
     />
   </div>
 </template>
@@ -198,6 +199,18 @@ const handleSave = async (formData) => {
   showDialog.value = false
   editingSeries.value = null
   await loadSeries()
+}
+
+const handleSeriesDelete = async (id) => {
+  if (!confirm('确定要删除该系列吗？')) return
+  try {
+    await seriesApi.delete(id)
+    showDialog.value = false
+    editingSeries.value = null
+    await loadSeries()
+  } catch (error) {
+    alert('删除失败：' + (error.message || error))
+  }
 }
 
 const handleCancel = () => {
