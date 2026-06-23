@@ -50,7 +50,7 @@
 
 <script setup>
 import { ref, watch } from 'vue'
-import { videoApi } from '@/scripts/api'
+import { actorApi } from '@/scripts/api'
 
 const props = defineProps({
   visible: Boolean,
@@ -84,8 +84,12 @@ function handleOverlayClick() {
 
 const loadCountries = async () => {
   try {
-    const res = await videoApi.getMeta()
-    if (res.success) countries.value = res.countries || []
+    const res = await actorApi.getList({ page: 1, pageSize: 1000 })
+    if (res.success && res.data) {
+      const unique = new Set()
+      res.data.forEach(a => { if (a.country) unique.add(a.country) })
+      countries.value = Array.from(unique).sort()
+    }
   } catch (e) { console.error('加载地区列表失败', e) }
 }
 
