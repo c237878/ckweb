@@ -140,7 +140,6 @@ const batchDelete = async () => {
 }
 
 const loadActors = async () => {
-  page.value = 1
   loading.value = true
   try {
     const params = {
@@ -181,7 +180,17 @@ const handleEdit = (actor) => {
   showDialog.value = true
 }
 
-const handleSave = async () => {
+const handleSave = async (formData) => {
+  try {
+    if (formData.id) {
+      await actorApi.update(formData.id, formData)
+    } else {
+      await actorApi.add(formData)
+    }
+  } catch (error) {
+    alert('保存失败：' + (error.message || error))
+    return
+  }
   showDialog.value = false
   editingActor.value = null
   await loadActors()

@@ -140,7 +140,6 @@ const batchDelete = async () => {
 }
 
 const loadSeries = async () => {
-  page.value = 1
   loading.value = true
   try {
     const params = {
