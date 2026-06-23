@@ -282,7 +282,29 @@ watch(() => props.visible, async (val) => {
       } else {
         seriesInput.value = ''
       }
-      selectedActors.value = props.editingVideo.actors || []
+      // 编辑时从 detail 接口加载完整数据（含演员）
+      try {
+        const detail = await videoApi.getDetail(props.editingVideo.id)
+        if (detail.success && detail.data) {
+          form.value = {
+            name: detail.data.video.name || '',
+            code: detail.data.video.code || '',
+            category: detail.data.video.category || '',
+            country: detail.data.video.country || '',
+            seriesId: detail.data.video.seriesId || '',
+            filePath: detail.data.video.filePath || '',
+            coverPath: detail.data.video.coverPath || ''
+          }
+          if (detail.data.video.seriesId && detail.data.video.seriesName) {
+            seriesInput.value = detail.data.video.seriesName
+          } else {
+            seriesInput.value = ''
+          }
+          selectedActors.value = detail.data.actors || []
+        }
+      } catch (e) {
+        console.error('加载影片详情失败', e)
+      }
     } else {
       resetForm()
     }

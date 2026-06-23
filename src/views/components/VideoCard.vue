@@ -24,6 +24,10 @@
       <div class="info-row" v-if="video.seriesName">
         <span class="series-tag clickable" @click.stop="goToSeries(video.seriesId)">{{ video.seriesName }}</span>
       </div>
+      <div class="info-row" v-if="video.actorNames">
+        <span class="actor-tag" v-for="(name, i) in video.actorNames.split(',').slice(0, 3)" :key="i">{{ name }}</span>
+        <span v-if="video.actorNames.split(',').length > 3" class="more-tag">+{{ video.actorNames.split(',').length - 3 }}</span>
+      </div>
     </div>
     <!-- 第五行：操作按钮 -->
     <CardActions v-if="mode === 'full' && showActions" @click.stop>
@@ -236,6 +240,20 @@ const handleEdit = () => {
 
 .clickable:hover {
   background: #ffe0b2;
+}
+
+.actor-tag {
+  background: #e3f2fd;
+  color: #1565c0;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.more-tag {
+  font-size: 12px;
+  color: #999;
 }
 
 /* 获赞数 */
