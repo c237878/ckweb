@@ -3,7 +3,7 @@
     <div class="list-header">
       <h1>影视系列</h1>
       <div class="header-actions">
-        <label v-if="selectedIds.length > 0" class="select-all">
+        <label class="select-all">
           <input type="checkbox" :checked="isAllSelected" @change="toggleSelectAll" />
           全选
         </label>
@@ -36,15 +36,16 @@
         :class="{ selected: selectedIds.includes(series.id) }"
       >
         <div class="card-main">
-          <div class="card-checkbox-col" v-if="selectedIds.length > 0">
+          <div class="card-checkbox-col">
             <input
               type="checkbox"
               class="card-checkbox"
               :checked="selectedIds.includes(series.id)"
               @change="handleSelect(series)"
+              @click.stop
             />
           </div>
-          <div class="card-body" @click="goToVideos(series.id)">
+          <div class="card-body" @click="handleSelect(series)">
             <div class="info-row">
               <span class="name">{{ series.name }}</span>
               <div class="right-tags">
