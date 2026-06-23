@@ -25,8 +25,12 @@
         <span class="series-tag clickable" @click.stop="goToSeries(video.seriesId)">{{ video.seriesName }}</span>
       </div>
       <div class="info-row" v-if="video.actorNames">
-        <span class="actor-tag" v-for="(name, i) in video.actorNames.split(',').slice(0, 3)" :key="i">{{ name }}</span>
-        <span v-if="video.actorNames.split(',').length > 3" class="more-tag">+{{ video.actorNames.split(',').length - 3 }}</span>
+        <span
+          v-for="item in parseActors(video.actorNames)"
+          :key="item.id"
+          class="actor-tag clickable"
+          @click.stop="goToActor(item.id)"
+        >{{ item.name }}</span>
       </div>
     </div>
     <!-- 第五行：操作按钮 -->
@@ -85,9 +89,21 @@ const goToDetail = () => {
 
 const goToSeries = (seriesId) => {
   if (seriesId) {
-    router.push(`/series`)
-    // 或者将来有系列详情页的话：router.push(`/series/${seriesId}`)
+    router.push(`/series/${seriesId}`)
   }
+}
+
+const parseActors = (str) => {
+  if (!str) return []
+  return str.split(',').map(part => {
+    const idx = part.indexOf('|')
+    if (idx === -1) return { id: '', name: part }
+    return { id: part.slice(0, idx), name: part.slice(idx + 1) }
+  })
+}
+
+const goToActor = (actorId) => {
+  if (actorId) router.push(`/actor/${actorId}`)
 }
 
 const handleEdit = () => {
