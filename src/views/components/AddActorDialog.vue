@@ -99,6 +99,7 @@ watch(() => props.visible, async (val) => {
     if (props.editingActor) {
       isEdit.value = true
       form.value = {
+        id: props.editingActor.id || '',
         name: props.editingActor.name || '',
         alias: props.editingActor.alias || '',
         country: props.editingActor.country || '',
@@ -106,7 +107,7 @@ watch(() => props.visible, async (val) => {
       }
     } else {
       isEdit.value = false
-      form.value = { name: '', alias: '', country: '', bio: '' }
+      form.value = { id: '', name: '', alias: '', country: '', bio: '' }
     }
   }
 })
