@@ -62,7 +62,7 @@
         <CardActions>
           <button v-if="series.link" class="btn" @click.stop="openLink(series.link)">链接</button>
           <button class="btn btn-primary" @click.stop="handleEdit(series)">编辑</button>
-          <button class="btn btn-success" @click.stop="goToVideos(series.id)">详情</button>
+          <button class="btn btn-success" @click.stop="goToDetail(series.id)">详情</button>
         </CardActions>
       </div>
     </div>
@@ -167,8 +167,8 @@ const changePage = (p) => {
   loadSeries()
 }
 
-const goToVideos = (seriesId) => {
-  router.push({ path: '/videos', query: { seriesId } })
+const goToDetail = (id) => {
+  router.push(`/series/${id}`)
 }
 
 const openLink = (link) => {

@@ -58,7 +58,8 @@ export const seriesApi = {
   getDetail: (id) => api.get(`/series/${id}`),
   add: (data) => api.post('/series', data),
   update: (id, data) => api.put(`/series/${id}`, data),
-  delete: (id) => api.delete(`/series/${id}`)
+  delete: (id) => api.delete(`/series/${id}`),
+  getVideos: (id, params) => api.get(`/series/${id}/videos`, { params })
 }
 
 // 扫描目录相关API

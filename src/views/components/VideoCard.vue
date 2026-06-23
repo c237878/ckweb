@@ -27,8 +27,8 @@
     </div>
     <!-- 第五行：操作按钮 -->
     <CardActions v-if="mode === 'full' && showActions" @click.stop>
-      <button class="btn btn-success" @click.stop="goToDetail">详情</button>
       <button class="btn btn-primary" @click.stop="handleEdit">编辑</button>
+      <button class="btn btn-success" @click.stop="goToDetail">详情</button>
     </CardActions>
   </div>
 </template>
