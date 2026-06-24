@@ -79,6 +79,9 @@
           <div class="form-group form-check">
             <label><input type="checkbox" v-model="scanDirForm.recursive" /> 递归扫描子目录</label>
           </div>
+          <div class="form-group form-check">
+            <label><input type="checkbox" v-model="scanDirForm.autoCreateSeries" /> 自动添加新系列</label>
+          </div>
         </div>
         <div class="dialog-footer">
           <span v-if="dialogTip.show" class="dialog-tip">{{ dialogTip.message }}</span>
@@ -121,7 +124,7 @@ function clearDialogTip() {
 const scanDirList = ref([])
 const showScanDirDialog = ref(false)
 const editingScanDir = ref(null)
-const scanDirForm = ref({ path: '', recursive: true, category: '' })
+const scanDirForm = ref({ path: '', recursive: true, category: '', autoCreateSeries: false })
 const showCatDropdown = ref(false)
 const categories = ref([])
 
@@ -219,7 +222,7 @@ const loadScanDirList = async () => {
 
 const openAddScanDirDialog = () => {
   editingScanDir.value = null
-  scanDirForm.value = { path: '', recursive: true, category: '' }
+  scanDirForm.value = { path: '', recursive: true, category: '', autoCreateSeries: false }
   clearDialogTip()
   showScanDirDialog.value = true
 }
@@ -229,7 +232,8 @@ const openEditScanDirDialog = (item) => {
   scanDirForm.value = {
     path: item.path,
     recursive: item.recursive,
-    category: item.category || ''
+    category: item.category || '',
+    autoCreateSeries: item.autoCreateSeries || false
   }
   clearDialogTip()
   showScanDirDialog.value = true
