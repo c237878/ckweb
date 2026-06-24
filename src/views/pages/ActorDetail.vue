@@ -1,13 +1,15 @@
 <template>
-  <div class="actor-detail" v-if="actor">
-    <div class="actor-header">
-      <div class="actor-info">
+  <div class="detail-page" v-if="actor">
+    <div class="detail-header">
+      <div class="header-row">
         <h1>{{ actor.name }}</h1>
-        <p v-if="actor.bio">{{ actor.bio }}</p>
+        <span v-if="actor.country" class="country-tag">{{ actor.country }}</span>
       </div>
+      <p v-if="actor.alias" class="alias-row">别名：{{ actor.alias }}</p>
+      <p v-if="actor.bio" class="bio-row">{{ actor.bio }}</p>
     </div>
-    <div class="actor-videos">
-      <h2>参演影片</h2>
+    <div class="detail-videos">
+      <h2>参演影片 ({{ videos.length }})</h2>
       <div class="video-grid">
         <VideoCard v-for="video in videos" :key="video.id" :video="video" mode="display" />
         <div v-if="videos.length === 0" class="empty-hint">暂无影片</div>
@@ -55,26 +57,48 @@ const loadVideos = async () => {
 </script>
 
 <style scoped>
-.actor-detail {
+.detail-page {
   padding: 20px 0;
 }
 
-.actor-header {
+.detail-header {
   margin-bottom: 40px;
 }
 
-.actor-info h1 {
-  font-size: 32px;
+.header-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   margin-bottom: 10px;
 }
 
-.actor-info p {
-  margin: 5px 0;
+.header-row h1 {
+  font-size: 32px;
+  margin: 0;
+}
+
+.country-tag {
+  background: #f3e5f5;
+  color: #7b1fa2;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.alias-row {
+  margin: 8px 0;
   color: #666;
   font-size: 15px;
 }
 
-.actor-videos h2 {
+.bio-row {
+  margin: 12px 0 0;
+  color: #444;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.detail-videos h2 {
   margin-bottom: 20px;
 }
 

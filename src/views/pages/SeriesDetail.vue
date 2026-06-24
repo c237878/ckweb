@@ -1,14 +1,16 @@
 <template>
-  <div class="series-detail" v-if="series">
-    <div class="series-header">
-      <div class="series-info">
+  <div class="detail-page" v-if="series">
+    <div class="detail-header">
+      <div class="header-row">
         <h1>{{ series.name }}</h1>
-        <p v-if="series.alias">别名：{{ series.alias }}</p>
-        <p v-if="series.country">地区：{{ series.country }}</p>
-        <p v-if="series.link"><a :href="series.link" target="_blank">链接 →</a></p>
+        <span v-if="series.country" class="country-tag">{{ series.country }}</span>
       </div>
+      <p v-if="series.alias" class="alias-row">别名：{{ series.alias }}</p>
+      <p v-if="series.link" class="link-row">
+        <a :href="series.link" target="_blank">链接 →</a>
+      </p>
     </div>
-    <div class="series-videos">
+    <div class="detail-videos">
       <h2>系列影片 ({{ videos.length }})</h2>
       <div class="video-grid">
         <VideoCard v-for="video in videos" :key="video.id" :video="video" mode="display" />
@@ -57,30 +59,50 @@ const loadVideos = async () => {
 </script>
 
 <style scoped>
-.series-detail {
+.detail-page {
   padding: 20px 0;
 }
 
-.series-header {
+.detail-header {
   margin-bottom: 40px;
 }
 
-.series-info h1 {
-  font-size: 32px;
+.header-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   margin-bottom: 10px;
 }
 
-.series-info p {
-  margin: 5px 0;
+.header-row h1 {
+  font-size: 32px;
+  margin: 0;
+}
+
+.country-tag {
+  background: #f3e5f5;
+  color: #7b1fa2;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.alias-row {
+  margin: 8px 0;
   color: #666;
   font-size: 15px;
 }
 
-.series-info a {
-  color: #3498db;
+.link-row {
+  margin: 12px 0 0;
 }
 
-.series-videos h2 {
+.link-row a {
+  color: #3498db;
+  font-size: 15px;
+}
+
+.detail-videos h2 {
   margin-bottom: 20px;
 }
 
