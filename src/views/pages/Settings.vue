@@ -29,6 +29,9 @@
         <button class="scan-all-btn" @click="scanAllDirs" :disabled="scanning || scanDirList.length === 0">
           {{ scanning ? '扫描中...' : '扫描全部' }}
         </button>
+        <span v-if="scanning && scanProgress.status === 'running'" class="scan-progress">
+          发现 {{ scanProgress.found }} | 新增 {{ scanProgress.added }} | 清理 {{ scanProgress.cleared }}
+        </span>
       </h2>
       <div class="scan-list" v-if="scanDirList.length > 0">
         <div class="scan-item" v-for="item in scanDirList" :key="item.id">
@@ -299,17 +302,52 @@ const scanAllDirs = async () => {
   if (scanDirList.value.length === 0) return
   if (!confirm(`确定扫描全部 ${scanDirList.value.length} 个目录吗？`)) return
   scanning.value = true
+  scanProgress.value = { status: 'pending', found: 0, added: 0, cleared: 0 }
   try {
     const res = await videoApi.scanAll()
     if (res.success) {
-      showPageTip(`扫描任务已启动！任务ID: ${res.data?.taskId}`, 'success')
+      const taskId = res.data?.taskId
+      showPageTip(`扫描任务已启动！`, 'success')
+      // 轮询任务状态
+      pollScanProgress(taskId)
     } else {
       showPageTip(res.message || '扫描失败', 'error')
+      scanning.value = false
     }
   } catch (error) {
     showPageTip('扫描失败: ' + error.message, 'error')
+    scanning.value = false
   }
-  scanning.value = false
+}
+
+const scanProgress = ref({ status: 'pending', found: 0, added: 0, cleared: 0 })
+
+const pollScanProgress = async (taskId) => {
+  try {
+    const res = await fetch(`/api/video/scan/${taskId}`).then(r => r.json())
+    if (res.success) {
+      const task = res.data
+      scanProgress.value = {
+        status: task.status,
+        found: task.files_found || 0,
+        added: task.files_added || 0,
+        cleared: task.files_updated || 0
+      }
+      
+      if (task.status === 'running' || task.status === 'pending') {
+        setTimeout(() => pollScanProgress(taskId), 500)
+      } else if (task.status === 'completed') {
+        showPageTip(`扫描完成！发现 ${task.files_found} 个文件，新增 ${task.files_added} 个，清理 ${task.files_updated} 个`, 'success')
+        scanning.value = false
+      } else if (task.status === 'failed') {
+        showPageTip('扫描失败: ' + (task.errors || '未知错误'), 'error')
+        scanning.value = false
+      }
+    }
+  } catch (error) {
+    console.error('轮询扫描进度失败:', error)
+    scanning.value = false
+  }
 }
 </script>
 
@@ -328,6 +366,8 @@ h2 { margin-bottom: 16px; font-size: 18px; color: #555; display: flex; align-ite
 .add-btn { padding: 6px 12px; background: #42b883; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
 .add-btn:hover { background: #369870; }
 .scan-all-btn { padding: 6px 12px; background: #1976d2; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
+.scan-all-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.scan-progress { margin-left: 12px; font-size: 13px; color: #666; }
 .scan-all-btn:hover:not(:disabled) { background: #1565c0; }
 .scan-all-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
