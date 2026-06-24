@@ -37,6 +37,7 @@
             <div class="scan-meta">
               <span class="meta-tag" v-if="item.category">{{ item.category }}</span>
               <span class="meta-tag" v-if="item.recursive">递归</span>
+              <span class="meta-tag auto-series" v-if="item.autoCreateSeries">自动系列</span>
             </div>
           </div>
           <div class="scan-actions">
@@ -363,6 +364,7 @@ h2 { margin-bottom: 16px; font-size: 18px; color: #555; display: flex; align-ite
 .scan-path { font-weight: 500; color: #333; }
 .scan-meta { margin-top: 4px; display: flex; gap: 8px; }
 .meta-tag { font-size: 12px; padding: 2px 6px; background: #e8f5e9; color: #2e7d32; border-radius: 3px; }
+.meta-tag.auto-series { background: #e3f2fd; color: #1565c0; }
 .scan-actions { display: flex; gap: 8px; }
 .btn-edit, .btn-delete { padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
 .btn-edit { background: #ff9800; color: #fff; }
