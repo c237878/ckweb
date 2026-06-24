@@ -4,10 +4,11 @@
       <div class="header-row">
         <h1>{{ series.name }}</h1>
         <span v-if="series.country" class="country-tag">{{ series.country }}</span>
+        <span v-if="series.likeCount > 0" class="like-tag">♥ {{ series.likeCount }}</span>
       </div>
       <p v-if="series.alias" class="alias-row">别名：{{ series.alias }}</p>
       <p v-if="series.link" class="link-row">
-        <a :href="series.link" target="_blank">链接 →</a>
+        <a :href="series.link" target="_blank">{{ series.link }}</a>
       </p>
     </div>
     <div class="detail-videos">
@@ -87,6 +88,14 @@ const loadVideos = async () => {
   font-size: 13px;
 }
 
+.like-tag {
+  background: #fce4ec;
+  color: #e74c3c;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
 .alias-row {
   margin: 8px 0;
   color: #666;
@@ -100,6 +109,7 @@ const loadVideos = async () => {
 .link-row a {
   color: #3498db;
   font-size: 15px;
+  word-break: break-all;
 }
 
 .detail-videos h2 {

@@ -4,6 +4,7 @@
       <div class="header-row">
         <h1>{{ actor.name }}</h1>
         <span v-if="actor.country" class="country-tag">{{ actor.country }}</span>
+        <span v-if="actor.likeCount > 0" class="like-tag">♥ {{ actor.likeCount }}</span>
       </div>
       <p v-if="actor.alias" class="alias-row">别名：{{ actor.alias }}</p>
       <p v-if="actor.bio" class="bio-row">{{ actor.bio }}</p>
@@ -80,6 +81,14 @@ const loadVideos = async () => {
 .country-tag {
   background: #f3e5f5;
   color: #7b1fa2;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.like-tag {
+  background: #fce4ec;
+  color: #e74c3c;
   padding: 4px 10px;
   border-radius: 4px;
   font-size: 13px;
