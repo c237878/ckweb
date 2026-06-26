@@ -200,7 +200,8 @@ const resetFileSize = async () => {
         const res = await videoApi.resetFileSize(video.value.id)
         if (res.success) {
             video.value.file_size = res.data.fileSize
-            alert('重置成功！文件大小: ' + formatSize(res.data.fileSize))
+            video.value.file_size = res.data.fileSize
+            console.log('重置成功！文件大小:', formatSize(res.data.fileSize))
         } else {
             alert('重置失败: ' + (res.message || '未知错误'))
         }
