@@ -149,8 +149,7 @@ const loadVideos = async () => {
   try {
     const params = {
       pageIndex: page.value,
-      pageSize: pageSize.value,
-      hasFile: true  // 首页只显示有文件的影片
+      pageSize: pageSize.value
     }
     if (filters.value.category) params.category = filters.value.category
     if (filters.value.country) params.country = filters.value.country

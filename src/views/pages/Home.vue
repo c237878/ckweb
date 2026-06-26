@@ -26,7 +26,7 @@ onMounted(async () => {
 
     // 并行加载每个分类的视频
     await Promise.all(metaRes.categories.map(async (catName) => {
-      const res = await videoApi.getList({ pageIndex: 1, pageSize: 12, category: catName })
+      const res = await videoApi.getList({ pageIndex: 1, pageSize: 12, category: catName, hasFile: true })
       if (res.success) {
         categories.value.push({ name: catName, value: catName, videos: res.data?.list || [] })
       }
