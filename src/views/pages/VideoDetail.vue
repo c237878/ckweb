@@ -98,6 +98,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { videoApi } from '@/scripts/api'
 import AddVideoDialog from '@/views/components/AddVideoDialog.vue'
 import VideoCard from '@/views/components/VideoCard.vue'
+import { formatSize } from '@/scripts/utils/format'
 
 const route = useRoute()
 const router = useRouter()
@@ -252,16 +253,7 @@ const handleLike = async () => {
     }
 }
 
-const formatSize = (bytes) => {
-    if (!bytes) return ''
-    const units = ['B', 'KB', 'MB', 'GB', 'TB']
-    let i = 0
-    while (bytes >= 1024 && i < units.length - 1) {
-        bytes /= 1024
-        i++
-    }
-    return bytes.toFixed(1) + ' ' + units[i]
-}
+// formatSize 已迁移至 @/scripts/utils/format.js
 </script>
 
 <style scoped>

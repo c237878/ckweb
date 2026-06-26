@@ -11,14 +11,17 @@
     <div class="video-body">
       <!-- 第二行：番号(code, 蓝色tag) + 名称(name, 加粗) -->
       <div class="info-row">
-        <span v-if="video.code" class="code-tag">{{ video.code }}</span>
-        <span class="name">{{ video.name }}</span>
+        <div class="name">
+          <span v-if="video.code">{{ video.code }}</span>
+          <span>{{ video.name }}</span>
+        </div>
       </div>
       <!-- 第三行：国家(tag, 紫色) + 分类(tag, 绿色) + 获赞数(红心) -->
       <div class="info-row">
         <span v-if="video.country" class="country-tag">{{ video.country }}</span>
         <span v-if="video.category" class="type-tag">{{ video.category }}</span>
         <span v-if="video.likeCount > 0" class="like-count">♥ {{ video.likeCount }}</span>
+        <span v-if="video.fileSize > 0" class="like-count">📁 {{ formatSize(video.fileSize) }}</span>
       </div>
       <!-- 第四行：所属系列名称（可点击，橙色tag） -->
       <div class="info-row" v-if="video.seriesName">
@@ -44,6 +47,7 @@
 <script setup>
 import { useRouter } from 'vue-router'
 import CardActions from './CardActions.vue'
+import { formatSize } from '@/scripts/utils/format'
 
 const props = defineProps({
   video: {
@@ -199,25 +203,25 @@ const handleEdit = () => {
 
 /* 第二行：名称样式 */
 .info-row .name {
+  width: 100%;
   font-size: 14px;
   font-weight: bold;
   color: #333;
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.info-row .name span {
+  width: auto;
+  height: 20px;
+  line-height: 20px;
   white-space: nowrap;
 }
 
-/* 番号 tag - 蓝色 */
-.code-tag {
-  font-size: 12px;
-  font-weight: bold;
-  color: #1976d2;
-  flex-shrink: 0;
-  background: #e3f2fd;
-  padding: 2px 6px;
-  border-radius: 3px;
+.info-row .name span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* 国家 tag - 紫色 */
