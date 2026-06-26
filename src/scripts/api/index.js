@@ -31,7 +31,8 @@ export const videoApi = {
   getStreamUrl: (id) => `/api/video/stream/${id}`,
   getCoverUrl: (id) => `/api/video/cover/${id}`,
   getMeta: () => api.get('/video/meta'),
-  like: (id) => api.post(`/video/${id}/like`)
+  like: (id) => api.post(`/video/${id}/like`),
+  resetFileSize: (id) => api.post(`/video/${id}/reset-file-size`)
 }
 
 // 演员相关API

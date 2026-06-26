@@ -60,6 +60,10 @@
                             <span class="btn-icon">✏️</span>
                             <span>编辑</span>
                         </button>
+                        <button class="action-btn" @click="resetFileSize" :disabled="resetting">
+                            <span class="btn-icon">🔄</span>
+                            <span>{{ resetting ? '重置中...' : '重置' }}</span>
+                        </button>
                     </div>
                     <div class="recommend-section" v-if="recommendList.length > 0">
                         <div class="recommend-title">推荐视频</div>
@@ -106,6 +110,7 @@ const showEditDialog = ref(false)
 const editingVideo = ref(null)
 const panelCollapsed = ref(false)
 const likeCount = ref(0)
+const resetting = ref(false)
 
 const videoNaturalWidth = ref(0)
 const videoNaturalHeight = ref(0)
@@ -186,6 +191,24 @@ const rotateVideo = () => {
 const openEditDialog = () => {
     editingVideo.value = { ...video.value }
     showEditDialog.value = true
+}
+
+const resetFileSize = async () => {
+    if (!video.value?.id) return
+    resetting.value = true
+    try {
+        const res = await videoApi.resetFileSize(video.value.id)
+        if (res.success) {
+            video.value.file_size = res.data.fileSize
+            alert('重置成功！文件大小: ' + formatSize(res.data.fileSize))
+        } else {
+            alert('重置失败: ' + (res.message || '未知错误'))
+        }
+    } catch (error) {
+        console.error('重置失败:', error)
+        alert('重置失败: ' + error.message)
+    }
+    resetting.value = false
 }
 
 const onEditSave = async (formData) => {
