@@ -49,6 +49,9 @@
                         <button class="action-btn like-btn" @click="handleLike">
                             <span>点赞</span>
                         </button>
+                        <button class="action-btn" @click="handleScreenshot">
+                            <span>截图</span>
+                        </button>
                         <button class="action-btn" @click="rotateVideo">
                             <span>旋转</span>
                         </button>
@@ -289,6 +292,36 @@ const loadRecommend = async () => {
         }
     } catch (error) {
         console.error('加载推荐视频失败:', error)
+    }
+}
+
+// 截图功能
+const handleScreenshot = () => {
+    if (!ckplayerInstance) {
+        console.warn('播放器未初始化')
+        return
+    }
+    
+    try {
+        // ckplayer 的 screenshot 方法会触发 screenshot 事件并返回 base64
+        const base64 = ckplayerInstance.screenshot()
+        if (base64) {
+            // 在新标签页打开截图
+            const imgWindow = window.open('', '_blank')
+            if (imgWindow) {
+                imgWindow.document.write(`
+                    <html>
+                    <head><title>截图 - ${video.value?.name || '视频'}</title></head>
+                    <body style="margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#000;">
+                        <img src="${base64}" style="max-width:100%;max-height:100%;" />
+                    </body>
+                    </html>
+                `)
+                imgWindow.document.close()
+            }
+        }
+    } catch (e) {
+        console.error('截图失败:', e)
     }
 }
 
