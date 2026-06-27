@@ -146,13 +146,13 @@ const initCkplayer = () => {
         video: videoUrl
     }
 
-    // 确保 ckplayer 已加载
-    if (typeof window.ckplayerEmbed === 'undefined') {
+    // ckplayer 通过 UMD 挂载到 window.ckplayer
+    if (typeof window.ckplayer === 'undefined') {
         console.error('ckplayer 未加载')
         return
     }
 
-    ckplayerInstance = new window.ckplayerEmbed(videoObject)
+    ckplayerInstance = new window.ckplayer(videoObject)
 
     // 获取视频元数据
     setTimeout(() => {
