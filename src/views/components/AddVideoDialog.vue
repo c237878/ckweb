@@ -149,21 +149,21 @@ const seriesInput = ref('')
 const seriesList = computed(() => meta.value.series || [])
 
 const filteredCategories = computed(() => {
-  if (showCatDropdown.value) return meta.value.categories || []
-  if (!form.value.category) return meta.value.categories || []
-  return (meta.value.categories || []).filter(c => c.includes(form.value.category))
+  const list = meta.value.categories || []
+  if (!form.value.category) return list
+  return list.filter(c => c.toLowerCase().includes(form.value.category.toLowerCase()))
 })
 
 const filteredCountries = computed(() => {
-  if (showCountryDropdown.value) return meta.value.countries || []
-  if (!form.value.country) return meta.value.countries || []
-  return (meta.value.countries || []).filter(c => c.includes(form.value.country))
+  const list = meta.value.countries || []
+  if (!form.value.country) return list
+  return list.filter(c => c.toLowerCase().includes(form.value.country.toLowerCase()))
 })
 
 const filteredSeries = computed(() => {
-  if (showSeriesDropdown.value) return seriesList.value
-  if (!seriesInput.value) return seriesList.value
-  return seriesList.value.filter(s => s.name.includes(seriesInput.value))
+  const list = seriesList.value || []
+  if (!seriesInput.value) return list.slice(0, 50) // 未输入时只显示前50个
+  return list.filter(s => s.name.toLowerCase().includes(seriesInput.value.toLowerCase())).slice(0, 50)
 })
 
 const form = ref({
