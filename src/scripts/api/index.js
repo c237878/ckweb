@@ -72,4 +72,11 @@ export const scanDirectoryApi = {
   delete: (id) => api.delete(`/scan-directory/${id}`)
 }
 
+export const friendLinkApi = {
+  getList: () => api.get('/friend-link'),
+  add: (data) => api.post('/friend-link', data),
+  update: (id, data) => api.put(`/friend-link/${id}`, data),
+  delete: (id) => api.delete(`/friend-link/${id}`)
+}
+
 export default api

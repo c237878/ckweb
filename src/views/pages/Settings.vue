@@ -94,12 +94,74 @@
         </div>
       </div>
     </div>
+
+    <!-- 友情链接管理 -->
+    <div class="settings-section">
+      <h2>
+        友情链接
+        <button class="add-btn" @click="openAddFriendLinkDialog">+ 添加链接</button>
+      </h2>
+      <div class="scan-list" v-if="friendLinkList.length > 0">
+        <div class="scan-item" v-for="item in friendLinkList" :key="item.id">
+          <div class="scan-info">
+            <div class="scan-path">{{ item.name }}</div>
+            <div class="scan-meta">
+              <span class="meta-tag">{{ item.link }}</span>
+              <span class="meta-tag green" v-if="item.description">{{ item.description }}</span>
+            </div>
+          </div>
+          <div class="scan-actions">
+            <button class="btn-edit" @click="openEditFriendLinkDialog(item)">编辑</button>
+            <button class="btn-delete" @click="deleteFriendLink(item)">删除</button>
+          </div>
+        </div>
+      </div>
+      <div class="empty-tip" v-else>暂无友情链接，点击上方按钮添加</div>
+    </div>
+
+    <!-- 友情链接弹窗 -->
+    <div class="dialog-overlay" v-if="showFriendLinkDialog"
+         @mousedown="handleFriendLinkOverlayDown"
+         @click="handleFriendLinkOverlayClick">
+      <div class="dialog">
+        <div class="dialog-header">
+          <h3>{{ editingFriendLink ? '编辑链接' : '添加链接' }}</h3>
+        </div>
+        <div class="dialog-body">
+          <div class="form-group">
+            <label>名称 *</label>
+            <input v-model="friendLinkForm.name" placeholder="链接显示名称" />
+          </div>
+          <div class="form-group">
+            <label>网址 *</label>
+            <input v-model="friendLinkForm.link" placeholder="https://example.com" />
+          </div>
+          <div class="form-group">
+            <label>Logo</label>
+            <input v-model="friendLinkForm.logo" placeholder="Logo 图片地址（选填）" />
+          </div>
+          <div class="form-group">
+            <label>描述</label>
+            <input v-model="friendLinkForm.description" placeholder="链接描述（选填）" />
+          </div>
+          <div class="form-group">
+            <label>排序</label>
+            <input v-model.number="friendLinkForm.sortorder" type="number" placeholder="数字越小越靠前" />
+          </div>
+        </div>
+        <div class="dialog-footer">
+          <span v-if="linkDialogTip.show" class="dialog-tip">{{ linkDialogTip.message }}</span>
+          <button class="btn btn-cancel" @click="closeFriendLinkDialog">取消</button>
+          <button class="btn btn-confirm" @click="saveFriendLink" :disabled="savingLink">{{ savingLink ? '保存中...' : '保存' }}</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { settingApi, videoApi } from '@/scripts/api'
+import { settingApi, videoApi, friendLinkApi } from '@/scripts/api'
 
 const settingsList = ref([
   { id: 'siteName', label: '网站名称', value: '', placeholder: '影视网站' },
@@ -164,6 +226,7 @@ onMounted(async () => {
   await loadSettings()
   await loadScanDirList()
   await loadCategories()
+  await loadFriendLinkList()
 })
 
 const loadSettings = async () => {
@@ -347,6 +410,117 @@ const pollScanProgress = async (taskId) => {
   } catch (error) {
     console.error('轮询扫描进度失败:', error)
     scanning.value = false
+  }
+}
+
+// 好友链接管理
+const friendLinkList = ref([])
+const showFriendLinkDialog = ref(false)
+const editingFriendLink = ref(null)
+const friendLinkForm = ref({ name: '', link: '', logo: '', description: '', sortorder: 0 })
+const savingLink = ref(false)
+const linkDialogTip = ref({ show: false, message: '' })
+
+let mouseDownOnLinkDialog = false
+function handleFriendLinkOverlayDown(e) {
+  const dialog = e.currentTarget.querySelector('.dialog')
+  mouseDownOnLinkDialog = dialog && dialog.contains(e.target)
+}
+function handleFriendLinkOverlayClick() {
+  if (!mouseDownOnLinkDialog) showFriendLinkDialog.value = false
+}
+function closeFriendLinkDialog() {
+  showFriendLinkDialog.value = false
+  linkDialogTip.value = { show: false, message: '' }
+}
+
+const loadFriendLinkList = async () => {
+  try {
+    const res = await friendLinkApi.getList()
+    if (res.success) friendLinkList.value = res.data || []
+  } catch (error) {
+    console.error('加载链接列表失败:', error)
+  }
+}
+
+const openAddFriendLinkDialog = () => {
+  editingFriendLink.value = null
+  friendLinkForm.value = { name: '', link: '', logo: '', description: '', sortorder: 0 }
+  linkDialogTip.value = { show: false, message: '' }
+  showFriendLinkDialog.value = true
+}
+
+const openEditFriendLinkDialog = (item) => {
+  editingFriendLink.value = item
+  friendLinkForm.value = {
+    name: item.name || '',
+    link: item.link || '',
+    logo: item.logo || '',
+    description: item.description || '',
+    sortorder: item.sortorder || 0
+  }
+  linkDialogTip.value = { show: false, message: '' }
+  showFriendLinkDialog.value = true
+}
+
+const saveFriendLink = async () => {
+  linkDialogTip.value = { show: false, message: '' }
+  if (!friendLinkForm.value.name) {
+    linkDialogTip.value = { show: true, message: '名称不能为空' }
+    return
+  }
+  if (!friendLinkForm.value.link) {
+    linkDialogTip.value = { show: true, message: '网址不能为空' }
+    return
+  }
+  savingLink.value = true
+  try {
+    let res
+    if (editingFriendLink.value) {
+      res = await friendLinkApi.update(editingFriendLink.value.id, {
+        name: friendLinkForm.value.name,
+        link: friendLinkForm.value.link,
+        logo: friendLinkForm.value.logo,
+        description: friendLinkForm.value.description,
+        sortorder: friendLinkForm.value.sortorder || 0
+      })
+    } else {
+      res = await friendLinkApi.add({
+        name: friendLinkForm.value.name,
+        link: friendLinkForm.value.link,
+        logo: friendLinkForm.value.logo,
+        description: friendLinkForm.value.description,
+        sortorder: friendLinkForm.value.sortorder || 0
+      })
+    }
+    if (res.success) {
+      showFriendLinkDialog.value = false
+      await loadFriendLinkList()
+      // 通知 Footer 更新
+      window.dispatchEvent(new CustomEvent('friendLinksUpdated'))
+    } else {
+      linkDialogTip.value = { show: true, message: res.message || '保存失败' }
+    }
+  } catch (error) {
+    linkDialogTip.value = { show: true, message: '保存失败: ' + error.message }
+  } finally {
+    savingLink.value = false
+  }
+}
+
+const deleteFriendLink = async (item) => {
+  if (!confirm(`确定删除链接 "${item.name}" 吗？`)) return
+  try {
+    const res = await friendLinkApi.delete(item.id)
+    if (res.success) {
+      showPageTip('删除成功', 'success')
+      await loadFriendLinkList()
+      window.dispatchEvent(new CustomEvent('friendLinksUpdated'))
+    } else {
+      showPageTip(res.message || '删除失败', 'error')
+    }
+  } catch (error) {
+    showPageTip('删除失败: ' + error.message, 'error')
   }
 }
 </script>
