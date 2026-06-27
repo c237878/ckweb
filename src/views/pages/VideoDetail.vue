@@ -105,6 +105,7 @@ const recommendList = ref([])
 const rotation = ref(0)
 const currentVolume = ref(1)  // 默认音量 1 (100%)
 const STORAGE_KEY = 'ckplayer_volume'
+const PLAYTIME_KEY_PREFIX = 'ckplayer_playtime_'
 
 // 从本地存储加载音量
 const loadVolume = () => {
@@ -112,6 +113,27 @@ const loadVolume = () => {
     if (saved !== null) {
         currentVolume.value = parseFloat(saved)
     }
+}
+
+// 获取视频播放时间
+const getPlayTime = (videoId) => {
+    const saved = localStorage.getItem(PLAYTIME_KEY_PREFIX + videoId)
+    if (saved !== null) {
+        return parseFloat(saved)
+    }
+    return 0
+}
+
+// 保存视频播放时间
+const savePlayTime = (videoId, time) => {
+    if (time > 5) {  // 只保存超过5秒的播放记录
+        localStorage.setItem(PLAYTIME_KEY_PREFIX + videoId, time.toString())
+    }
+}
+
+// 清除视频播放时间
+const clearPlayTime = (videoId) => {
+    localStorage.removeItem(PLAYTIME_KEY_PREFIX + videoId)
 }
 
 // 保存音量到本地存储
@@ -194,13 +216,17 @@ const initCkplayer = () => {
         ? `/api/video/cover/${video.value.id}` 
         : ''
     
+    // 获取记忆播放位置
+    const savedPlayTime = getPlayTime(video.value.id)
+    
     const videoObject = {
         container: '#ckplayer',
         variable: 'player',
         autoplay: false,
         video: videoUrl,
         screenshot: true,  // 开启截图功能
-        poster: poster  // 封面图片
+        poster: poster,  // 封面图片
+        seek: savedPlayTime  // 记忆播放位置
     }
 
     // ckplayer 通过 UMD 挂载到 window.ckplayer
@@ -217,6 +243,22 @@ const initCkplayer = () => {
             setVolume(currentVolume.value)
         }, 500)
     }
+    
+    // 监听播放时间并保存播放进度
+    let saveTimer = null
+    setTimeout(() => {
+        if (ckplayerInstance) {
+            ckplayerInstance.time((currentTime) => {
+                // 每10秒保存一次播放进度
+                if (!saveTimer) {
+                    saveTimer = setTimeout(() => {
+                        savePlayTime(video.value.id, currentTime)
+                        saveTimer = null
+                    }, 10000)
+                }
+            })
+        }
+    }, 1000)
     
     // 获取视频元数据
     setTimeout(() => {
@@ -384,6 +426,7 @@ const onEditSave = async (formData) => {
 
 const onDeleteVideo = async (videoId) => {
     try {
+        clearPlayTime(videoId)  // 清除播放记录
         await videoApi.delete(videoId)
         router.push('/')
     } catch (error) {
