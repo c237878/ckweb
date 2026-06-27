@@ -21,6 +21,7 @@ api.interceptors.response.use(
 export const videoApi = {
   getList: (params) => api.get('/video/list', { params }),
   getDetail: (id) => api.get(`/video/${id}`),
+  getRecommend: (id, limit = 8) => api.get(`/video/${id}/recommend`, { params: { limit } }),
   add: (data) => api.post('/video/add', data),
   update: (id, data) => api.put(`/video/${id}`, data),
   delete: (id) => api.delete(`/video/${id}`),

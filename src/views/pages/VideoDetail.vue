@@ -167,15 +167,10 @@ const loadVideo = async () => {
 
 const loadRecommend = async () => {
     try {
-        // 从同分类中随机推荐（排除当前视频）
-        if (!video.value?.category) return
-        const res = await videoApi.getList({
-            pageIndex: 1,
-            pageSize: 8,
-            category: video.value.category
-        })
+        if (!video.value?.id) return
+        const res = await videoApi.getRecommend(video.value.id, 8)
         if (res.success) {
-            recommendList.value = (res.data.list || []).filter(v => v.id !== video.value.id)
+            recommendList.value = res.data || []
         }
     } catch (error) {
         console.error('加载推荐视频失败:', error)
