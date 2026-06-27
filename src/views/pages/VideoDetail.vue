@@ -192,7 +192,8 @@ const initCkplayer = () => {
         container: '#ckplayer',
         variable: 'player',
         autoplay: false,
-        video: videoUrl
+        video: videoUrl,
+        screenshot: true  // 开启截图功能
     }
 
     // ckplayer 通过 UMD 挂载到 window.ckplayer
