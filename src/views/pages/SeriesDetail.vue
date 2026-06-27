@@ -22,7 +22,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { seriesApi } from '@/scripts/api'
 import VideoCard from '@/views/components/VideoCard.vue'
@@ -30,11 +30,6 @@ import VideoCard from '@/views/components/VideoCard.vue'
 const route = useRoute()
 const series = ref(null)
 const videos = ref([])
-
-onMounted(async () => {
-  await loadSeries()
-  await loadVideos()
-})
 
 const loadSeries = async () => {
   try {
@@ -57,6 +52,25 @@ const loadVideos = async () => {
     console.error('加载系列影片失败:', error)
   }
 }
+
+const loadAll = async () => {
+  await loadSeries()
+  await loadVideos()
+}
+
+onMounted(() => {
+  loadAll()
+})
+
+// 监听路由参数变化
+watch(
+  () => route.params.id,
+  (newId) => {
+    if (newId) {
+      loadAll()
+    }
+  }
+)
 
 // URL解码函数
 const decodeUrl = (url) => {

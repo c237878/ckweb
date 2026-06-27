@@ -20,7 +20,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { actorApi } from '@/scripts/api'
 import VideoCard from '@/views/components/VideoCard.vue'
@@ -28,11 +28,6 @@ import VideoCard from '@/views/components/VideoCard.vue'
 const route = useRoute()
 const actor = ref(null)
 const videos = ref([])
-
-onMounted(async () => {
-  await loadActor()
-  await loadVideos()
-})
 
 const loadActor = async () => {
   try {
@@ -55,6 +50,25 @@ const loadVideos = async () => {
     console.error('加载演员影片失败:', error)
   }
 }
+
+const loadAll = async () => {
+  await loadActor()
+  await loadVideos()
+}
+
+onMounted(() => {
+  loadAll()
+})
+
+// 监听路由参数变化
+watch(
+  () => route.params.id,
+  (newId) => {
+    if (newId) {
+      loadAll()
+    }
+  }
+)
 </script>
 
 <style scoped>
