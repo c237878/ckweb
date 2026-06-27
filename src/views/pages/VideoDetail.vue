@@ -5,14 +5,7 @@
             <div class="left-panel">
                 <div class="player-section">
                     <div class="player-wrapper" :style="wrapperStyle">
-                        <video
-                            v-if="video.id"
-                            ref="videoPlayer"
-                            :src="`/api/video/stream/${video.id}`"
-                            controls
-                            @loadedmetadata="onMetadata"
-                            :style="videoStyle"
-                        ></video>
+                        <div v-if="video.id" id="ckplayer" ref="playerContainer"></div>
                         <div v-else class="no-video">暂无视频</div>
                     </div>
                 </div>
@@ -90,7 +83,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, computed, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { videoApi } from '@/scripts/api'
 import AddVideoDialog from '@/views/components/AddVideoDialog.vue'
@@ -103,7 +96,6 @@ const video = ref(null)
 const actors = ref([])
 const recommendList = ref([])
 const rotation = ref(0)
-const videoPlayer = ref(null)
 const showEditDialog = ref(false)
 const editingVideo = ref(null)
 const panelCollapsed = ref(false)
@@ -112,6 +104,8 @@ const resetting = ref(false)
 
 const videoNaturalWidth = ref(0)
 const videoNaturalHeight = ref(0)
+const playerContainer = ref(null)
+let ckplayerInstance = null
 
 const wrapperStyle = computed(() => {
     if (!videoNaturalWidth.value || !videoNaturalHeight.value) {
@@ -131,6 +125,60 @@ const videoStyle = computed(() => {
     }
 })
 
+const initCkplayer = () => {
+    if (!video.value?.id) return
+
+    // 销毁旧实例
+    if (ckplayerInstance) {
+        try {
+            ckplayerInstance.remove()
+        } catch (e) {
+            console.warn('销毁播放器失败:', e)
+        }
+        ckplayerInstance = null
+    }
+
+    const videoUrl = `/api/video/stream/${video.value.id}`
+    const videoObject = {
+        container: '#ckplayer',
+        variable: 'player',
+        autoplay: false,
+        video: videoUrl,
+        // 支持旋转
+        rotate: rotation.value,
+        // 其他配置
+        loaded: 'ckplayerLoaded'
+    }
+
+    // 确保 ckplayer 已加载
+    if (typeof window.ckplayer === 'undefined') {
+        console.error('ckplayer 未加载')
+        return
+    }
+
+    ckplayerInstance = new window.ckplayer(videoObject)
+
+    // 获取视频元数据
+    setTimeout(() => {
+        if (ckplayerInstance) {
+            try {
+                const metaData = ckplayerInstance.getMetaDate()
+                if (metaData) {
+                    videoNaturalWidth.value = metaData.width || 1920
+                    videoNaturalHeight.value = metaData.height || 1080
+                }
+            } catch (e) {
+                console.warn('获取视频元数据失败:', e)
+            }
+        }
+    }, 1000)
+}
+
+// 全局回调函数
+window.ckplayerLoaded = function() {
+    console.log('ckplayer 加载完成')
+}
+
 onMounted(async () => {
     await loadVideo()
     await loadRecommend()
@@ -145,13 +193,6 @@ watch(() => route.params.id, async (newId, oldId) => {
     }
 })
 
-const onMetadata = () => {
-    if (videoPlayer.value) {
-        videoNaturalWidth.value = videoPlayer.value.videoWidth
-        videoNaturalHeight.value = videoPlayer.value.videoHeight
-    }
-}
-
 const loadVideo = async () => {
     try {
         const res = await videoApi.getDetail(route.params.id)
@@ -159,6 +200,11 @@ const loadVideo = async () => {
             video.value = res.data.video || res.data
             actors.value = res.data.actors || []
             likeCount.value = res.data.likeCount || 0
+
+            // 初始化 ckplayer
+            nextTick(() => {
+                initCkplayer()
+            })
         }
     } catch (error) {
         console.error('加载视频详情失败:', error)
@@ -179,6 +225,10 @@ const loadRecommend = async () => {
 
 const rotateVideo = () => {
     rotation.value = (rotation.value + 90) % 360
+    // 重新初始化播放器以应用旋转
+    if (ckplayerInstance) {
+        initCkplayer()
+    }
 }
 
 const openEditDialog = () => {
@@ -292,6 +342,11 @@ const handleLike = async () => {
     height: 100%;
     display: block;
     object-fit: contain;
+}
+
+.player-wrapper #ckplayer {
+    width: 100%;
+    height: 100%;
 }
 
 .no-video {
