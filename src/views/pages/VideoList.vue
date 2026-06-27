@@ -23,10 +23,34 @@
         <option value="">全部分类</option>
         <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
       </select>
-      <select v-model="filters.seriesId" @change="page = 1; loadVideos()">
-        <option value="">全部系列</option>
-        <option v-for="s in seriesList" :key="s.id" :value="s.id">{{ s.name }}</option>
-      </select>
+      <div class="combobox-wrap">
+        <input
+          v-model="seriesInput"
+          type="text"
+          placeholder="筛选系列..."
+          @focus="showSeriesDropdown = true"
+          @blur="hideSeriesDropdown"
+        />
+        <div v-if="showSeriesDropdown" class="combobox-dropdown">
+          <div
+            class="combobox-option"
+            :class="{ active: filters.seriesId === '' }"
+            @mousedown.prevent="selectSeries('')"
+          >
+            全部系列
+          </div>
+          <div
+            v-for="s in filteredSeriesList"
+            :key="s.id"
+            class="combobox-option"
+            :class="{ active: filters.seriesId === s.id }"
+            @mousedown.prevent="selectSeries(s.id, s.name)"
+          >
+            {{ s.name }}
+          </div>
+          <div v-if="filteredSeriesList.length === 0" class="combobox-empty">无匹配系列</div>
+        </div>
+      </div>
       <input
         v-model="filters.keyword"
         type="text"
@@ -81,14 +105,23 @@ const seriesList = ref([])
 const filters = ref({
   category: '',
   country: '',
-  seriesId: ''
+  seriesId: '',
+  keyword: ''
 })
 const showAddDialog = ref(false)
 const editingVideo = ref(null)
 const selectedIds = ref([])
+const showSeriesDropdown = ref(false)
+const seriesInput = ref('')
 
 const isAllSelected = computed(() => {
   return videos.value.length > 0 && selectedIds.value.length === videos.value.length
+})
+
+const filteredSeriesList = computed(() => {
+  const list = seriesList.value || []
+  if (!seriesInput.value) return list.slice(0, 50)
+  return list.filter(s => s.name.toLowerCase().includes(seriesInput.value.toLowerCase())).slice(0, 50)
 })
 
 const toggleSelectAll = () => {
@@ -97,6 +130,20 @@ const toggleSelectAll = () => {
   } else {
     selectedIds.value = videos.value.map(v => v.id)
   }
+}
+
+const selectSeries = (seriesId, seriesName = '') => {
+  filters.value.seriesId = seriesId
+  seriesInput.value = seriesId ? seriesName : ''
+  showSeriesDropdown.value = false
+  page.value = 1
+  loadVideos()
+}
+
+const hideSeriesDropdown = () => {
+  setTimeout(() => {
+    showSeriesDropdown.value = false
+  }, 200)
 }
 
 const handleSelectVideo = (videoId) => {
@@ -265,6 +312,57 @@ const handleDeleteVideo = async (videoId) => {
 
 .filters input[type="text"] {
   min-width: 200px;
+}
+
+.combobox-wrap {
+  position: relative;
+  min-width: 200px;
+}
+
+.combobox-wrap input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  height: 38px;
+  box-sizing: border-box;
+}
+
+.combobox-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  margin-top: 4px;
+  max-height: 300px;
+  overflow-y: auto;
+  z-index: 100;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.combobox-option {
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.combobox-option:hover {
+  background: #f5f5f5;
+}
+
+.combobox-option.active {
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+.combobox-empty {
+  padding: 8px 12px;
+  color: #999;
+  font-size: 14px;
 }
 
 .search-btn {
