@@ -7,6 +7,10 @@
                     <div class="player-wrapper" :style="wrapperStyle">
                         <div v-if="video.id" id="ckplayer" ref="playerContainer"></div>
                         <div v-else class="no-video">暂无视频</div>
+                        <!-- 音量提示 -->
+                        <div v-if="volumeTipVisible" class="volume-tip">
+                            <span>音量: {{ Math.round(currentVolume * 100) }}%</span>
+                        </div>
                     </div>
                 </div>
                 <div class="info-section">
@@ -83,7 +87,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { videoApi } from '@/scripts/api'
 import AddVideoDialog from '@/views/components/AddVideoDialog.vue'
@@ -96,11 +100,60 @@ const video = ref(null)
 const actors = ref([])
 const recommendList = ref([])
 const rotation = ref(0)
+const currentVolume = ref(1)  // 默认音量 1 (100%)
+const STORAGE_KEY = 'ckplayer_volume'
+
+// 从本地存储加载音量
+const loadVolume = () => {
+    const saved = localStorage.getItem(STORAGE_KEY)
+    if (saved !== null) {
+        currentVolume.value = parseFloat(saved)
+    }
+}
+
+// 保存音量到本地存储
+const saveVolume = () => {
+    localStorage.setItem(STORAGE_KEY, currentVolume.value.toString())
+}
+
+// 设置播放器音量
+const setVolume = (vol) => {
+    currentVolume.value = Math.max(0, Math.min(1, vol))
+    saveVolume()
+    
+    if (ckplayerInstance) {
+        try {
+            ckplayerInstance.volume(currentVolume.value)
+        } catch (e) {
+            console.warn('设置音量失败:', e)
+        }
+    }
+}
+
+// 键盘控制音量
+const handleKeyDown = (e) => {
+    // 只有在页面可见且没有焦点在输入框时才响应
+    if (document.visibilityState === 'hidden') return
+    const activeTag = document.activeElement?.tagName?.toLowerCase()
+    if (activeTag === 'input' || activeTag === 'textarea') return
+    
+    if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setVolume(currentVolume.value + 0.1)
+        showVolumeTip()
+    } else if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setVolume(currentVolume.value - 0.1)
+        showVolumeTip()
+    }
+}
 const showEditDialog = ref(false)
 const editingVideo = ref(null)
 const panelCollapsed = ref(false)
 const likeCount = ref(0)
 const resetting = ref(false)
+const volumeTipVisible = ref(false)
+let volumeTipTimer = null
 
 const videoNaturalWidth = ref(0)
 const videoNaturalHeight = ref(0)
@@ -146,7 +199,14 @@ const initCkplayer = () => {
     }
 
     ckplayerInstance = new window.ckplayer(videoObject)
-
+    
+    // 恢复保存的音量
+    if (currentVolume.value !== 1) {
+        setTimeout(() => {
+            setVolume(currentVolume.value)
+        }, 500)
+    }
+    
     // 获取视频元数据
     setTimeout(() => {
         if (ckplayerInstance) {
@@ -163,9 +223,34 @@ const initCkplayer = () => {
     }, 1000)
 }
 
+// 显示音量提示
+const showVolumeTip = () => {
+    // 通过设置一个临时值来触发提示显示
+    volumeTipVisible.value = true
+    clearTimeout(volumeTipTimer)
+    volumeTipTimer = setTimeout(() => {
+        volumeTipVisible.value = false
+    }, 1000)
+}
+
 onMounted(async () => {
+    loadVolume()
+    document.addEventListener('keydown', handleKeyDown)
     await loadVideo()
     await loadRecommend()
+})
+
+onUnmounted(() => {
+    document.removeEventListener('keydown', handleKeyDown)
+    clearTimeout(volumeTipTimer)
+    if (ckplayerInstance) {
+        try {
+            ckplayerInstance.remove()
+        } catch (e) {
+            console.warn('销毁播放器失败:', e)
+        }
+        ckplayerInstance = null
+    }
 })
 
 watch(() => route.params.id, async (newId, oldId) => {
@@ -345,6 +430,20 @@ const handleLike = async () => {
     justify-content: center;
     color: #999;
     font-size: 18px;
+}
+
+.volume-tip {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.75);
+    color: #fff;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 16px;
+    pointer-events: none;
+    z-index: 100;
 }
 
 .info-section {
