@@ -143,20 +143,16 @@ const initCkplayer = () => {
         container: '#ckplayer',
         variable: 'player',
         autoplay: false,
-        video: videoUrl,
-        // 支持旋转
-        rotate: rotation.value,
-        // 其他配置
-        loaded: 'ckplayerLoaded'
+        video: videoUrl
     }
 
     // 确保 ckplayer 已加载
-    if (typeof window.ckplayer === 'undefined') {
+    if (typeof window.ckplayerEmbed === 'undefined') {
         console.error('ckplayer 未加载')
         return
     }
 
-    ckplayerInstance = new window.ckplayer(videoObject)
+    ckplayerInstance = new window.ckplayerEmbed(videoObject)
 
     // 获取视频元数据
     setTimeout(() => {
@@ -172,11 +168,6 @@ const initCkplayer = () => {
             }
         }
     }, 1000)
-}
-
-// 全局回调函数
-window.ckplayerLoaded = function() {
-    console.log('ckplayer 加载完成')
 }
 
 onMounted(async () => {
