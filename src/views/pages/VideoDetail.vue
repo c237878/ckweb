@@ -18,16 +18,17 @@
                 </div>
                 <div class="info-section">
                     <div class="info-row1">
-                        {{ video.name }}
+                        <span>{{ video.code ? video.code + ' ' + video.name : video.name }}</span>
                     </div>
                     <div class="info-row2">
-                        <span v-if="video.category" class="type-tag">{{ video.category }}</span>
                         <span v-if="video.country" class="country-tag">{{ video.country }}</span>
-                        <span v-if="video.code" class="code-tag">{{ video.code }}</span>
-                        <span v-if="video.fileSize">{{ formatSize(video.fileSize) }}</span>
+                        <span v-if="video.category" class="type-tag">{{ video.category }}</span>
+                        <span v-if="likeCount > 0" class="like-count">♥ {{ likeCount }}</span>
+                        <span v-if="video.fileSize" class="file-size">{{ formatSize(video.fileSize) }}</span>
                     </div>
                     <div class="info-row3" v-if="video.seriesName">
-                        <span>系列：{{ video.seriesName }}</span>
+                        <span>系列：</span>
+                        <a :key="video.seriesId" class="actor-link" @click="goToSeries(video.seriesId)">{{ video.seriesName }}</a>
                     </div>
                     <div class="info-row4" v-if="actors.length > 0">
                         <span>参演演员：</span>
@@ -49,20 +50,16 @@
                 <template v-if="!panelCollapsed">
                     <div class="action-section">
                         <button class="action-btn like-btn" @click="handleLike">
-                            <span class="btn-icon">❤️</span>
-                            <span>点赞 ({{ likeCount }})</span>
+                            <span>点赞</span>
                         </button>
                         <button class="action-btn" @click="rotateVideo">
-                            <span class="btn-icon">🔄</span>
-                            <span>旋转{{ rotation ? '（' + rotation + '°）' : '' }}</span>
+                            <span>旋转</span>
                         </button>
                         <button class="action-btn" @click="openEditDialog">
-                            <span class="btn-icon">✏️</span>
                             <span>编辑</span>
                         </button>
                         <button class="action-btn" @click="resetFileSize" :disabled="resetting">
-                            <span class="btn-icon">🔄</span>
-                            <span>{{ resetting ? '重置中...' : '重置' }}</span>
+                            <span>重置</span>
                         </button>
                     </div>
                     <div class="recommend-section" v-if="recommendList.length > 0">
@@ -202,6 +199,7 @@ const resetFileSize = async () => {
         if (res.success) {
             video.value.file_size = res.data.fileSize
             video.value.file_size = res.data.fileSize
+            video.value.fileSize = res.data.fileSize
             console.log('重置成功！文件大小:', formatSize(res.data.fileSize))
         } else {
             alert('重置失败: ' + (res.message || '未知错误'))
@@ -231,6 +229,10 @@ const onDeleteVideo = async (videoId) => {
     } catch (error) {
         console.error('删除失败:', error)
     }
+}
+
+const goToSeries = (id) => {
+    router.push(`/series/${id}`)
 }
 
 const goToActor = (id) => {
@@ -310,13 +312,15 @@ const handleLike = async () => {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    padding: 4px 0;
 }
 
 .info-row1 {
     font-size: 18px;
     font-weight: bold;
     color: #333;
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .info-row2 {
@@ -367,11 +371,15 @@ const handleLike = async () => {
     color: #666;
 }
 
+.info-row4 {
+    display: flex;
+    gap: 6px;
+}
+
 .actor-link {
     color: #3498db;
     cursor: pointer;
     text-decoration: none;
-    margin-right: 4px;
 }
 
 .actor-link:hover {
@@ -379,7 +387,6 @@ const handleLike = async () => {
 }
 
 .actor-link:not(:last-child)::after {
-    content: '、';
     color: #666;
 }
 
@@ -431,10 +438,11 @@ const handleLike = async () => {
 }
 
 .action-btn {
+    width: calc(25% - 6px);
+    height: 36px;
     display: flex;
+    justify-content: center;
     align-items: center;
-    gap: 4px;
-    padding: 8px 12px;
     border: 1px solid #ddd;
     border-radius: 8px;
     background: #fff;
@@ -459,10 +467,6 @@ const handleLike = async () => {
     background: #fdf2f2;
 }
 
-.btn-icon {
-    font-size: 15px;
-}
-
 .recommend-title {
     font-size: 15px;
     font-weight: bold;
@@ -474,6 +478,42 @@ const handleLike = async () => {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 10px;
+}
+
+/* tag 样式 */
+.country-tag, .type-tag, .series-tag, .like-count, .file-size {
+  width: auto;
+  height: 20px;
+  line-height: 20px;
+  padding: 0 6px;
+  border-radius: 3px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+/* 国家 tag - 紫色 */
+.country-tag {
+  background: #f3e5f5;
+  color: #7b1fa2;
+}
+/* 分类 tag - 绿色 */
+.type-tag {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+/* 系列 tag - 橙色 */
+.series-tag {
+  background: #fff3e0;
+  color: #e65100;
+}
+/* 获赞数 */
+.like-count {
+  color: #e74c3c;
+  background: #fce4ec;
+}
+/* 文件大小 */
+.file-size {
+  color: #555;
+  background: #f0f0f0;
 }
 
 @media (max-width: 900px) {

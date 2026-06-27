@@ -352,7 +352,7 @@ onMounted(async () => {
 
 .series-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 16px;
   margin-bottom: 30px;
 }
@@ -509,18 +509,12 @@ onMounted(async () => {
 
 @media (max-width: 768px) {
   .series-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(1, 1fr);
   }
   .list-header {
     flex-direction: column;
     gap: 12px;
     align-items: flex-start;
-  }
-}
-
-@media (min-width: 769px) and (max-width: 1200px) {
-  .series-grid {
-    grid-template-columns: repeat(2, 1fr);
   }
 }
 </style>

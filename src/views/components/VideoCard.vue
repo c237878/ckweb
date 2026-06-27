@@ -1,5 +1,5 @@
 <template>
-  <div class="video-card" :class="[`mode-${mode}`, { selectable: selectable, selected }]" @click="handleClick">
+  <div class="video-card" :title="video.code + ' ' + video.name" :class="[`mode-${mode}`, { selectable: selectable, selected }]" @click="handleClick">
     <div v-if="selectable" class="select-checkbox">
       <input type="checkbox" :checked="selected" @change.stop="handleSelect" />
     </div>
@@ -7,6 +7,10 @@
     <div class="video-cover">
       <img v-if="video.coverPath" :src="`/api/video/cover/${video.id}`" :alt="video.name" @error="$event.target.style.display='none'" />
       <div v-if="!video.coverPath" class="no-cover">{{ video.name?.charAt(0) || '?' }}</div>
+      <!-- file_size=0 时显示灰色蒙版 -->
+      <div v-if="!video.fileSize || video.fileSize === 0" class="cover-mask">
+        <span class="mask-text">无文件</span>
+      </div>
     </div>
     <div class="video-body">
       <!-- 第二行：番号(code, 蓝色tag) + 名称(name, 加粗) -->
@@ -17,17 +21,17 @@
         </div>
       </div>
       <!-- 第三行：国家(tag, 紫色) + 分类(tag, 绿色) + 获赞数(红心) -->
-      <div class="info-row">
+      <div class="info-row" v-if="mode!='brief'">
         <span v-if="video.country" class="country-tag">{{ video.country }}</span>
-        <span v-if="video.category" class="type-tag">{{ video.category }}</span>
+        <span v-if="video.category && mode=='full'" class="type-tag">{{ video.category }}</span>
         <span v-if="video.likeCount > 0" class="like-count">♥ {{ video.likeCount }}</span>
-        <span v-if="video.fileSize > 0" class="like-count">📁 {{ formatSize(video.fileSize) }}</span>
+        <span v-if="video.fileSize > 0" class="file-size">{{ formatSize(video.fileSize) }}</span>
       </div>
       <!-- 第四行：所属系列名称（可点击，橙色tag） -->
-      <div class="info-row" v-if="video.seriesName">
+      <div class="info-row" v-if="video.seriesName && mode!='brief'">
         <span class="series-tag clickable" @click.stop="goToSeries(video.seriesId)">{{ video.seriesName }}</span>
       </div>
-      <div class="info-row" v-if="video.actorNames">
+      <div class="info-row actors" v-if="video.actorNames">
         <span
           v-for="item in parseActors(video.actorNames)"
           :key="item.id"
@@ -184,6 +188,29 @@ const handleEdit = () => {
   font-size: 14px;
 }
 
+/* 灰色蒙版 - file_size=0 */
+.cover-mask {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(128, 128, 128, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.mask-text {
+  color: #fff;
+  font-size: 14px;
+  font-weight: bold;
+  padding: 6px 12px;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 4px;
+}
+
 .video-body {
   padding: 12px 16px;
   flex: 1;
@@ -201,8 +228,15 @@ const handleEdit = () => {
   overflow: hidden;
 }
 
+.info-row.actors {
+  flex-wrap: wrap;
+}
+.mode-brief .info-row.actors {
+  flex-wrap: nowrap;
+}
+
 /* 第二行：名称样式 */
-.info-row .name {
+ .info-row .name {
   width: 100%;
   font-size: 14px;
   font-weight: bold;
@@ -222,36 +256,6 @@ const handleEdit = () => {
 .info-row .name span:last-child {
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-/* 国家 tag - 紫色 */
-.country-tag {
-  background: #f3e5f5;
-  color: #7b1fa2;
-  padding: 2px 6px;
-  border-radius: 3px;
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-/* 分类 tag - 绿色 */
-.type-tag {
-  background: #e8f5e9;
-  color: #2e7d32;
-  padding: 2px 6px;
-  border-radius: 3px;
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-/* 系列 tag - 橙色 */
-.series-tag {
-  background: #fff3e0;
-  color: #e65100;
-  padding: 2px 6px;
-  border-radius: 3px;
-  font-size: 12px;
-  white-space: nowrap;
 }
 
 .clickable {
@@ -276,13 +280,39 @@ const handleEdit = () => {
   color: #999;
 }
 
+/* tag 样式 */
+.country-tag, .type-tag, .series-tag, .like-count, .file-size {
+  width: auto;
+  height: 20px;
+  line-height: 20px;
+  padding: 0 6px;
+  border-radius: 3px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+/* 国家 tag - 紫色 */
+.country-tag {
+  background: #f3e5f5;
+  color: #7b1fa2;
+}
+/* 分类 tag - 绿色 */
+.type-tag {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+/* 系列 tag - 橙色 */
+.series-tag {
+  background: #fff3e0;
+  color: #e65100;
+}
 /* 获赞数 */
 .like-count {
-  font-size: 12px;
   color: #e74c3c;
   background: #fce4ec;
-  padding: 2px 6px;
-  border-radius: 3px;
-  white-space: nowrap;
+}
+/* 文件大小 */
+.file-size {
+  color: #555;
+  background: #f0f0f0;
 }
 </style>

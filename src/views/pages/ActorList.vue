@@ -347,7 +347,7 @@ onMounted(async () => {
 
 .actor-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 16px;
   margin-bottom: 30px;
 }
@@ -504,5 +504,16 @@ onMounted(async () => {
 .pagination span {
   font-size: 14px;
   color: #666;
+}
+
+@media (max-width: 768px) {
+  .actor-grid {
+    grid-template-columns: repeat(1, 1fr);
+  }
+  .list-header {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
 }
 </style>
