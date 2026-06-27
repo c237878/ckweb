@@ -31,9 +31,9 @@
         v-model="filters.keyword"
         type="text"
         placeholder="搜索影片名称或番号..."
-        @keyup.enter="loadVideos"
+        @keyup.enter="handleSearch"
       />
-      <button class="search-btn" @click="loadVideos">搜索</button>
+      <button class="search-btn" @click="handleSearch">搜索</button>
     </div>
 
     <div class="video-grid">
@@ -164,6 +164,11 @@ const loadVideos = async () => {
   } catch (error) {
     console.error('加载影片失败:', error)
   }
+}
+
+const handleSearch = () => {
+  page.value = 1
+  loadVideos()
 }
 
 const changePage = (newPage) => {

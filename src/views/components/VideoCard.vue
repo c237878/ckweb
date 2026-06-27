@@ -30,6 +30,7 @@
       <div class="info-row" v-if="video.seriesName && mode!='brief'">
         <span class="series-tag clickable" @click.stop="goToSeries(video.seriesId)">{{ video.seriesName }}</span>
       </div>
+      <!-- 第五行：演员名称（可点击，蓝色tag） -->
       <div class="info-row actors" v-if="video.actorNames">
         <span
           v-for="item in parseActors(video.actorNames)"
@@ -39,7 +40,7 @@
         >{{ item.name }}</span>
       </div>
     </div>
-    <!-- 第五行：操作按钮 -->
+    <!-- 第六行：操作按钮 -->
     <CardActions v-if="mode === 'full' && showActions" @click.stop>
       <button class="btn btn-primary" @click.stop="handleEdit">编辑</button>
       <button class="btn btn-success" @click.stop="goToDetail">详情</button>

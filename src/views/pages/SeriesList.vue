@@ -23,9 +23,9 @@
         v-model="keyword"
         placeholder="搜索系列..."
         type="text"
-        @keyup.enter="loadSeries"
+        @keyup.enter="handleSearch"
       />
-      <button class="search-btn" @click="loadSeries">搜索</button>
+      <button class="search-btn" @click="handleSearch">搜索</button>
     </div>
 
     <div class="series-grid">
@@ -160,6 +160,11 @@ const loadSeries = async () => {
   } finally {
     loading.value = false
   }
+}
+
+const handleSearch = () => {
+  page.value = 1
+  loadSeries()
 }
 
 const changePage = (p) => {

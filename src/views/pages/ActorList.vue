@@ -23,9 +23,9 @@
         v-model="keyword"
         placeholder="搜索演员..."
         type="text"
-        @keyup.enter="loadActors"
+        @keyup.enter="handleSearch"
       />
-      <button class="search-btn" @click="loadActors">搜索</button>
+      <button class="search-btn" @click="handleSearch">搜索</button>
     </div>
 
     <div class="actor-grid">
@@ -159,6 +159,11 @@ const loadActors = async () => {
   } finally {
     loading.value = false
   }
+}
+
+const handleSearch = () => {
+  page.value = 1
+  loadActors()
 }
 
 const changePage = (newPage) => {
