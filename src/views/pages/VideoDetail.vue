@@ -11,6 +11,10 @@
                         <div v-if="volumeTipVisible" class="volume-tip">
                             <span>音量: {{ Math.round(currentVolume * 100) }}%</span>
                         </div>
+                        <!-- 倍速提示 -->
+                        <div v-if="speedTipVisible" class="volume-tip">
+                            <span>倍速: {{ currentSpeed }}x</span>
+                        </div>
                     </div>
                 </div>
                 <div class="info-section">
@@ -162,6 +166,20 @@ const handleKeyDown = (e) => {
     const activeTag = document.activeElement?.tagName?.toLowerCase()
     if (activeTag === 'input' || activeTag === 'textarea') return
     
+    // 数字键 1-9 设置倍速
+    if (e.key >= '1' && e.key <= '9') {
+        e.preventDefault()
+        setSpeed(parseInt(e.key))
+        return
+    }
+    
+    // 数字键 0 重置为1倍速
+    if (e.key === '0') {
+        e.preventDefault()
+        setSpeed(1)
+        return
+    }
+    
     if (e.key === 'ArrowUp') {
         e.preventDefault()
         setVolume(currentVolume.value + 0.1)
@@ -178,6 +196,9 @@ const panelCollapsed = ref(false)
 const likeCount = ref(0)
 const resetting = ref(false)
 const volumeTipVisible = ref(false)
+const speedTipVisible = ref(false)
+const currentSpeed = ref(1)
+let speedTipTimer = null
 let volumeTipTimer = null
 
 const videoNaturalWidth = ref(0)
@@ -283,6 +304,28 @@ const showVolumeTip = () => {
     clearTimeout(volumeTipTimer)
     volumeTipTimer = setTimeout(() => {
         volumeTipVisible.value = false
+    }, 1000)
+}
+
+// 设置播放倍速
+const setSpeed = (speed) => {
+    currentSpeed.value = speed
+    if (ckplayerInstance) {
+        try {
+            ckplayerInstance.playbackRate(speed)
+        } catch (e) {
+            console.warn('设置倍速失败:', e)
+        }
+    }
+    showSpeedTip()
+}
+
+// 显示倍速提示
+const showSpeedTip = () => {
+    speedTipVisible.value = true
+    clearTimeout(speedTipTimer)
+    speedTipTimer = setTimeout(() => {
+        speedTipVisible.value = false
     }, 1000)
 }
 
