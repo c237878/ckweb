@@ -109,19 +109,13 @@ let ckplayerInstance = null
 
 const wrapperStyle = computed(() => {
     if (!videoNaturalWidth.value || !videoNaturalHeight.value) {
-        return { aspectRatio: '16/9', '--rotation': `${rotation.value}deg` }
+        return { aspectRatio: '16/9' }
     }
     const ar = videoNaturalWidth.value / videoNaturalHeight.value
     if (rotation.value % 180 === 90) {
-        return { 
-            aspectRatio: (1 / ar).toFixed(4),
-            '--rotation': `${rotation.value}deg`
-        }
+        return { aspectRatio: (1 / ar).toFixed(4) }
     }
-    return { 
-        aspectRatio: ar.toFixed(4),
-        '--rotation': `${rotation.value}deg`
-    }
+    return { aspectRatio: ar.toFixed(4) }
 })
 
 const initCkplayer = () => {
@@ -215,9 +209,14 @@ const loadRecommend = async () => {
 
 const rotateVideo = () => {
     rotation.value = (rotation.value + 90) % 360
-    // 重新初始化播放器以应用旋转
-    if (ckplayerInstance) {
-        initCkplayer()
+    // 直接旋转 video 元素
+    const videoEl = document.querySelector('#ckplayer video')
+    if (videoEl) {
+        videoEl.style.transform = `rotate(${rotation.value}deg)`
+        videoEl.style.transformOrigin = 'center center'
+        console.log('视频旋转:', rotation.value)
+    } else {
+        console.warn('video 元素未找到')
     }
 }
 
@@ -337,10 +336,6 @@ const handleLike = async () => {
 .player-wrapper #ckplayer {
     width: 100%;
     height: 100%;
-}
-
-.player-wrapper #ckplayer video {
-    transform: rotate(var(--rotation, 0deg));
 }
 
 .no-video {
