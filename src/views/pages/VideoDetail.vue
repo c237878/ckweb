@@ -188,12 +188,19 @@ const initCkplayer = () => {
     }
 
     const videoUrl = `/api/video/stream/${video.value.id}`
+    
+    // 封面图片：优先使用后端代理接口
+    const poster = video.value.coverPath 
+        ? `/api/video/cover/${video.value.id}` 
+        : ''
+    
     const videoObject = {
         container: '#ckplayer',
         variable: 'player',
         autoplay: false,
         video: videoUrl,
-        screenshot: true  // 开启截图功能
+        screenshot: true,  // 开启截图功能
+        poster: poster  // 封面图片
     }
 
     // ckplayer 通过 UMD 挂载到 window.ckplayer
