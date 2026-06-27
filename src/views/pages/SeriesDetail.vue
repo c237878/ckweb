@@ -8,7 +8,7 @@
       </div>
       <p v-if="series.alias" class="alias-row">别名：{{ series.alias }}</p>
       <p v-if="series.link" class="link-row">
-        <a :href="series.link" target="_blank">{{ series.link }}</a>
+        链接：<a :href="series.link" target="_blank">{{ decodeUrl(series.link) }}</a>
       </p>
     </div>
     <div class="detail-videos">
@@ -55,6 +55,15 @@ const loadVideos = async () => {
     }
   } catch (error) {
     console.error('加载系列影片失败:', error)
+  }
+}
+
+// URL解码函数
+const decodeUrl = (url) => {
+  try {
+    return decodeURIComponent(url)
+  } catch {
+    return url
   }
 }
 </script>

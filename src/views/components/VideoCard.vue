@@ -9,7 +9,6 @@
       <div v-if="!video.coverPath" class="no-cover">{{ video.name?.charAt(0) || '?' }}</div>
       <!-- file_size=0 时显示灰色蒙版 -->
       <div v-if="!video.fileSize || video.fileSize === 0" class="cover-mask">
-        <span class="mask-text">无文件</span>
       </div>
     </div>
     <div class="video-body">
@@ -25,7 +24,7 @@
         <span v-if="video.country" class="country-tag">{{ video.country }}</span>
         <span v-if="video.category && mode=='full'" class="type-tag">{{ video.category }}</span>
         <span v-if="video.likeCount > 0" class="like-count">♥ {{ video.likeCount }}</span>
-        <span v-if="video.fileSize > 0" class="file-size">{{ formatSize(video.fileSize) }}</span>
+        <span class="file-size">{{ video.fileSize ? formatSize(video.fileSize) : '无文件' }}</span>
       </div>
       <!-- 第四行：所属系列名称（可点击，橙色tag） -->
       <div class="info-row" v-if="video.seriesName && mode!='brief'">
@@ -116,6 +115,15 @@ const goToActor = (actorId) => {
 
 const handleEdit = () => {
   emit('edit', props.video)
+}
+
+// URL解码函数
+const decodeUrl = (url) => {
+  try {
+    return decodeURIComponent(url)
+  } catch {
+    return url
+  }
 }
 </script>
 
