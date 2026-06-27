@@ -109,19 +109,18 @@ let ckplayerInstance = null
 
 const wrapperStyle = computed(() => {
     if (!videoNaturalWidth.value || !videoNaturalHeight.value) {
-        return { aspectRatio: '16/9' }
+        return { aspectRatio: '16/9', '--rotation': `${rotation.value}deg` }
     }
     const ar = videoNaturalWidth.value / videoNaturalHeight.value
     if (rotation.value % 180 === 90) {
-        return { aspectRatio: (1 / ar).toFixed(4) }
+        return { 
+            aspectRatio: (1 / ar).toFixed(4),
+            '--rotation': `${rotation.value}deg`
+        }
     }
-    return { aspectRatio: ar.toFixed(4) }
-})
-
-const videoStyle = computed(() => {
-    return {
-        transform: `rotate(${rotation.value}deg)`,
-        transformOrigin: 'center center'
+    return { 
+        aspectRatio: ar.toFixed(4),
+        '--rotation': `${rotation.value}deg`
     }
 })
 
@@ -319,7 +318,7 @@ const handleLike = async () => {
     width: 100%;
     background: #000;
     border-radius: 8px;
-    overflow: hidden;
+    overflow: visible;
 }
 
 .player-wrapper {
@@ -338,6 +337,10 @@ const handleLike = async () => {
 .player-wrapper #ckplayer {
     width: 100%;
     height: 100%;
+}
+
+.player-wrapper #ckplayer video {
+    transform: rotate(var(--rotation, 0deg));
 }
 
 .no-video {
