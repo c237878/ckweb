@@ -150,7 +150,9 @@ const loadSeries = async () => {
     }
     if (filters.value.country) params.country = filters.value.country
 
+    console.log('[SeriesList] 请求参数:', params)
     const res = await seriesApi.getList(params)
+    console.log('[SeriesList] 响应:', { total: res.total, count: res.data?.length })
     if (res.success) {
       seriesList.value = res.data || []
       total.value = res.total || 0
