@@ -236,10 +236,10 @@ const initCkplayer = () => {
         : ''
 
     // 记忆播放位置
-    const savedPlayTime = video.value.file_size ? getPlayTime(video.value.id) : 0
+    const savedPlayTime = video.value.fileSize ? getPlayTime(video.value.id) : 0
 
     // 文件不存在时视频地址为空，由 ckplayer 自动显示封面
-    const videoUrl = video.value.file_size
+    const videoUrl = video.value.fileSize
         ? `/api/video/stream/${video.value.id}`
         : ''
 
@@ -446,7 +446,7 @@ const resetFileSize = async () => {
         const res = await videoApi.resetFileSize(video.value.id)
         if (res.success) {
             if (res.data?.filePath !== undefined) video.value.file_path = res.data.filePath
-            if (res.data?.fileSize !== undefined) video.value.file_size = res.data.fileSize
+            if (res.data?.fileSize !== undefined) video.value.fileSize = res.data.fileSize
             if (res.data?.coverPath !== undefined) video.value.cover_path = res.data.coverPath
             console.log('重置结果:', res.message)
         } else {
