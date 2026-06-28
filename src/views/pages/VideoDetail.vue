@@ -442,10 +442,11 @@ const resetFileSize = async () => {
     try {
         const res = await videoApi.resetFileSize(video.value.id)
         if (res.success) {
-            video.value.file_size = res.data.fileSize
-            video.value.file_size = res.data.fileSize
-            video.value.fileSize = res.data.fileSize
-            console.log('重置成功！文件大小:', formatSize(res.data.fileSize))
+            if (res.data?.filePath !== undefined) video.value.file_path = res.data.filePath
+            if (res.data?.fileSize !== undefined) video.value.file_size = res.data.fileSize
+            if (res.data?.coverPath !== undefined) video.value.cover_path = res.data.coverPath
+            console.log('重置结果:', res.message)
+            alert('重置完成：' + (res.message || '成功'))
         } else {
             alert('重置失败: ' + (res.message || '未知错误'))
         }
