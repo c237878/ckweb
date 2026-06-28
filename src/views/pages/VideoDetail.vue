@@ -446,7 +446,6 @@ const resetFileSize = async () => {
             if (res.data?.fileSize !== undefined) video.value.file_size = res.data.fileSize
             if (res.data?.coverPath !== undefined) video.value.cover_path = res.data.coverPath
             console.log('重置结果:', res.message)
-            alert('重置完成：' + (res.message || '成功'))
         } else {
             alert('重置失败: ' + (res.message || '未知错误'))
         }
