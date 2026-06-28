@@ -70,7 +70,9 @@ export const scanDirectoryApi = {
   getList: () => api.get('/scan-directory'),
   add: (data) => api.post('/scan-directory', data),
   update: (id, data) => api.put(`/scan-directory/${id}`, data),
-  delete: (id) => api.delete(`/scan-directory/${id}`)
+  delete: (id) => api.delete(`/scan-directory/${id}`),
+  // 扫描单个目录（复用 videoApi.scan）
+  scan: (path, recursive = true) => api.post('/video/scan-directory', { targetPath: path, recursive })
 }
 
 export const friendLinkApi = {

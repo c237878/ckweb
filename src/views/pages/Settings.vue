@@ -44,6 +44,9 @@
             </div>
           </div>
           <div class="scan-actions">
+            <button class="btn-scan" @click="scanSingleDir(item)" :disabled="scanningDirs.has(item.id) || scanning">
+              {{ scanningDirs.has(item.id) ? '扫描中...' : '扫描' }}
+            </button>
             <button class="btn-edit" @click="openEditScanDirDialog(item)">编辑</button>
             <button class="btn-delete" @click="deleteScanDir(item)">删除</button>
           </div>
@@ -161,7 +164,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { settingApi, videoApi, friendLinkApi } from '@/scripts/api'
+import { settingApi, videoApi, friendLinkApi, scanDirectoryApi } from '@/scripts/api'
 
 const settingsList = ref([
   { id: 'siteName', label: '网站名称', value: '', placeholder: '影视网站' },
@@ -193,6 +196,7 @@ const editingScanDir = ref(null)
 const scanDirForm = ref({ path: '', recursive: true, category: '', autoCreateSeries: false })
 const showCatDropdown = ref(false)
 const categories = ref([])
+const scanningDirs = ref(new Set()) // 记录正在被扫描的目录ID
 
 const hideCatDropdown = () => { setTimeout(() => { showCatDropdown.value = false }, 200) }
 const selectCat = (val) => { scanDirForm.value.category = val; showCatDropdown.value = false }
@@ -357,6 +361,36 @@ const deleteScanDir = async (item) => {
     }
   } catch (error) {
     showPageTip('删除失败: ' + error.message, 'error')
+  }
+}
+
+// 扫描单个目录
+const scanSingleDir = async (dir) => {
+  if (scanningDirs.value.has(dir.id)) return
+  if (!confirm(`确定扫描目录：${dir.path}？`)) return
+  scanningDirs.value.add(dir.id)
+  try {
+    const res = await scanDirectoryApi.scan(dir.path, dir.recursive !== false)
+    if (res.success) {
+      showPageTip(`扫描任务已启动！`, 'success')
+      const taskId = res.data?.taskId
+      // 轮询该任务状态，结束后从 Set 中移除
+      const poll = async () => {
+        const r = await fetch(`/api/video/scan/${taskId}`).then(x => x.json())
+        if (r.success && r.data?.status === 'pending') {
+          setTimeout(poll, 500)
+        } else {
+          scanningDirs.value.delete(dir.id)
+        }
+      }
+      poll()
+    } else {
+      showPageTip(res.message || '扫描失败', 'error')
+      scanningDirs.value.delete(dir.id)
+    }
+  } catch (error) {
+    showPageTip('扫描失败: ' + error.message, 'error')
+    scanningDirs.value.delete(dir.id)
   }
 }
 
@@ -580,11 +614,14 @@ h2 { margin-bottom: 16px; font-size: 18px; color: #555; display: flex; align-ite
 .meta-tag { font-size: 12px; padding: 2px 6px; background: #e3f2fd; color: #1565c0; border-radius: 3px; }
 .meta-tag.green { background: #e8f5e9; color: #2e7d32; }
 .scan-actions { display: flex; gap: 8px; }
-.btn-edit, .btn-delete { padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
+.btn-edit, .btn-delete, .btn-scan { padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
 .btn-edit { background: #ff9800; color: #fff; }
 .btn-delete { background: #d32f2f; color: #fff; }
+.btn-scan { background: #4caf50; color: #fff; }
 .btn-edit:hover { background: #f57c00; }
 .btn-delete:hover { background: #c62828; }
+.btn-scan:hover { background: #388e3c; }
+.btn-scan:disabled, .btn-edit:disabled, .btn-delete:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .empty-tip { color: #999; font-size: 14px; padding: 20px; text-align: center; }
 
