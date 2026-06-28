@@ -84,18 +84,22 @@ const decodeUrl = (url) => {
 
 <style scoped>
 .detail-page {
-  padding: 20px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
 .detail-header {
-  margin-bottom: 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .header-row {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 10px;
+  flex-wrap: wrap;
 }
 
 .header-row h1 {
@@ -120,14 +124,11 @@ const decodeUrl = (url) => {
 }
 
 .alias-row {
-  margin: 8px 0;
   color: #666;
   font-size: 15px;
 }
 
-.link-row {
-  margin: 12px 0 0;
-}
+.link-row {}
 
 .link-row a {
   color: #3498db;

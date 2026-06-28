@@ -250,7 +250,9 @@ onMounted(async () => {
 
 <style scoped>
 .actor-list {
-  padding: 20px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
   max-width: 1400px;
   margin: 0 auto;
 }
@@ -259,7 +261,6 @@ onMounted(async () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
 }
 
 .list-header h1 {
@@ -320,7 +321,6 @@ onMounted(async () => {
 }
 
 .filters {
-  margin-bottom: 20px;
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
@@ -372,7 +372,6 @@ onMounted(async () => {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 16px;
-  margin-bottom: 30px;
 }
 
 .actor-card {

@@ -7,6 +7,7 @@ import ActorDetail from '@/views/pages/ActorDetail.vue'
 import SeriesList from '@/views/pages/SeriesList.vue'
 import SeriesDetail from '@/views/pages/SeriesDetail.vue'
 import Settings from '@/views/pages/Settings.vue'
+import Highlights from '@/views/pages/Highlights.vue'
 
 const routes = [
   {
@@ -43,6 +44,11 @@ const routes = [
     path: '/series/:id',
     name: 'SeriesDetail',
     component: SeriesDetail
+  },
+  {
+    path: '/highlights',
+    name: 'Highlights',
+    component: Highlights
   },
   {
     path: '/settings',

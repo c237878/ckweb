@@ -509,7 +509,9 @@ const handleLike = async () => {
 
 <style scoped>
 .video-detail {
-    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
     max-width: 1400px;
     margin: 0 auto;
 }

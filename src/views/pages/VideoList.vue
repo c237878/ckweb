@@ -275,7 +275,9 @@ const handleDeleteVideo = async (videoId) => {
 
 <style scoped>
 .video-list {
-  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
   max-width: 1400px;
   margin: 0 auto;
 }
@@ -284,7 +286,6 @@ const handleDeleteVideo = async (videoId) => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
 }
 
 .list-header h1 {
@@ -309,7 +310,6 @@ const handleDeleteVideo = async (videoId) => {
 }
 
 .filters {
-  margin-bottom: 20px;
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
@@ -412,7 +412,6 @@ const handleDeleteVideo = async (videoId) => {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 16px;
-  margin-bottom: 30px;
 }
 
 @media (max-width: 768px) {
@@ -435,7 +434,6 @@ const handleDeleteVideo = async (videoId) => {
   justify-content: center;
   align-items: center;
   gap: 15px;
-  margin-top: 30px;
 }
 
 .pagination button {

@@ -12,8 +12,7 @@
 
     <!-- 海报墙 -->
     <div class="poster-wall" v-if="posters.length > 0">
-      <h2>📷 海报墙</h2>
-      <div class="poster-grid">
+      <div class="poster-grid" ref="posterGridRef">
         <div
           v-for="(p, i) in posters"
           :key="p"
@@ -57,6 +56,7 @@ const videos = ref([])
 const posters = ref([])
 const posterStyles = ref([])
 const lightboxIndex = ref(null)
+const posterGridRef = ref(null)
 
 const actorId = computed(() => route.params.id)
 
@@ -82,15 +82,50 @@ const loadVideos = async () => {
   }
 }
 
+const generatePosterLayout = (count) => {
+  const baseW = 150       // 基准宽度
+  const baseH = 210       // 基准高度
+  const pad = 20          // 容器内边距
+  const overlapX = 40     // 水平重叠量（数值越小重叠越多）
+  const overlapY = 30     // 垂直重叠量
+
+  // 估算可用宽度
+  const docW = window.innerWidth
+  const availW = Math.min(docW - 80, 1200) - pad * 2
+  const cellW = baseW - overlapX
+
+  // 计算列数
+  const cols = Math.max(2, Math.min(Math.floor(availW / cellW), count, 10))
+  // 平均分配列间距，填满整个可用宽度
+  const spacing = cols <= 1 ? availW - baseW : (availW - baseW) / (cols - 1)
+  // 内容宽度
+  const totalW = (cols - 1) * spacing + baseW
+  const offsetX = pad + (availW - totalW) / 2
+
+  const styles = []
+  for (let i = 0; i < count; i++) {
+    const col = i % cols
+    const row = Math.floor(i / cols)
+    const w = baseW + Math.random() * 20  // 150~170
+    const x = offsetX + col * spacing + (spacing - w) / 2 + Math.random() * 12 - 6
+    const y = pad + row * (baseH - overlapY) + Math.random() * 12 - 6
+    styles.push({
+      left: `${Math.max(0, x)}px`,
+      top: `${Math.max(0, y)}px`,
+      width: `${w}px`,
+      transform: `rotate(${Math.random() * 6 - 3}deg)`,
+      zIndex: i
+    })
+  }
+  return styles
+}
+
 const loadPosters = async () => {
   try {
     const res = await fetch(`/api/actor/${route.params.id}/posters`).then(r => r.json())
     if (res.success && res.data && res.data.length > 0) {
       posters.value = res.data
-      posterStyles.value = res.data.map(() => ({
-        transform: `rotate(${Math.random() * 10 - 5}deg) translateY(${Math.random() * 8 - 4}px)`,
-        width: `${130 + Math.random() * 70}px`
-      }))
+      posterStyles.value = generatePosterLayout(res.data.length)
     }
   } catch (error) {
     console.error('加载海报失败:', error)
@@ -127,18 +162,22 @@ watch(
 
 <style scoped>
 .detail-page {
-  padding: 20px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
 .detail-header {
-  margin-bottom: 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .header-row {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 10px;
+  flex-wrap: wrap;
 }
 
 .header-row h1 {
@@ -163,51 +202,44 @@ watch(
 }
 
 .alias-row {
-  margin: 8px 0;
   color: #666;
   font-size: 15px;
 }
 
 .bio-row {
-  margin: 12px 0 0;
   color: #444;
   font-size: 15px;
   line-height: 1.6;
 }
 
 .poster-wall {
-  margin-bottom: 40px;
-}
-
-.poster-wall h2 {
-  margin-bottom: 16px;
+  flex-shrink: 0;
 }
 
 .poster-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  padding: 16px;
+  position: relative;
+  width: 100%;
+  height: 50vh;
+  overflow: hidden;
+  padding: 20px;
   background: #fafafa;
   border-radius: 8px;
-  min-height: 100px;
-  align-items: flex-start;
 }
 
 .poster-item {
-  flex-shrink: 0;
+  position: absolute;
   cursor: pointer;
   border-radius: 6px;
   overflow: hidden;
   box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, z-index 0s;
   background: #fff;
 }
 
 .poster-item:hover {
-  transform: scale(1.08) !important;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.25);
-  z-index: 2;
+  transform: scale(1.12) !important;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+  z-index: 9999 !important;
 }
 
 .poster-item img {
