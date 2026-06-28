@@ -5,8 +5,7 @@
             <div class="left-panel">
                 <div class="player-section">
                     <div class="player-wrapper" :style="wrapperStyle">
-                        <div v-if="video.id && video.file_size" id="ckplayer" ref="playerContainer"></div>
-                        <img v-else-if="video.coverPath" :src="`/api/video/cover/${video.id}`" class="cover-only" alt="cover" />
+                        <div v-if="video.id" id="ckplayer" ref="playerContainer"></div>
                         <div v-else class="no-video">暂无视频</div>
                         <!-- 音量提示 -->
                         <div v-if="volumeTipVisible" class="volume-tip">
@@ -221,12 +220,6 @@ const wrapperStyle = computed(() => {
 const initCkplayer = () => {
     if (!video.value?.id) return
 
-    // 文件不存在时不初始化播放器
-    if (!video.value.file_size) {
-        console.warn('视频文件不存在，跳过播放器初始化')
-        return
-    }
-
     // 销毁旧实例
     if (ckplayerInstance) {
         try {
@@ -237,24 +230,27 @@ const initCkplayer = () => {
         ckplayerInstance = null
     }
 
-    const videoUrl = `/api/video/stream/${video.value.id}`
-    
-    // 封面图片：优先使用后端代理接口
-    const poster = video.value.coverPath 
-        ? `/api/video/cover/${video.value.id}` 
+    // 封面图片
+    const poster = video.value.coverPath
+        ? `/api/video/cover/${video.value.id}`
         : ''
-    
-    // 获取记忆播放位置
-    const savedPlayTime = getPlayTime(video.value.id)
-    
+
+    // 记忆播放位置
+    const savedPlayTime = video.value.file_size ? getPlayTime(video.value.id) : 0
+
+    // 文件不存在时视频地址为空，由 ckplayer 自动显示封面
+    const videoUrl = video.value.file_size
+        ? `/api/video/stream/${video.value.id}`
+        : ''
+
     const videoObject = {
         container: '#ckplayer',
         variable: 'player',
         autoplay: false,
         video: videoUrl,
-        screenshot: true,  // 开启截图功能
-        poster: poster,  // 封面图片
-        seek: savedPlayTime  // 记忆播放位置
+        screenshot: true,
+        poster: poster,
+        seek: savedPlayTime
     }
 
     // ckplayer 通过 UMD 挂载到 window.ckplayer
@@ -564,13 +560,6 @@ const handleLike = async () => {
     justify-content: center;
     color: #999;
     font-size: 18px;
-}
-
-.cover-only {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-    background: #000;
 }
 
 .volume-tip {
