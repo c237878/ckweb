@@ -33,7 +33,8 @@ export const videoApi = {
   getCoverUrl: (id) => `/api/video/cover/${id}`,
   getMeta: () => api.get('/video/meta'),
   like: (id) => api.post(`/video/${id}/like`),
-  resetFileSize: (id) => api.post(`/video/${id}/reset-file-size`)
+  resetFileSize: (id) => api.post(`/video/${id}/reset-file-size`),
+  getLikeStats: (year, month) => api.get('/video/likes/stats', { params: { year, month } })
 }
 
 // 演员相关API
