@@ -1,12 +1,12 @@
 <template>
   <div class="like-calendar" :class="{ collapsed: collapsed }">
     <!-- 头部 -->
-    <div class="cal-header">
+    <div class="cal-header" @click="collapsed && (collapsed = false)">
       <div class="cal-title">
         <span class="cal-icon">📅</span>
         <span>观影日历</span>
       </div>
-      <button class="toggle-btn" @click="collapsed = !collapsed" :title="collapsed ? '展开' : '收起'">
+      <button class="toggle-btn" @click.stop="collapsed = !collapsed" :title="collapsed ? '展开' : '收起'">
         {{ collapsed ? '▶' : '◀' }}
       </button>
     </div>
@@ -168,22 +168,23 @@ onMounted(() => {
 .like-calendar {
   background: #fff;
   border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
   overflow: hidden;
   width: 240px;
   flex-shrink: 0;
-  transition: width 0.3s ease;
+  transition: width 0.3s ease, height 0.3s ease;
 }
 
 .like-calendar.collapsed {
-  width: 44px;
+  width: 48px;
+  border-radius: 24px;
 }
 
 .cal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px;
+  padding: 10px 12px;
   background: linear-gradient(135deg, #e74c3c, #c0392b);
   color: #fff;
 }
@@ -202,6 +203,12 @@ onMounted(() => {
   display: none;
 }
 
+.collapsed .cal-header {
+  justify-content: center;
+  cursor: pointer;
+  padding: 10px;
+}
+
 .toggle-btn {
   background: rgba(255,255,255,0.2);
   border: none;
@@ -214,7 +221,12 @@ onMounted(() => {
 }
 
 .collapsed .toggle-btn {
-  margin: 0 auto;
+  display: none;
+}
+
+.collapsed .cal-icon {
+  margin: 0;
+  font-size: 20px;
 }
 
 .cal-body {

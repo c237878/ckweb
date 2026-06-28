@@ -1,19 +1,17 @@
 <template>
   <div class="home">
-    <div class="home-layout">
-      <div class="home-main">
-        <section class="section" v-for="cat in categories" :key="cat.name">
-          <h2 class="section-title">{{ cat.name }}</h2>
-          <div class="video-grid">
-            <VideoCard v-for="video in cat.videos" :key="video.id" :video="video" mode="display" />
-            <div v-if="cat.videos.length === 0" class="empty-hint">暂无 {{ cat.name }} 影片</div>
-          </div>
-        </section>
-        <div v-if="categories.length === 0" class="empty-hint" style="text-align:center;padding:60px">暂无影片</div>
+    <section class="section" v-for="cat in categories" :key="cat.name">
+      <h2 class="section-title">{{ cat.name }}</h2>
+      <div class="video-grid">
+        <VideoCard v-for="video in cat.videos" :key="video.id" :video="video" mode="display" />
+        <div v-if="cat.videos.length === 0" class="empty-hint">暂无 {{ cat.name }} 影片</div>
       </div>
-      <aside class="home-sidebar">
-        <LikeCalendar />
-      </aside>
+    </section>
+    <div v-if="categories.length === 0" class="empty-hint" style="text-align:center;padding:60px">暂无影片</div>
+
+    <!-- 悬浮日历 -->
+    <div class="floating-calendar">
+      <LikeCalendar />
     </div>
   </div>
 </template>
@@ -43,25 +41,7 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.home { padding: 20px 0; }
-
-.home-layout {
-  display: flex;
-  gap: 20px;
-  align-items: flex-start;
-}
-
-.home-main {
-  flex: 1;
-  min-width: 0;
-}
-
-.home-sidebar {
-  width: 240px;
-  flex-shrink: 0;
-  position: sticky;
-  top: 20px;
-}
+.home { padding: 20px 20px 60px; position: relative; }
 
 .section { margin-bottom: 40px; }
 .section-title {
@@ -78,8 +58,11 @@ onMounted(async () => {
 }
 .empty-hint { color: #999; font-size: 14px; padding: 20px; }
 
-@media (max-width: 900px) {
-  .home-layout { flex-direction: column; }
-  .home-sidebar { width: 100%; position: static; }
+/* 悬浮日历 */
+.floating-calendar {
+  position: fixed;
+  right: 20px;
+  top: 80px;
+  z-index: 100;
 }
 </style>
