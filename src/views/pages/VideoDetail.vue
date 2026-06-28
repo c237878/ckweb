@@ -5,7 +5,8 @@
             <div class="left-panel">
                 <div class="player-section">
                     <div class="player-wrapper" :style="wrapperStyle">
-                        <div v-if="video.id" id="ckplayer" ref="playerContainer"></div>
+                        <div v-if="video.id && video.file_size" id="ckplayer" ref="playerContainer"></div>
+                        <div v-else-if="!video.file_size" class="no-video">文件不存在</div>
                         <div v-else class="no-video">暂无视频</div>
                         <!-- 音量提示 -->
                         <div v-if="volumeTipVisible" class="volume-tip">
@@ -219,6 +220,12 @@ const wrapperStyle = computed(() => {
 
 const initCkplayer = () => {
     if (!video.value?.id) return
+
+    // 文件不存在时不初始化播放器
+    if (!video.value.file_size) {
+        console.warn('视频文件不存在，跳过播放器初始化')
+        return
+    }
 
     // 销毁旧实例
     if (ckplayerInstance) {
