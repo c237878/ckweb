@@ -6,7 +6,7 @@
                 <div class="player-section">
                     <div class="player-wrapper" :style="wrapperStyle">
                         <div v-if="video.id && video.file_size" id="ckplayer" ref="playerContainer"></div>
-                        <div v-else-if="!video.file_size" class="no-video">文件不存在</div>
+                        <img v-else-if="video.coverPath" :src="`/api/video/cover/${video.id}`" class="cover-only" alt="cover" />
                         <div v-else class="no-video">暂无视频</div>
                         <!-- 音量提示 -->
                         <div v-if="volumeTipVisible" class="volume-tip">
@@ -26,7 +26,7 @@
                         <span v-if="video.country" class="country-tag">{{ video.country }}</span>
                         <span v-if="video.category" class="type-tag">{{ video.category }}</span>
                         <span v-if="likeCount > 0" class="like-count">♥ {{ likeCount }}</span>
-                        <span v-if="video.fileSize" class="file-size">{{ formatSize(video.fileSize) }}</span>
+                        <span class="file-size">{{ video.fileSize?formatSize(video.fileSize):'无文件' }}</span>
                     </div>
                     <div class="info-row3" v-if="video.seriesName">
                         <span>系列：</span>
@@ -564,6 +564,13 @@ const handleLike = async () => {
     justify-content: center;
     color: #999;
     font-size: 18px;
+}
+
+.cover-only {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: #000;
 }
 
 .volume-tip {
