@@ -215,7 +215,8 @@ const loadVideos = async () => {
     if (filters.value.country) params.country = filters.value.country
     if (filters.value.seriesId) params.seriesId = filters.value.seriesId
     if (filters.value.keyword) params.keyword = filters.value.keyword
-    if (filters.value.downloaded) params.downloaded = filters.value.downloaded
+    if (filters.value.downloaded === 'yes') params.hasFile = true
+    else if (filters.value.downloaded === 'no') params.hasFile = false
     if (filters.value.sortBy) params.sortBy = filters.value.sortBy
 
     const res = await videoApi.getList(params)
