@@ -26,6 +26,12 @@
         @keyup.enter="handleSearch"
       />
       <button class="search-btn" @click="handleSearch">搜索</button>
+      <select v-model="filters.sortBy" @change="page = 1; loadSeries()" class="sort-select">
+        <option value="">默认排序</option>
+        <option value="name">按名称</option>
+        <option value="likeCount">按点赞</option>
+        <option value="videoCount">按作品数</option>
+      </select>
     </div>
 
     <div class="series-grid">
@@ -102,7 +108,7 @@ const loading = ref(false)
 const showDialog = ref(false)
 const editingSeries = ref(null)
 const countries = ref([])
-const filters = ref({ country: '' })
+const filters = ref({ country: '', sortBy: '' })
 const selectedIds = ref([])
 
 const isAllSelected = computed(() => {
@@ -149,6 +155,7 @@ const loadSeries = async () => {
       keyword: keyword.value
     }
     if (filters.value.country) params.country = filters.value.country
+    if (filters.value.sortBy) params.sortBy = filters.value.sortBy
 
     const res = await seriesApi.getList(params)
     if (res.success) {
@@ -323,6 +330,17 @@ onMounted(async () => {
   gap: 6px;
   flex-wrap: wrap;
   align-items: center;
+}
+
+.sort-select {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  height: 38px;
+  box-sizing: border-box;
+  background: #fff;
+  cursor: pointer;
 }
 
 .filters select,

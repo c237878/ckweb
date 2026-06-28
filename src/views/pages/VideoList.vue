@@ -58,6 +58,12 @@
         @keyup.enter="handleSearch"
       />
       <button class="search-btn" @click="handleSearch">搜索</button>
+      <select v-model="filters.sortBy" @change="page = 1; loadVideos()" class="sort-select">
+        <option value="">默认排序</option>
+        <option value="code">按番号</option>
+        <option value="name">按名称</option>
+        <option value="likeCount">按点赞</option>
+      </select>
     </div>
 
     <div class="video-grid">
@@ -103,6 +109,7 @@ const categories = ref([])
 const countries = ref([])
 const seriesList = ref([])
 const filters = ref({
+  sortBy: '',
   category: '',
   country: '',
   seriesId: '',
@@ -202,6 +209,7 @@ const loadVideos = async () => {
     if (filters.value.country) params.country = filters.value.country
     if (filters.value.seriesId) params.seriesId = filters.value.seriesId
     if (filters.value.keyword) params.keyword = filters.value.keyword
+    if (filters.value.sortBy) params.sortBy = filters.value.sortBy
 
     const res = await videoApi.getList(params)
     if (res.success) {
@@ -298,6 +306,17 @@ const handleDeleteVideo = async (videoId) => {
   gap: 6px;
   flex-wrap: wrap;
   align-items: center;
+}
+
+.sort-select {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  height: 38px;
+  box-sizing: border-box;
+  background: #fff;
+  cursor: pointer;
 }
 
 .filters select,

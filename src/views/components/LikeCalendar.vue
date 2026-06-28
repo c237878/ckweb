@@ -81,7 +81,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { videoApi } from '@/scripts/api'
 
-const collapsed = ref(false)
+const collapsed = ref(true)
 const currentYear = ref(new Date().getFullYear())
 const currentMonth = ref(new Date().getMonth() + 1)
 const stats = ref({
