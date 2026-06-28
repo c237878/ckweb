@@ -23,6 +23,11 @@
         <option value="">全部分类</option>
         <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
       </select>
+      <select v-model="filters.downloaded" @change="page = 1; loadVideos()">
+        <option value="">全部状态</option>
+        <option value="yes">已下载</option>
+        <option value="no">未下载</option>
+      </select>
       <div class="combobox-wrap">
         <input
           v-model="seriesInput"
@@ -113,7 +118,8 @@ const filters = ref({
   category: '',
   country: '',
   seriesId: '',
-  keyword: ''
+  keyword: '',
+  downloaded: ''
 })
 const showAddDialog = ref(false)
 const editingVideo = ref(null)
@@ -209,6 +215,7 @@ const loadVideos = async () => {
     if (filters.value.country) params.country = filters.value.country
     if (filters.value.seriesId) params.seriesId = filters.value.seriesId
     if (filters.value.keyword) params.keyword = filters.value.keyword
+    if (filters.value.downloaded) params.downloaded = filters.value.downloaded
     if (filters.value.sortBy) params.sortBy = filters.value.sortBy
 
     const res = await videoApi.getList(params)
