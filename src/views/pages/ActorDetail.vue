@@ -48,6 +48,7 @@
       :editingActor="actor"
       @save="onEditSave"
       @cancel="showEditDialog = false"
+      @delete="onDelete"
     />
   </div>
 </template>
@@ -74,9 +75,26 @@ const openEditDialog = () => {
   showEditDialog.value = true
 }
 
-const onEditSave = () => {
-  showEditDialog.value = false
-  loadActor()
+const onEditSave = async (formData) => {
+  try {
+    await actorApi.update(actor.value.id, formData)
+    showEditDialog.value = false
+    await loadActor()
+  } catch (error) {
+    alert('保存失败：' + (error.message || error))
+  }
+}
+
+const onDelete = async (id) => {
+  if (!confirm('确定要删除该演员吗？')) return
+  try {
+    await actorApi.delete(id)
+    showEditDialog.value = false
+    // 删除后跳转回演员列表
+    window.location.href = '/actor'
+  } catch (error) {
+    alert('删除失败：' + (error.message || error))
+  }
 }
 
 const loadActor = async () => {

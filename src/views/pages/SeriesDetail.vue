@@ -25,6 +25,7 @@
       :editingSeries="series"
       @save="onEditSave"
       @cancel="showEditDialog = false"
+      @delete="onDelete"
     />
   </div>
 </template>
@@ -45,9 +46,26 @@ const openEditDialog = () => {
   showEditDialog.value = true
 }
 
-const onEditSave = () => {
-  showEditDialog.value = false
-  loadSeries()
+const onEditSave = async (formData) => {
+  try {
+    await seriesApi.update(series.value.id, formData)
+    showEditDialog.value = false
+    await loadSeries()
+  } catch (error) {
+    alert('保存失败：' + (error.message || error))
+  }
+}
+
+const onDelete = async (id) => {
+  if (!confirm('确定要删除该系列吗？')) return
+  try {
+    await seriesApi.delete(id)
+    showEditDialog.value = false
+    // 删除后跳转回系列列表
+    window.location.href = '/series'
+  } catch (error) {
+    alert('删除失败：' + (error.message || error))
+  }
 }
 
 const loadSeries = async () => {
