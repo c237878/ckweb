@@ -1,8 +1,5 @@
 <template>
   <div class="highlights-page">
-    <div class="hl-header">
-      <h1>精彩瞬间</h1>
-    </div>
     <div class="hl-poster-wall" v-if="posters.length > 0" ref="wallRef">
       <div
         v-for="(p, i) in posters"
@@ -52,35 +49,42 @@ const loadPosters = async () => {
 
 const generateLayout = () => {
   const count = posters.value.length
-  const baseW = 150
-  const baseH = 210
-  const overlapX = 80
-  const overlapY = 50
+  if (count === 0) { posterStyles.value = []; return }
 
   const docW = window.innerWidth
-  const availW = docW - 40
-  const cellW = baseW - overlapX
-  const cols = Math.max(2, Math.min(Math.floor(availW / cellW), count, 12))
-  const spacing = cols <= 1 ? availW - baseW : (availW - baseW) / (cols - 1)
-  const totalW = (cols - 1) * spacing + baseW
-  const offsetX = (availW - totalW) / 2
+  const docH = window.innerHeight - 60
+  const padding = 20
+  const availW = docW - padding * 2
+  const availH = docH - padding * 2
 
-  // 估算行数以决定是否完全撑满视口高度
+  const baseW = 140
+  const baseH = baseW * 1.4
+  const overlapX = 20
+  const overlapY = 20
+
+  const cellW = baseW - overlapX
+  const cols = Math.min(Math.floor(availW / cellW), count)
   const rows = Math.ceil(count / cols)
-  const totalH = rows * (baseH - overlapY) + 80 // 80 = padding top+bottom
+
+  // 水平间距均匀分布撑满宽度
+  const hStep = cols > 1 ? (availW - baseW) / (cols - 1) : 0
+  const offsetX = cols > 1 ? (availW - (cols - 1) * hStep - baseW) / 2 : (availW - baseW) / 2
+
+  // 垂直间距均匀分布撑满高度
+  const vStep = rows > 1 ? (availH - baseH) / (rows - 1) : (availH - baseH) / 2
 
   const styles = []
   for (let i = 0; i < count; i++) {
     const col = i % cols
     const row = Math.floor(i / cols)
-    const w = baseW + Math.random() * 30
-    const x = offsetX + col * spacing + (spacing - w) / 2 + Math.random() * 10 - 5
-    const y = 20 + row * (baseH - overlapY) + Math.random() * 16 - 8
+    const w = baseW + Math.random() * 20
+    const x = offsetX + col * hStep + (Math.random() - 0.5) * 14
+    const y = row * vStep + (Math.random() - 0.5) * 14
     styles.push({
       left: `${Math.max(0, x)}px`,
       top: `${Math.max(0, y)}px`,
       width: `${w}px`,
-      transform: `rotate(${Math.random() * 6 - 3}deg)`,
+      transform: `rotate(${Math.random() * 8 - 4}deg)`,
       zIndex: i + 1
     })
   }
@@ -117,29 +121,9 @@ onUnmounted(() => {
 <style scoped>
 .highlights-page {
   position: relative;
-  width: 100%;
   min-height: calc(100vh - 60px);
+  width: 100%;
   overflow: hidden;
-}
-
-.hl-header {
-  position: fixed;
-  top: 70px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 100;
-  background: rgba(0,0,0,0.5);
-  backdrop-filter: blur(8px);
-  padding: 8px 24px;
-  border-radius: 20px;
-  pointer-events: none;
-}
-
-.hl-header h1 {
-  margin: 0;
-  font-size: 18px;
-  color: #fff;
-  font-weight: normal;
 }
 
 .hl-poster-wall {
@@ -148,7 +132,6 @@ onUnmounted(() => {
   height: calc(100vh - 60px);
   overflow: hidden;
   padding: 20px;
-  background: #1a1a2e;
 }
 
 .hl-poster-item {
@@ -156,14 +139,14 @@ onUnmounted(() => {
   cursor: pointer;
   border-radius: 6px;
   overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
   transition: transform 0.25s ease, box-shadow 0.25s ease;
   background: #fff;
 }
 
 .hl-poster-item:hover {
   transform: scale(1.15) !important;
-  box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.4);
   z-index: 9999 !important;
 }
 

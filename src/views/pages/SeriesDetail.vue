@@ -5,6 +5,7 @@
         <h1>{{ series.name }}</h1>
         <span v-if="series.country" class="country-tag">{{ series.country }}</span>
         <span v-if="series.likeCount > 0" class="like-tag">♥ {{ series.likeCount }}</span>
+        <button class="edit-btn" @click="openEditDialog">编辑</button>
       </div>
       <p v-if="series.alias" class="alias-row">别名：{{ series.alias }}</p>
       <p v-if="series.link" class="link-row">
@@ -18,6 +19,13 @@
         <div v-if="videos.length === 0" class="empty-hint">暂无影片</div>
       </div>
     </div>
+
+    <AddSeriesDialog
+      :visible="showEditDialog"
+      :editingSeries="series"
+      @save="onEditSave"
+      @cancel="showEditDialog = false"
+    />
   </div>
 </template>
 
@@ -26,10 +34,21 @@ import { ref, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { seriesApi } from '@/scripts/api'
 import VideoCard from '@/views/components/VideoCard.vue'
+import AddSeriesDialog from '@/views/components/AddSeriesDialog.vue'
 
 const route = useRoute()
 const series = ref(null)
 const videos = ref([])
+const showEditDialog = ref(false)
+
+const openEditDialog = () => {
+  showEditDialog.value = true
+}
+
+const onEditSave = () => {
+  showEditDialog.value = false
+  loadSeries()
+}
 
 const loadSeries = async () => {
   try {
@@ -105,6 +124,22 @@ const decodeUrl = (url) => {
 .header-row h1 {
   font-size: 32px;
   margin: 0;
+}
+
+.edit-btn {
+  background: none;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 4px 12px;
+  font-size: 13px;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.edit-btn:hover {
+  border-color: #3498db;
+  color: #3498db;
 }
 
 .country-tag {

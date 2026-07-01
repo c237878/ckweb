@@ -5,6 +5,7 @@
         <h1>{{ actor.name }}</h1>
         <span v-if="actor.country" class="country-tag">{{ actor.country }}</span>
         <span v-if="actor.likeCount > 0" class="like-tag">♥ {{ actor.likeCount }}</span>
+        <button class="edit-btn" @click="openEditDialog">编辑</button>
       </div>
       <p v-if="actor.alias" class="alias-row">别名：{{ actor.alias }}</p>
       <p v-if="actor.bio" class="bio-row">{{ actor.bio }}</p>
@@ -41,6 +42,13 @@
         <div v-if="videos.length === 0" class="empty-hint">暂无影片</div>
       </div>
     </div>
+
+    <AddActorDialog
+      :visible="showEditDialog"
+      :editingActor="actor"
+      @save="onEditSave"
+      @cancel="showEditDialog = false"
+    />
   </div>
 </template>
 
@@ -49,6 +57,7 @@ import { ref, onMounted, watch, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { actorApi } from '@/scripts/api'
 import VideoCard from '@/views/components/VideoCard.vue'
+import AddActorDialog from '@/views/components/AddActorDialog.vue'
 
 const route = useRoute()
 const actor = ref(null)
@@ -59,6 +68,16 @@ const lightboxIndex = ref(null)
 const posterGridRef = ref(null)
 
 const actorId = computed(() => route.params.id)
+const showEditDialog = ref(false)
+
+const openEditDialog = () => {
+  showEditDialog.value = true
+}
+
+const onEditSave = () => {
+  showEditDialog.value = false
+  loadActor()
+}
 
 const loadActor = async () => {
   try {
@@ -183,6 +202,22 @@ watch(
 .header-row h1 {
   font-size: 32px;
   margin: 0;
+}
+
+.edit-btn {
+  background: none;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 4px 12px;
+  font-size: 13px;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.edit-btn:hover {
+  border-color: #3498db;
+  color: #3498db;
 }
 
 .country-tag {
