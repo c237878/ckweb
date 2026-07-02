@@ -75,6 +75,25 @@ export const scanDirectoryApi = {
   scan: (path, recursive = true) => api.post('/video/scan-directory', { targetPath: path, recursive })
 }
 
+export const uploadApi = {
+  uploadVideo: (directory, file) => {
+    const formData = new FormData()
+    formData.append('directory', directory)
+    formData.append('file', file)
+    return api.post('/upload/video', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+  },
+  uploadCover: (directory, file) => {
+    const formData = new FormData()
+    formData.append('directory', directory)
+    formData.append('file', file)
+    return api.post('/upload/cover', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+  }
+}
+
 export const friendLinkApi = {
   getList: () => api.get('/FriendLink'),
   add: (data) => api.post('/FriendLink', data),

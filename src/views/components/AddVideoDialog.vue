@@ -78,14 +78,78 @@
           </div>
         </div>
       </div>
+
+      <!-- 视频路径：手动输入 + 上传按钮 -->
       <div class="form-item">
         <label>视频路径</label>
-        <input v-model="form.filePath" type="text" placeholder="视频文件完整路径（如 /Volumes/disk1/movies/...）" />
+        <div class="path-row">
+          <input v-model="form.filePath" type="text" placeholder="视频文件完整路径（如 /Volumes/disk1/movies/...）" />
+          <button class="upload-btn" @click="showVideoUploadDir" :disabled="uploading">
+            <span v-if="uploading && uploadTarget === 'video'">上传中...</span>
+            <span v-else>上传视频</span>
+          </button>
+        </div>
+        <!-- 视频上传目录选择器（显示在按钮下方） -->
+        <div v-if="showVideoDirDropdown" class="upload-dir-panel">
+          <div class="upload-dir-header">选择保存目录</div>
+          <div class="upload-dir-list">
+            <div
+              v-for="dir in scanDirectories"
+              :key="dir.id"
+              class="upload-dir-item"
+              @click="pickVideoFile(dir.path)"
+            >
+              {{ dir.path }}
+            </div>
+          </div>
+          <div class="upload-dir-custom">
+            <input
+              v-model="customVideoDir"
+              type="text"
+              placeholder="或输入自定义目录路径"
+              @keyup.enter="pickVideoFile(customVideoDir)"
+            />
+            <button @click="pickVideoFile(customVideoDir)" :disabled="!customVideoDir.trim()">使用此目录</button>
+          </div>
+        </div>
       </div>
+
+      <!-- 封面路径：手动输入 + 上传按钮 -->
       <div class="form-item">
         <label>封面路径</label>
-        <input v-model="form.coverPath" type="text" placeholder="封面图片路径（选填，如 /Volumes/disk1/cover.jpg）" />
+        <div class="path-row">
+          <input v-model="form.coverPath" type="text" placeholder="封面图片路径（选填，如 /Volumes/disk1/cover.jpg）" />
+          <button class="upload-btn" @click="showCoverUploadDir" :disabled="uploading">
+            <span v-if="uploading && uploadTarget === 'cover'">上传中...</span>
+            <span v-else>上传封面</span>
+          </button>
+        </div>
+        <!-- 封面上传目录选择器 -->
+        <div v-if="showCoverDirDropdown" class="upload-dir-panel">
+          <div class="upload-dir-header">选择保存目录</div>
+          <div class="upload-dir-list">
+            <div
+              v-for="dir in scanDirectories"
+              :key="dir.id"
+              class="upload-dir-item"
+              @click="pickCoverFile(dir.path)"
+            >
+              {{ dir.path }}
+            </div>
+          </div>
+          <div class="upload-dir-custom">
+            <input
+              v-model="customCoverDir"
+              type="text"
+              placeholder="或输入自定义目录路径"
+              @keyup.enter="pickCoverFile(customCoverDir)"
+            />
+            <button @click="pickCoverFile(customCoverDir)" :disabled="!customCoverDir.trim()">使用此目录</button>
+          </div>
+        </div>
       </div>
+
+      <!-- 演员 -->
       <div class="form-item">
         <label>演员</label>
         <div class="actor-selector">
@@ -115,6 +179,22 @@
           </div>
         </div>
       </div>
+
+      <!-- 隐藏的文件选择器 -->
+      <input
+        ref="videoFileInputRef"
+        type="file"
+        accept="video/*"
+        style="display:none"
+        @change="onVideoFileSelected"
+      />
+      <input
+        ref="coverFileInputRef"
+        type="file"
+        accept="image/*"
+        style="display:none"
+        @change="onCoverFileSelected"
+      />
     </template>
     <template #actions>
       <button v-if="editingVideo" class="delete-btn" @click="handleDelete">删除</button>
@@ -124,7 +204,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { videoApi, actorApi } from '@/scripts/api'
+import { videoApi, actorApi, scanDirectoryApi, uploadApi } from '@/scripts/api'
 import Dialog from './Dialog.vue'
 
 const props = defineProps({
@@ -139,10 +219,20 @@ const selectedActors = ref([])
 const actorSearch = ref('')
 const matchedActors = ref([])
 const meta = ref({ categories: [], countries: [], series: [] })
+const scanDirectories = ref([])
 
 const showCatDropdown = ref(false)
 const showCountryDropdown = ref(false)
 const showSeriesDropdown = ref(false)
+const showVideoDirDropdown = ref(false)
+const showCoverDirDropdown = ref(false)
+const customVideoDir = ref('')
+const customCoverDir = ref('')
+const uploading = ref(false)
+const uploadTarget = ref('')
+const videoFileInputRef = ref(null)
+const coverFileInputRef = ref(null)
+const pendingUploadDir = ref('')
 
 const seriesInput = ref('')
 
@@ -162,7 +252,7 @@ const filteredCountries = computed(() => {
 
 const filteredSeries = computed(() => {
   const list = seriesList.value || []
-  if (!seriesInput.value) return list.slice(0, 50) // 未输入时只显示前50个
+  if (!seriesInput.value) return list.slice(0, 50)
   return list.filter(s => s.name.toLowerCase().includes(seriesInput.value.toLowerCase())).slice(0, 50)
 })
 
@@ -175,6 +265,93 @@ const form = ref({
   filePath: '',
   coverPath: ''
 })
+
+// ===== 上传相关 =====
+const loadScanDirectories = async () => {
+  try {
+    const res = await scanDirectoryApi.getList()
+    if (res.success) {
+      scanDirectories.value = res.data || []
+    }
+  } catch (e) {
+    console.error('加载扫描目录失败:', e)
+  }
+}
+
+// 显示视频上传目录选择器
+const showVideoUploadDir = () => {
+  showVideoDirDropdown.value = !showVideoDirDropdown.value
+  showCoverDirDropdown.value = false
+  customVideoDir.value = ''
+}
+
+// 显示封面上传目录选择器
+const showCoverUploadDir = () => {
+  showCoverDirDropdown.value = !showCoverDirDropdown.value
+  showVideoDirDropdown.value = false
+  customCoverDir.value = ''
+}
+
+// 选择视频目录后触发文件选择器
+const pickVideoFile = (dir) => {
+  if (!dir) return
+  pendingUploadDir.value = dir
+  showVideoDirDropdown.value = false
+  videoFileInputRef.value?.click()
+}
+
+// 选择封面目录后触发文件选择器
+const pickCoverFile = (dir) => {
+  if (!dir) return
+  pendingUploadDir.value = dir
+  showCoverDirDropdown.value = false
+  coverFileInputRef.value?.click()
+}
+
+// 视频文件选择后上传
+const onVideoFileSelected = async (e) => {
+  const file = e.target.files?.[0]
+  if (!file) return
+  await doUpload('video', pendingUploadDir.value, file)
+  e.target.value = '' // 清空，支持重复选择同一文件
+}
+
+// 封面文件选择后上传
+const onCoverFileSelected = async (e) => {
+  const file = e.target.files?.[0]
+  if (!file) return
+  await doUpload('cover', pendingUploadDir.value, file)
+  e.target.value = ''
+}
+
+// 执行上传
+const doUpload = async (type, directory, file) => {
+  uploading.value = true
+  uploadTarget.value = type
+  try {
+    const res = type === 'video'
+      ? await uploadApi.uploadVideo(directory, file)
+      : await uploadApi.uploadCover(directory, file)
+    if (res.success) {
+      if (type === 'video') {
+        form.value.filePath = res.filePath
+      } else {
+        form.value.coverPath = res.filePath
+      }
+    } else {
+      alert('上传失败: ' + (res.message || '未知错误'))
+    }
+  } catch (err) {
+    console.error('上传失败:', err)
+    alert('上传失败: ' + (err.message || err))
+  } finally {
+    uploading.value = false
+    uploadTarget.value = ''
+    pendingUploadDir.value = ''
+  }
+}
+
+// ===== 其他方法 =====
 
 const selectCategory = (val) => {
   form.value.category = val
@@ -198,12 +375,10 @@ const hideDropdown = (type) => {
     if (type === 'country') showCountryDropdown.value = false
     if (type === 'series') {
       showSeriesDropdown.value = false
-      // 如果输入了文字但没选中已有系列，则清空seriesId（允许自由输入，但seriesId只有选中已有才有效）
       const matched = seriesList.value.find(s => s.name === seriesInput.value)
       if (matched) {
         form.value.seriesId = matched.id
       } else {
-        // 自由输入不对应已有系列ID，保持seriesId为空
         form.value.seriesId = ''
       }
     }
@@ -265,24 +440,11 @@ const loadActorList = async () => {
 
 watch(() => props.visible, async (val) => {
   if (val) {
-    await Promise.all([loadMeta(), loadActorList()])
+    await Promise.all([loadMeta(), loadActorList(), loadScanDirectories()])
+    // 关闭所有目录选择器
+    showVideoDirDropdown.value = false
+    showCoverDirDropdown.value = false
     if (props.editingVideo) {
-      form.value = {
-        name: props.editingVideo.name || '',
-        code: props.editingVideo.code || '',
-        category: props.editingVideo.category || '',
-        country: props.editingVideo.country || '',
-        seriesId: props.editingVideo.seriesId || '',
-        filePath: props.editingVideo.filePath || props.editingVideo.videoUrl || '',
-        coverPath: props.editingVideo.coverPath || props.editingVideo.coverUrl || ''
-      }
-      // 设置系列输入框显示名称
-      if (props.editingVideo.seriesId && props.editingVideo.seriesName) {
-        seriesInput.value = props.editingVideo.seriesName
-      } else {
-        seriesInput.value = ''
-      }
-      // 编辑时从 detail 接口加载完整数据（含演员）
       try {
         const detail = await videoApi.getDetail(props.editingVideo.id)
         if (detail.success && detail.data) {
@@ -312,15 +474,7 @@ watch(() => props.visible, async (val) => {
 })
 
 const resetForm = () => {
-  form.value = {
-    name: '',
-    code: '',
-    category: '',
-    country: '',
-    seriesId: '',
-    filePath: '',
-    coverPath: ''
-  }
+  form.value = { name: '', code: '', category: '', country: '', seriesId: '', filePath: '', coverPath: '' }
   seriesInput.value = ''
   selectedActors.value = []
   actorSearch.value = ''
@@ -374,4 +528,76 @@ const handleDelete = () => {
 .suggestion-item:hover { background: #f5f5f5; }
 .delete-btn { padding: 8px 16px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; }
 .delete-btn:hover { background: #c0392b; }
+
+/* 路径行 + 上传按钮 */
+.path-row { display: flex; gap: 8px; align-items: center; }
+.path-row input { flex: 1; }
+.upload-btn {
+  padding: 8px 14px;
+  background: #3498db;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.upload-btn:hover { background: #2980b9; }
+.upload-btn:disabled { background: #b0bec5; cursor: not-allowed; }
+
+/* 上传目录选择面板 */
+.upload-dir-panel {
+  margin-top: 8px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: #fafafa;
+  overflow: hidden;
+}
+.upload-dir-header {
+  padding: 8px 12px;
+  font-size: 13px;
+  color: #666;
+  background: #f0f0f0;
+  border-bottom: 1px solid #ddd;
+  font-weight: 500;
+}
+.upload-dir-list {
+  max-height: 160px;
+  overflow-y: auto;
+}
+.upload-dir-item {
+  padding: 8px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  color: #333;
+  word-break: break-all;
+}
+.upload-dir-item:hover { background: #e3f2fd; color: #1976d2; }
+.upload-dir-custom {
+  display: flex;
+  gap: 6px;
+  padding: 8px 12px;
+  border-top: 1px solid #ddd;
+}
+.upload-dir-custom input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+.upload-dir-custom button {
+  padding: 6px 12px;
+  background: #27ae60;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.upload-dir-custom button:hover { background: #219653; }
+.upload-dir-custom button:disabled { background: #b0bec5; cursor: not-allowed; }
 </style>
