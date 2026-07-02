@@ -85,9 +85,16 @@
         <div class="path-row">
           <input v-model="form.filePath" type="text" placeholder="视频文件完整路径（如 /Volumes/disk1/movies/...）" />
           <button class="upload-btn" @click="showVideoUploadDir" :disabled="uploading">
-            <span v-if="uploading && uploadTarget === 'video'">上传中...</span>
+            <span v-if="uploading && uploadTarget === 'video'">上传中 {{ uploadProgress }}%</span>
             <span v-else>上传视频</span>
           </button>
+        </div>
+        <!-- 上传进度条 -->
+        <div v-if="uploading && uploadTarget === 'video'" class="upload-progress">
+          <div class="upload-progress-bar">
+            <div class="upload-progress-fill" :style="{ width: uploadProgress + '%' }"></div>
+          </div>
+          <div class="upload-progress-text">{{ uploadingFileName }}</div>
         </div>
         <!-- 视频上传目录选择器（显示在按钮下方） -->
         <div v-if="showVideoDirDropdown" class="upload-dir-panel">
@@ -120,9 +127,16 @@
         <div class="path-row">
           <input v-model="form.coverPath" type="text" placeholder="封面图片路径（选填，如 /Volumes/disk1/cover.jpg）" />
           <button class="upload-btn" @click="showCoverUploadDir" :disabled="uploading">
-            <span v-if="uploading && uploadTarget === 'cover'">上传中...</span>
+            <span v-if="uploading && uploadTarget === 'cover'">上传中 {{ uploadProgress }}%</span>
             <span v-else>上传封面</span>
           </button>
+        </div>
+        <!-- 上传进度条 -->
+        <div v-if="uploading && uploadTarget === 'cover'" class="upload-progress">
+          <div class="upload-progress-bar">
+            <div class="upload-progress-fill" :style="{ width: uploadProgress + '%' }"></div>
+          </div>
+          <div class="upload-progress-text">{{ uploadingFileName }}</div>
         </div>
         <!-- 封面上传目录选择器 -->
         <div v-if="showCoverDirDropdown" class="upload-dir-panel">
@@ -230,6 +244,8 @@ const customVideoDir = ref('')
 const customCoverDir = ref('')
 const uploading = ref(false)
 const uploadTarget = ref('')
+const uploadProgress = ref(0)
+const uploadingFileName = ref('')
 const videoFileInputRef = ref(null)
 const coverFileInputRef = ref(null)
 const pendingUploadDir = ref('')
@@ -328,10 +344,17 @@ const onCoverFileSelected = async (e) => {
 const doUpload = async (type, directory, file) => {
   uploading.value = true
   uploadTarget.value = type
+  uploadProgress.value = 0
+  uploadingFileName.value = file.name
   try {
+    const onProgress = (progressEvent) => {
+      if (progressEvent.total) {
+        uploadProgress.value = Math.round((progressEvent.loaded / progressEvent.total) * 100)
+      }
+    }
     const res = type === 'video'
-      ? await uploadApi.uploadVideo(directory, file)
-      : await uploadApi.uploadCover(directory, file)
+      ? await uploadApi.uploadVideo(directory, file, onProgress)
+      : await uploadApi.uploadCover(directory, file, onProgress)
     if (res.success) {
       if (type === 'video') {
         form.value.filePath = res.filePath
@@ -347,6 +370,8 @@ const doUpload = async (type, directory, file) => {
   } finally {
     uploading.value = false
     uploadTarget.value = ''
+    uploadProgress.value = 0
+    uploadingFileName.value = ''
     pendingUploadDir.value = ''
   }
 }
@@ -600,4 +625,29 @@ const handleDelete = () => {
 }
 .upload-dir-custom button:hover { background: #219653; }
 .upload-dir-custom button:disabled { background: #b0bec5; cursor: not-allowed; }
+
+/* 上传进度条 */
+.upload-progress {
+  margin-top: 8px;
+}
+.upload-progress-bar {
+  height: 6px;
+  background: #e0e0e0;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.upload-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3498db, #2ecc71);
+  border-radius: 3px;
+  transition: width 0.2s ease;
+}
+.upload-progress-text {
+  font-size: 12px;
+  color: #888;
+  margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 </style>

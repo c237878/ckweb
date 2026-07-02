@@ -85,17 +85,17 @@ export const scanDirectoryApi = {
 }
 
 export const uploadApi = {
-  uploadVideo: (directory, file) => {
+  uploadVideo: (directory, file, onProgress) => {
     const formData = new FormData()
     formData.append('directory', directory)
     formData.append('file', file)
-    return uploadAxios.post('/upload/video', formData)
+    return uploadAxios.post('/upload/video', formData, onProgress ? { onUploadProgress: onProgress } : {})
   },
-  uploadCover: (directory, file) => {
+  uploadCover: (directory, file, onProgress) => {
     const formData = new FormData()
     formData.append('directory', directory)
     formData.append('file', file)
-    return uploadAxios.post('/upload/cover', formData)
+    return uploadAxios.post('/upload/cover', formData, onProgress ? { onUploadProgress: onProgress } : {})
   }
 }
 
