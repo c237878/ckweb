@@ -94,8 +94,9 @@
           <div class="upload-progress-bar">
             <div class="upload-progress-fill" :style="{ width: uploadProgress + '%' }"></div>
           </div>
-          <div class="upload-progress-text">{{ uploadingFileName }}</div>
+          <div class="upload-progress-text">{{ uploadingFileName }}{{ uploadProgress === 100 ? '（处理中...' : '' }}</div>
         </div>
+        <div v-if="!uploading && form.fileSize" class="upload-size-hint">文件大小：{{ formatSize(form.fileSize) }}</div>
         <!-- 视频上传目录选择器（显示在按钮下方） -->
         <div v-if="showVideoDirDropdown" class="upload-dir-panel">
           <div class="upload-dir-header">选择保存目录</div>
@@ -219,6 +220,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { videoApi, actorApi, scanDirectoryApi, uploadApi } from '@/scripts/api'
+import { formatSize } from '@/scripts/utils/format'
 import Dialog from './Dialog.vue'
 
 const props = defineProps({
@@ -279,7 +281,8 @@ const form = ref({
   country: '',
   seriesId: '',
   filePath: '',
-  coverPath: ''
+  coverPath: '',
+  fileSize: null
 })
 
 // ===== 上传相关 =====
@@ -358,8 +361,21 @@ const doUpload = async (type, directory, file) => {
     if (res.success) {
       if (type === 'video') {
         form.value.filePath = res.filePath
+        form.value.fileSize = res.fileSize
+        // 编辑模式：立即更新数据库 file_size
+        if (props.editingVideo?.id) {
+          await videoApi.updateFileInfo(props.editingVideo.id, {
+            filePath: res.filePath,
+            fileSize: res.fileSize
+          })
+        }
       } else {
         form.value.coverPath = res.filePath
+        if (props.editingVideo?.id) {
+          await videoApi.updateFileInfo(props.editingVideo.id, {
+            coverPath: res.filePath
+          })
+        }
       }
     } else {
       alert('上传失败: ' + (res.message || '未知错误'))
@@ -499,7 +515,7 @@ watch(() => props.visible, async (val) => {
 })
 
 const resetForm = () => {
-  form.value = { name: '', code: '', category: '', country: '', seriesId: '', filePath: '', coverPath: '' }
+  form.value = { name: '', code: '', category: '', country: '', seriesId: '', filePath: '', coverPath: '', fileSize: null }
   seriesInput.value = ''
   selectedActors.value = []
   actorSearch.value = ''
@@ -520,6 +536,7 @@ const handleSave = () => {
     seriesId: form.value.seriesId,
     filePath: form.value.filePath,
     coverPath: form.value.coverPath,
+    fileSize: form.value.fileSize,
     actorIds: selectedActors.value.map(a => a.id)
   })
 }
@@ -649,5 +666,10 @@ const handleDelete = () => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.upload-size-hint {
+  font-size: 12px;
+  color: #52c41a;
+  margin-top: 2px;
 }
 </style>

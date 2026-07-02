@@ -54,6 +54,7 @@ export const videoApi = {
   getMeta: () => api.get('/video/meta'),
   like: (id) => api.post(`/video/${id}/like`),
   resetFileSize: (id) => api.post(`/video/${id}/reset-file-size`),
+  updateFileInfo: (id, data) => api.put(`/video/${id}/file-info`, data),
   getLikeStats: (year, month) => api.get('/video/likes/stats', { params: { year, month } })
 }
 
