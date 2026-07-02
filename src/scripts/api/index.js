@@ -67,10 +67,10 @@ export const seriesApi = {
 
 // 扫描目录相关API
 export const scanDirectoryApi = {
-  getList: () => api.get('/scan-directory'),
-  add: (data) => api.post('/scan-directory', data),
-  update: (id, data) => api.put(`/scan-directory/${id}`, data),
-  delete: (id) => api.delete(`/scan-directory/${id}`),
+  getList: () => api.get('/scanDirectory'),
+  add: (data) => api.post('/scanDirectory', data),
+  update: (id, data) => api.put(`/scanDirectory/${id}`, data),
+  delete: (id) => api.delete(`/scanDirectory/${id}`),
   // 扫描单个目录（复用 videoApi.scan）
   scan: (path, recursive = true) => api.post('/video/scan-directory', { targetPath: path, recursive })
 }
