@@ -9,13 +9,24 @@ const api = axios.create({
 })
 
 // 上传专用实例 - 跳过 Vite 代理，直连后端（避免大文件断流）
-// 开发模式直接用 LAN IP，连 Mac mini:5033，生产模式走相对路径
+// baseURL 包含 /api 前缀，因为 UploadController 路由为 api/[controller]
 const LAN_IP = '192.168.110.67'
 const uploadAxios = axios.create({
-  baseURL: import.meta.env.DEV ? `http://${LAN_IP}:5033` : '/api',
+  baseURL: import.meta.env.DEV
+    ? `http://${LAN_IP}:5033/api`
+    : '/api',
   timeout: 0,
   headers: { 'Content-Type': 'multipart/form-data' }
 })
+
+// 响应拦截器：与 api 实例保持一致
+uploadAxios.interceptors.response.use(
+  response => response.data,
+  error => {
+    console.error('Upload API Error:', error)
+    return Promise.reject(error)
+  }
+)
 
 // 响应拦截器
 api.interceptors.response.use(

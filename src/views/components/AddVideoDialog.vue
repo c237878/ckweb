@@ -366,7 +366,7 @@ const doUpload = async (type, directory, file) => {
     }
   } catch (err) {
     console.error('上传失败:', err)
-    alert('上传失败: ' + (err.message || err))
+    alert('上传失败: ' + (err.response?.status || '') + ' ' + (err.message || err))
   } finally {
     uploading.value = false
     uploadTarget.value = ''
