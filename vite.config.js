@@ -24,11 +24,15 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:5033',
         changeOrigin: true,
-        timeout: 300000, // 5分钟超时，支持大文件上传
+        // 大文件上传关键配置
         configure: (proxy) => {
+          // 禁用服务端超时，让连接保持活跃
           proxy.on('proxyRes', (proxyRes) => {
-            // 禁用代理响应超时
             proxyRes.socket.setTimeout(0)
+          })
+          // 禁用请求端超时
+          proxy.on('proxyReq', (proxyReq) => {
+            proxyReq.setTimeout(0)
           })
         }
       },

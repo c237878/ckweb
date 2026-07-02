@@ -2,10 +2,19 @@ import axios from 'axios'
 
 const api = axios.create({
   baseURL: '/api',
-  timeout: 30000,
+  timeout: 0, // 无超时限制
   headers: {
     'Content-Type': 'application/json'
   }
+})
+
+// 上传专用实例 - 跳过 Vite 代理，直连后端（避免大文件断流）
+// 开发模式直接用 LAN IP，连 Mac mini:5033，生产模式走相对路径
+const LAN_IP = '192.168.110.67'
+const uploadAxios = axios.create({
+  baseURL: import.meta.env.DEV ? `http://${LAN_IP}:5033` : '/api',
+  timeout: 0,
+  headers: { 'Content-Type': 'multipart/form-data' }
 })
 
 // 响应拦截器
@@ -80,17 +89,13 @@ export const uploadApi = {
     const formData = new FormData()
     formData.append('directory', directory)
     formData.append('file', file)
-    return api.post('/upload/video', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    })
+    return uploadAxios.post('/upload/video', formData)
   },
   uploadCover: (directory, file) => {
     const formData = new FormData()
     formData.append('directory', directory)
     formData.append('file', file)
-    return api.post('/upload/cover', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    })
+    return uploadAxios.post('/upload/cover', formData)
   }
 }
 
