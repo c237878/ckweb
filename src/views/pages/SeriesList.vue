@@ -177,6 +177,7 @@ const loadSeries = async () => {
 
 const handleSearch = () => {
   page.value = 1
+  saveFilterState(STORAGE_KEY, { filters: filters.value, page: page.value, keyword: keyword.value })
   loadSeries()
 }
 
