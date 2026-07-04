@@ -91,11 +91,14 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { actorApi, settingApi } from '@/scripts/api'
 import CardActions from '@/views/components/CardActions.vue'
 import AddActorDialog from '@/views/components/AddActorDialog.vue'
+import { loadFilterState, saveFilterState } from '@/scripts/utils/filterPersist'
+
+const STORAGE_KEY = 'actor-list'
 
 const router = useRouter()
 const actors = ref([])
@@ -109,6 +112,9 @@ const editingActor = ref(null)
 const countries = ref([])
 const filters = ref({ country: '', sortBy: '' })
 const selectedIds = ref([])
+
+// 持久化
+watch(filters, () => saveFilterState(STORAGE_KEY, { filters: filters.value, page: page.value, keyword: keyword.value }), { deep: true })
 
 const isAllSelected = computed(() => {
   return actors.value.length > 0 && selectedIds.value.length === actors.value.length
@@ -175,6 +181,7 @@ const handleSearch = () => {
 
 const changePage = (newPage) => {
   page.value = newPage
+  saveFilterState(STORAGE_KEY, { filters: filters.value, page: page.value, keyword: keyword.value })
   loadActors()
 }
 
@@ -226,6 +233,14 @@ const handleDelete = async (id) => {
 }
 
 onMounted(async () => {
+  // 恢复筛选状态
+  const saved = loadFilterState(STORAGE_KEY)
+  if (saved) {
+    if (saved.filters) filters.value = { ...filters.value, ...saved.filters }
+    if (saved.page) page.value = saved.page
+    if (saved.keyword !== undefined) keyword.value = saved.keyword || ''
+  }
+
   try {
     const res = await settingApi.getByName('pageSize')
     if (res.success && res.data) {

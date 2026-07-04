@@ -101,10 +101,13 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { videoApi, settingApi } from '@/scripts/api'
 import VideoCard from '@/views/components/VideoCard.vue'
 import AddVideoDialog from '@/views/components/AddVideoDialog.vue'
+import { loadFilterState, saveFilterState } from '@/scripts/utils/filterPersist'
+
+const STORAGE_KEY = 'video-list'
 
 const videos = ref([])
 const page = ref(1)
@@ -126,6 +129,9 @@ const editingVideo = ref(null)
 const selectedIds = ref([])
 const showSeriesDropdown = ref(false)
 const seriesInput = ref('')
+
+// 持久化
+watch(filters, () => saveFilterState(STORAGE_KEY, { filters: filters.value, page: page.value, seriesInput: seriesInput.value }), { deep: true })
 
 const isAllSelected = computed(() => {
   return videos.value.length > 0 && selectedIds.value.length === videos.value.length
@@ -181,6 +187,14 @@ const batchDelete = async () => {
 }
 
 onMounted(async () => {
+  // 恢复筛选状态
+  const saved = loadFilterState(STORAGE_KEY)
+  if (saved) {
+    if (saved.filters) filters.value = { ...filters.value, ...saved.filters }
+    if (saved.page) page.value = saved.page
+    if (saved.seriesInput !== undefined) seriesInput.value = saved.seriesInput || ''
+  }
+
   try {
     const res = await settingApi.getByName('pageSize')
     if (res.success && res.data) {
@@ -237,6 +251,7 @@ const handleSearch = () => {
 const changePage = (newPage) => {
   if (newPage < 1) return
   page.value = newPage
+  saveFilterState(STORAGE_KEY, { filters: filters.value, page: page.value, seriesInput: seriesInput.value })
   loadVideos()
 }
 

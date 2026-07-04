@@ -92,11 +92,14 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { seriesApi, settingApi } from '@/scripts/api'
 import CardActions from '@/views/components/CardActions.vue'
 import AddSeriesDialog from '@/views/components/AddSeriesDialog.vue'
+import { loadFilterState, saveFilterState } from '@/scripts/utils/filterPersist'
+
+const STORAGE_KEY = 'series-list'
 
 const router = useRouter()
 const seriesList = ref([])
@@ -110,6 +113,9 @@ const editingSeries = ref(null)
 const countries = ref([])
 const filters = ref({ country: '', sortBy: '' })
 const selectedIds = ref([])
+
+// 持久化
+watch(filters, () => saveFilterState(STORAGE_KEY, { filters: filters.value, page: page.value, keyword: keyword.value }), { deep: true })
 
 const isAllSelected = computed(() => {
   return seriesList.value.length > 0 && selectedIds.value.length === seriesList.value.length
@@ -176,6 +182,7 @@ const handleSearch = () => {
 
 const changePage = (p) => {
   page.value = p
+  saveFilterState(STORAGE_KEY, { filters: filters.value, page: page.value, keyword: keyword.value })
   loadSeries()
 }
 
@@ -231,6 +238,14 @@ const handleCancel = () => {
 }
 
 onMounted(async () => {
+  // 恢复筛选状态
+  const saved = loadFilterState(STORAGE_KEY)
+  if (saved) {
+    if (saved.filters) filters.value = { ...filters.value, ...saved.filters }
+    if (saved.page) page.value = saved.page
+    if (saved.keyword !== undefined) keyword.value = saved.keyword || ''
+  }
+
   try {
     const res = await settingApi.getByName('pageSize')
     if (res.success && res.data) {
