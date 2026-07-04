@@ -81,7 +81,7 @@ const loadSeries = async () => {
 
 const loadVideos = async () => {
   try {
-    const res = await seriesApi.getVideos(route.params.id, { page: 1, pageSize: 50 })
+    const res = await seriesApi.getVideos(route.params.id, { page: 1, pageSize: 1000 })
     if (res.success) {
       videos.value = res.data || []
     }
