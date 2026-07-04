@@ -55,7 +55,10 @@ export const videoApi = {
   like: (id) => api.post(`/video/${id}/like`),
   resetFileSize: (id) => api.post(`/video/${id}/reset-file-size`),
   updateFileInfo: (id, data) => api.put(`/video/${id}/file-info`, data),
-  getLikeStats: (year, month) => api.get('/video/likes/stats', { params: { year, month } })
+  getLikeStats: (year, month) => api.get('/video/likes/stats', { params: { year, month } }),
+  getLatestAdded: (count) => api.get('/video/latest-added', { params: { count } }),
+  getRecentlyLiked: (count) => api.get('/video/recently-liked', { params: { count } }),
+  getTopLiked: (count) => api.get('/video/top-liked', { params: { count } })
 }
 
 // 演员相关API

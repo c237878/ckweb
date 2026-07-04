@@ -170,6 +170,8 @@ const settingsList = ref([
   { id: 'siteName', label: '网站名称', value: '', placeholder: '影视网站' },
   { id: 'scanType', label: '扫描类型', value: '', placeholder: '如: .mp4,.mkv,.avi（多个后缀以逗号分隔）' },
   { id: 'pageSize', label: '每页数量', value: '', placeholder: '列表每页显示数量，默认 24' },
+  { id: 'homePageCategories', label: '首页展示分类', value: '', placeholder: '多个分类用逗号分隔，留空显示全部' },
+  { id: 'homePageCategoryCount', label: '首页分类数量', value: '', placeholder: '每个分类/板块显示数量，默认 12' },
   { id: 'posterDir', label: '海报墙目录', value: '', placeholder: '如: /Volumes/disk1/posters' }
 ])
 const savingBasic = ref(false)
