@@ -293,18 +293,19 @@ const initCkplayer = () => {
     
     // 获取视频元数据
     setTimeout(() => {
-        if (ckplayerInstance) {
-            try {
-                const metaData = ckplayerInstance.getMetaDate()
-                if (metaData) {
-                    videoNaturalWidth.value = metaData.width || 1920
-                    videoNaturalHeight.value = metaData.height || 1080
-                }
-            } catch (e) {
-                console.warn('获取视频元数据失败:', e)
+        const videoEl = document.querySelector('#ckplayer video')
+        if (videoEl) {
+            if (videoEl.videoWidth && videoEl.videoHeight) {
+                videoNaturalWidth.value = videoEl.videoWidth
+                videoNaturalHeight.value = videoEl.videoHeight
+            } else {
+                videoEl.addEventListener('loadedmetadata', () => {
+                    videoNaturalWidth.value = videoEl.videoWidth || 1920
+                    videoNaturalHeight.value = videoEl.videoHeight || 1080
+                })
             }
         }
-    }, 1000)
+    }, 500)
 }
 
 // 显示音量提示
@@ -586,6 +587,7 @@ const handleLike = async () => {
 
 .player-wrapper {
     width: 100%;
+    max-height: 500px;
     position: relative;
     background: #000;
 }
@@ -672,11 +674,6 @@ const handleLike = async () => {
     font-size: 13px;
 }
 
-.info-row4 {
-    font-size: 14px;
-    color: #666;
-}
-
 .info-row-note {
     font-size: 13px;
     color: #999;
@@ -690,7 +687,10 @@ const handleLike = async () => {
 
 .info-row4 {
     display: flex;
+    flex-wrap: wrap;
     gap: 6px;
+    font-size: 14px;
+    color: #666;
 }
 
 .actor-link {

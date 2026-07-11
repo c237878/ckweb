@@ -149,7 +149,7 @@
               class="upload-dir-item"
               @click="pickCoverFile(dir.path)"
             >
-              {{ dir.path }}
+              {{ dir.path.replace(/[\\/]video$/i, '/cover').replace(/[\\/]video[\\/]/i, '/cover/') }}
             </div>
           </div>
           <div class="upload-dir-custom">
@@ -322,7 +322,9 @@ const pickVideoFile = (dir) => {
 // 选择封面目录后触发文件选择器
 const pickCoverFile = (dir) => {
   if (!dir) return
-  pendingUploadDir.value = dir
+  // 把路径中的 video 替换为 cover
+  const coverDir = dir.replace(/[\\/]video$/i, '/cover').replace(/[\\/]video[\\/]/i, '/cover/')
+  pendingUploadDir.value = coverDir
   showCoverDirDropdown.value = false
   coverFileInputRef.value?.click()
 }
