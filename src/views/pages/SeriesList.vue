@@ -78,6 +78,9 @@
     <div class="pagination" v-if="total > 0">
       <button :disabled="page === 1" @click="changePage(page - 1)">上一页</button>
       <span>第 {{ page }} 页 / 共 {{ Math.ceil(total / pageSize) }} 页（共 {{ total }} 条）</span>
+      <input class="goto-input" v-model.number="gotoPage" type="number" min="1" :max="Math.ceil(total / pageSize)"
+        placeholder="跳转" @keyup.enter="handleGotoPage" />
+      <button @click="handleGotoPage">跳转</button>
       <button :disabled="page * pageSize >= total" @click="changePage(page + 1)">下一页</button>
     </div>
 
@@ -179,6 +182,15 @@ const handleSearch = () => {
   page.value = 1
   saveFilterState(STORAGE_KEY, { filters: filters.value, page: page.value, keyword: keyword.value })
   loadSeries()
+}
+
+const gotoPage = ref()
+const handleGotoPage = () => {
+    const totalPages = Math.ceil(total.value / pageSize.value)
+    const p = gotoPage.value
+    if (!p || p < 1 || p > totalPages) return
+    changePage(p)
+    gotoPage.value = undefined
 }
 
 const changePage = (p) => {
@@ -537,6 +549,20 @@ onMounted(async () => {
 .pagination button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.goto-input {
+  width: 60px;
+  padding: 4px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 13px;
+  text-align: center;
+}
+
+.goto-input:focus {
+  outline: none;
+  border-color: #3498db;
 }
 
 .pagination span {

@@ -46,8 +46,8 @@ onMounted(async () => {
 
     // 并行加载：三个固定板块 + 分类
     const promises = [
-      // 最新添加
-      videoApi.getLatestAdded(count),
+      // 今日推荐
+      videoApi.getDailyRecommend(count),
       // 最近点赞
       videoApi.getRecentlyLiked(count),
       // 高赞影片
@@ -69,7 +69,7 @@ onMounted(async () => {
     const topRes = results[2]
 
     if (latestRes.success && latestRes.data?.length > 0)
-      topSections.value.push({ name: '最新添加', videos: latestRes.data })
+      topSections.value.push({ name: '今日推荐', videos: latestRes.data })
     if (likedRes.success && likedRes.data?.length > 0)
       topSections.value.push({ name: '最近点赞', videos: likedRes.data })
     if (topRes.success && topRes.data?.length > 0)

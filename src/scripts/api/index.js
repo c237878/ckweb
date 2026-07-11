@@ -54,9 +54,10 @@ export const videoApi = {
   getMeta: () => api.get('/video/meta'),
   like: (id) => api.post(`/video/${id}/like`),
   resetFileSize: (id) => api.post(`/video/${id}/reset-file-size`),
+  deleteVideoFile: (id) => api.delete(`/video/${id}/file`),
   updateFileInfo: (id, data) => api.put(`/video/${id}/file-info`, data),
   getLikeStats: (year, month) => api.get('/video/likes/stats', { params: { year, month } }),
-  getLatestAdded: (count) => api.get('/video/latest-added', { params: { count } }),
+  getDailyRecommend: (count) => api.get('/video/daily-recommend', { params: { count } }),
   getRecentlyLiked: (count) => api.get('/video/recently-liked', { params: { count } }),
   getTopLiked: (count) => api.get('/video/top-liked', { params: { count } })
 }

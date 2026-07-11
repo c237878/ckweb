@@ -62,8 +62,14 @@
                         <button class="action-btn" @click="openEditDialog">
                             <span>编辑</span>
                         </button>
+                        <button class="action-btn" @click="handlePictureInPicture">
+                            <span>画中画</span>
+                        </button>
                         <button class="action-btn" @click="resetFileSize" :disabled="resetting">
                             <span>重置</span>
+                        </button>
+                        <button class="action-btn" @click="handleDeleteFile" :disabled="deletingFile">
+                            <span>删除文件</span>
                         </button>
                     </div>
                     <div class="recommend-section" v-if="recommendList.length > 0">
@@ -195,6 +201,7 @@ const editingVideo = ref(null)
 const panelCollapsed = ref(false)
 const likeCount = ref(0)
 const resetting = ref(false)
+const deletingFile = ref(false)
 const volumeTipVisible = ref(false)
 const speedTipVisible = ref(false)
 const currentSpeed = ref(1)
@@ -457,6 +464,46 @@ const resetFileSize = async () => {
         alert('重置失败: ' + error.message)
     }
     resetting.value = false
+}
+
+// 删除视频文件
+const handleDeleteFile = async () => {
+    if (!video.value?.id) return
+    if (!confirm('确定要删除视频文件吗？封面不会受影响。')) return
+    deletingFile.value = true
+    try {
+        const res = await videoApi.deleteVideoFile(video.value.id)
+        if (res.success) {
+            video.value.file_path = null
+            video.value.fileSize = 0
+            console.log('删除结果:', res.message)
+            alert('已删除文件：' + res.message)
+        } else {
+            alert('删除失败：' + (res.message || '未知错误'))
+        }
+    } catch (error) {
+        console.error('删除失败:', error)
+        alert('删除失败：' + error.message)
+    }
+    deletingFile.value = false
+}
+
+// 画中画
+const handlePictureInPicture = async () => {
+    const videoEl = document.querySelector('#ckplayer video')
+    if (!videoEl) {
+        console.warn('video 元素未找到')
+        return
+    }
+    try {
+        if (document.pictureInPictureElement) {
+            await document.exitPictureInPicture()
+        } else {
+            await videoEl.requestPictureInPicture()
+        }
+    } catch (error) {
+        console.error('画中画失败:', error)
+    }
 }
 
 const onEditSave = async (formData) => {

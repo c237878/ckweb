@@ -5221,15 +5221,18 @@
 		*/
 		changeLoad=function(){
 			if(video){
-				var len = video.buffered.length;
-				if(len>0){
-					var bufferEnd = video.buffered.end(len-1);
-					if(loadTime<bufferEnd){
-						loadTime=bufferEnd;
+				try {
+					var len = video.buffered.length;
+					if(len>0){
+						var bufferEnd = video.buffered.end(len-1);
+						if(loadTime<bufferEnd){
+							loadTime=bufferEnd;
+						}
 					}
-					replaceInformation('loadTime',parseInt(loadTime*100)*0.01);
-					C['bar']['pbox']['load'].css('width',(loadTime/duration)*100+'%');
-				}
+				} catch(e) {}
+				var dur = duration || 1;
+				replaceInformation('loadTime',parseInt(loadTime*100)*0.01);
+				C['bar']['pbox']['load'].css('width',(loadTime/dur)*100+'%');
 			}
 		},
 		/*
