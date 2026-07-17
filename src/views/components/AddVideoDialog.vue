@@ -3,7 +3,10 @@
     <template #content>
       <div class="form-item">
         <label>番号</label>
-        <input v-model="form.code" type="text" placeholder="如: ABC-123" />
+        <div class="code-row">
+          <input v-model="form.code" type="text" placeholder="如: ABC-123" />
+          <button type="button" class="autocode-btn" @click="generateCode" :disabled="codeLoading">{{ codeLoading ? '生成中...' : '自动编号' }}</button>
+        </div>
       </div>
       <div class="form-item">
         <label>名称 *</label>
@@ -234,6 +237,7 @@ const actorList = ref([])
 const selectedActors = ref([])
 const actorSearch = ref('')
 const matchedActors = ref([])
+const codeLoading = ref(false)
 const meta = ref({ categories: [], countries: [], series: [] })
 const scanDirectories = ref([])
 
@@ -455,6 +459,19 @@ const removeActor = (actorId) => {
   selectedActors.value = selectedActors.value.filter(a => a.id !== actorId)
 }
 
+const generateCode = async () => {
+  codeLoading.value = true
+  try {
+    const res = await videoApi.getAutoCode()
+    if (res.success) {
+      form.value.code = res.code
+    }
+  } catch (e) {
+    console.error('生成自动编号失败:', e)
+  }
+  codeLoading.value = false
+}
+
 const loadMeta = async () => {
   try {
     const res = await videoApi.getMeta()
@@ -556,6 +573,11 @@ const handleDelete = () => {
 .form-item { margin-bottom: 16px; }
 .form-item label { display: block; margin-bottom: 6px; font-size: 14px; color: #666; }
 .form-item input, .form-item select { width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; box-sizing: border-box; }
+.code-row { display: flex; gap: 8px; }
+.code-row input { flex: 1; }
+.autocode-btn { white-space: nowrap; padding: 8px 14px; border: 1px solid #4a9eff; background: #4a9eff; color: #fff; border-radius: 4px; cursor: pointer; font-size: 13px; }
+.autocode-btn:hover { background: #3a8eef; }
+.autocode-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 .combobox-wrap { position: relative; }
 .combobox-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid #ddd; border-radius: 4px; margin-top: 4px; max-height: 200px; overflow-y: auto; z-index: 10; }
 .combobox-option { padding: 8px 12px; cursor: pointer; }

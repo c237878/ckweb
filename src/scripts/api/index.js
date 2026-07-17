@@ -52,6 +52,7 @@ export const videoApi = {
   getStreamUrl: (id) => `/api/video/stream/${id}`,
   getCoverUrl: (id) => `/api/video/cover/${id}`,
   getMeta: () => api.get('/video/meta'),
+  getAutoCode: () => api.get('/video/autocode'),
   like: (id) => api.post(`/video/${id}/like`),
   resetFileSize: (id) => api.post(`/video/${id}/reset-file-size`),
   deleteVideoFile: (id) => api.delete(`/video/${id}/file`),
