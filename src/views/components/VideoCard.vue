@@ -235,6 +235,7 @@ const decodeUrl = (url) => {
   align-items: center;
   gap: 6px;
   overflow: hidden;
+  height: 21px;
 }
 
 .info-row.actors {

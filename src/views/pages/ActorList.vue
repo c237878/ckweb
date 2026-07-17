@@ -263,11 +263,9 @@ onMounted(async () => {
     console.warn('读取 pageSize 设置失败，使用默认值 24')
   }
   try {
-    const metaRes = await actorApi.getList({ page: 1, pageSize: 1000 })
-    if (metaRes.success && metaRes.data) {
-      const unique = new Set()
-      metaRes.data.forEach(a => { if (a.country) unique.add(a.country) })
-      countries.value = Array.from(unique).sort()
+    const res = await actorApi.getCountries()
+    if (res.success && res.data) {
+      countries.value = res.data
     }
   } catch (e) {
     console.warn('加载地区列表失败', e)

@@ -50,7 +50,7 @@
                 </div>
                 <template v-if="!panelCollapsed">
                     <div class="action-section">
-                        <button class="action-btn like-btn" @click="handleLike">
+                        <button class="action-btn like-btn" @click="handleLike" :disabled="likeDisabled">
                             <span>点赞</span>
                         </button>
                         <button class="action-btn" @click="handleScreenshot">
@@ -202,6 +202,7 @@ const panelCollapsed = ref(false)
 const likeCount = ref(0)
 const resetting = ref(false)
 const deletingFile = ref(false)
+const likeDisabled = ref(false)
 const volumeTipVisible = ref(false)
 const speedTipVisible = ref(false)
 const currentSpeed = ref(1)
@@ -542,6 +543,8 @@ const goToVideo = (id) => {
 }
 
 const handleLike = async () => {
+    if (likeDisabled.value) return
+    likeDisabled.value = true
     try {
         const res = await videoApi.like(video.value.id)
         if (res.success) {
@@ -549,6 +552,8 @@ const handleLike = async () => {
         }
     } catch (error) {
         console.error('点赞失败:', error)
+    } finally {
+        setTimeout(() => { likeDisabled.value = false }, 3000)
     }
 }
 
