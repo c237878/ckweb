@@ -58,7 +58,7 @@ export const videoApi = {
   deleteVideoFile: (id) => api.delete(`/video/${id}/file`),
   updateFileInfo: (id, data) => api.put(`/video/${id}/file-info`, data),
   getLikeStats: (year, month) => api.get('/video/likes/stats', { params: { year, month } }),
-  getDailyRecommend: (count) => api.get('/video/daily-recommend', { params: { count } }),
+  getDailyRecommend: (count, refresh = false) => api.get('/video/daily-recommend', { params: { count, refresh } }),
   getRecentlyLiked: (count) => api.get('/video/recently-liked', { params: { count } }),
   getTopLiked: (count) => api.get('/video/top-liked', { params: { count } })
 }

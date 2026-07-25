@@ -2,7 +2,10 @@
   <div class="home">
     <!-- 顶部三个固定板块 -->
     <section v-for="sec in topSections" :key="sec.name" class="section">
-      <h2 class="section-title">{{ sec.name }}</h2>
+      <div class="section-header">
+        <h2 class="section-title">{{ sec.name }}</h2>
+        <button v-if="sec.name === '今日推荐'" class="refresh-btn" @click="refreshDaily" :disabled="dailyRefreshing">{{ dailyRefreshing ? '加载中...' : '换一批' }}</button>
+      </div>
       <div class="video-grid">
         <VideoCard v-for="video in sec.videos" :key="video.id" :video="video" mode="display" />
         <div v-if="sec.videos.length === 0" class="empty-hint">暂无内容</div>
@@ -35,6 +38,7 @@ import LikeCalendar from '@/views/components/LikeCalendar.vue'
 
 const topSections = ref([])
 const categories = ref([])
+const dailyRefreshing = ref(false)
 
 onMounted(async () => {
   try {
@@ -94,10 +98,32 @@ onMounted(async () => {
     console.error('加载首页失败:', error)
   }
 })
+
+const refreshDaily = async () => {
+  dailyRefreshing.value = true
+  try {
+    const metaRes = await videoApi.getMeta()
+    const count = parseInt(metaRes.homePageCategoryCount) || 12
+    const res = await videoApi.getDailyRecommend(count, true)
+    if (res.success && res.data?.length > 0) {
+      const idx = topSections.value.findIndex(s => s.name === '今日推荐')
+      if (idx >= 0) {
+        topSections.value[idx].videos = res.data
+      }
+    }
+  } catch (e) {
+    console.error('换一批失败:', e)
+  }
+  dailyRefreshing.value = false
+}
 </script>
 
 <style scoped>
 .home { padding: 20px 20px 60px; position: relative; }
+.section-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.refresh-btn { padding: 4px 14px; border: 1px solid #4a9eff; background: transparent; color: #4a9eff; border-radius: 4px; cursor: pointer; font-size: 13px; }
+.refresh-btn:hover { background: #4a9eff; color: #fff; }
+.refresh-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
 .section { margin-bottom: 40px; }
 .section-title {
