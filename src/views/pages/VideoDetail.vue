@@ -225,7 +225,9 @@ const wrapperStyle = computed(() => {
     return { aspectRatio: ar.toFixed(4) }
 })
 
-const initCkplayer = () => {
+const subtitleInfo = ref(null)
+
+const initCkplayer = async () => {
     if (!video.value?.id) return
 
     // 销毁旧实例
@@ -236,6 +238,19 @@ const initCkplayer = () => {
             console.warn('销毁播放器失败:', e)
         }
         ckplayerInstance = null
+    }
+
+    // 检查字幕
+    try {
+        const subRes = await videoApi.checkSubtitle(video.value.id)
+        if (subRes.success && subRes.hasSubtitle) {
+            subtitleInfo.value = subRes
+        } else {
+            subtitleInfo.value = null
+        }
+    } catch (e) {
+        console.warn('检查字幕失败:', e)
+        subtitleInfo.value = null
     }
 
     // 封面图片
@@ -259,6 +274,17 @@ const initCkplayer = () => {
         screenshot: true,
         poster: poster,
         seek: savedPlayTime
+    }
+
+    // 如果有字幕，添加 track 配置
+    if (subtitleInfo.value) {
+        videoObject.track = [{
+            src: subtitleInfo.value.url,
+            srclang: 'zh',
+            kind: 'subtitles',
+            label: '中文字幕',
+            default: true
+        }]
     }
 
     // ckplayer 通过 UMD 挂载到 window.ckplayer
@@ -379,8 +405,8 @@ const loadVideo = async () => {
             likeCount.value = res.data.likeCount || 0
 
             // 初始化 ckplayer
-            nextTick(() => {
-                initCkplayer()
+            nextTick(async () => {
+                await initCkplayer()
             })
         }
     } catch (error) {

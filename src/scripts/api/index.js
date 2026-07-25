@@ -51,6 +51,7 @@ export const videoApi = {
   getScanStatus: (taskId) => api.get(`/video/scan/${taskId}`),
   getStreamUrl: (id) => `/api/video/stream/${id}`,
   getCoverUrl: (id) => `/api/video/cover/${id}`,
+  checkSubtitle: (id) => api.get(`/video/${id}/subtitle/check`),
   getMeta: () => api.get('/video/meta'),
   getAutoCode: () => api.get('/video/autocode'),
   like: (id) => api.post(`/video/${id}/like`),
