@@ -121,7 +121,7 @@ const refreshDaily = async () => {
 <style scoped>
 .home { padding: 20px 20px 60px; position: relative; }
 .section-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-.refresh-btn { padding: 4px 14px; border: 1px solid #4a9eff; background: transparent; color: #4a9eff; border-radius: 4px; cursor: pointer; font-size: 13px; }
+.refresh-btn { padding: 4px 14px; border: 1px solid #4a9eff; background: transparent; color: #4a9eff; border-radius: 4px; cursor: pointer; font-size: 13px; user-select: none; }
 .refresh-btn:hover { background: #4a9eff; color: #fff; }
 .refresh-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
@@ -129,7 +129,6 @@ const refreshDaily = async () => {
 .section-title {
   font-size: 24px;
   font-weight: bold;
-  margin-bottom: 20px;
   padding-left: 10px;
   border-left: 4px solid #e74c3c;
 }
