@@ -54,15 +54,15 @@
           <div class="card-body" @click="handleSelect(series)">
             <div class="info-row">
               <span class="name">{{ series.name }}</span>
-              <div class="right-tags">
-                <span v-if="series.likeCount > 0" class="like-count">♥ {{ series.likeCount }}</span>
-                <span v-if="series.videoCount > 0" class="video-count">{{ series.videoCount }} 部</span>
-                <span v-if="series.unloadedCount > 0" class="unloaded-badge" title="有 {{ series.unloadedCount }} 部未下载">⬇ {{ series.unloadedCount }} 未下载</span>
-                <span v-if="series.country" class="country-tag">{{ series.country }}</span>
-              </div>
             </div>
             <div class="info-row alias-row" v-if="series.alias">
               <span class="alias">{{ series.alias }}</span>
+            </div>
+            <div class="info-row">
+              <span v-if="series.likeCount > 0" class="like-count">♥ {{ series.likeCount }}</span>
+              <span v-if="series.videoCount > 0" class="video-count">{{ series.videoCount }} 部</span>
+              <span v-if="series.country" class="country-tag">{{ series.country }}</span>
+              <span v-if="series.unloadedCount > 0" class="unloaded-badge" title="有 {{ series.unloadedCount }} 部未下载">⬇{{ series.unloadedCount }}</span>
             </div>
           </div>
         </div>
