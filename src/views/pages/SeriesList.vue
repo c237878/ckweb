@@ -57,6 +57,7 @@
               <div class="right-tags">
                 <span v-if="series.likeCount > 0" class="like-count">♥ {{ series.likeCount }}</span>
                 <span v-if="series.videoCount > 0" class="video-count">{{ series.videoCount }} 部</span>
+                <span v-if="series.unloadedCount > 0" class="unloaded-badge" title="有 {{ series.unloadedCount }} 部未下载">⬇ {{ series.unloadedCount }} 未下载</span>
                 <span v-if="series.country" class="country-tag">{{ series.country }}</span>
               </div>
             </div>
@@ -493,6 +494,22 @@ onMounted(async () => {
   padding: 2px 6px;
   border-radius: 3px;
   white-space: nowrap;
+}
+
+.unloaded-badge {
+  font-size: 12px;
+  color: #fff;
+  background: #e74c3c;
+  padding: 2px 8px;
+  border-radius: 3px;
+  white-space: nowrap;
+  font-weight: 600;
+  animation: pulse-badge 2s ease-in-out infinite;
+}
+
+@keyframes pulse-badge {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
 }
 
 .country-tag {
