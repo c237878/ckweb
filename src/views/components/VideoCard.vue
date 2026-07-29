@@ -24,7 +24,7 @@
         <span v-if="video.country" class="country-tag">{{ video.country }}</span>
         <span v-if="video.category && mode=='full'" class="type-tag">{{ video.category }}</span>
         <span v-if="video.likeCount > 0" class="like-count">♥ {{ video.likeCount }}</span>
-        <span class="file-size">{{ video.fileSize ? formatSize(video.fileSize) : '无文件' }}</span>
+        <span class="file-size" @click.stop="copyCode" title="点击复制番号">{{ video.fileSize ? formatSize(video.fileSize) : '无文件' }}</span>
       </div>
       <!-- 第四行：所属系列名称（可点击，橙色tag） -->
       <div class="info-row" v-if="video.seriesName && mode!='brief'">
@@ -78,6 +78,23 @@ const props = defineProps({
 
 const router = useRouter()
 const emit = defineEmits(['edit', 'select'])
+
+const copyCode = async (e) => {
+  e.stopPropagation()
+  const code = props.video.code || ''
+  if (!code) return
+  try {
+    await navigator.clipboard.writeText(code)
+  } catch {
+    // 兜底
+    const ta = document.createElement('textarea')
+    ta.value = code
+    document.body.appendChild(ta)
+    ta.select()
+    document.execCommand('copy')
+    document.body.removeChild(ta)
+  }
+}
 
 const handleClick = () => {
   if (props.selectable) {
@@ -324,5 +341,12 @@ const decodeUrl = (url) => {
 .file-size {
   color: #555;
   background: #f0f0f0;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.file-size:hover {
+  background: #d0e8ff;
+  color: #2980b9;
 }
 </style>
