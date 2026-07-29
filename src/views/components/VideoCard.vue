@@ -342,11 +342,5 @@ const decodeUrl = (url) => {
   color: #555;
   background: #f0f0f0;
   cursor: pointer;
-  transition: background 0.2s;
-}
-
-.file-size:hover {
-  background: #d0e8ff;
-  color: #2980b9;
 }
 </style>
