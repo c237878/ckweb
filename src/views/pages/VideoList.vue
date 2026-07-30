@@ -28,6 +28,13 @@
         <option value="yes">已下载</option>
         <option value="no">未下载</option>
       </select>
+      <select v-model="filters.mediaAttrFlags" @change="page = 1; loadVideos()">
+        <option value="">全部片源</option>
+        <option value="0">未设置</option>
+        <option value="1">劣质</option>
+        <option value="2">无字幕</option>
+        <option value="3">完美</option>
+      </select>
       <div class="combobox-wrap">
         <input
           v-model="seriesInput"
@@ -125,7 +132,8 @@ const filters = ref({
   country: '',
   seriesId: '',
   keyword: '',
-  downloaded: ''
+  downloaded: '',
+  mediaAttrFlags: ''
 })
 const showAddDialog = ref(false)
 const editingVideo = ref(null)
@@ -234,6 +242,7 @@ const loadVideos = async () => {
     if (filters.value.keyword) params.keyword = filters.value.keyword
     if (filters.value.downloaded === 'yes') params.hasFile = true
     else if (filters.value.downloaded === 'no') params.hasFile = false
+    if (filters.value.mediaAttrFlags !== '') params.mediaAttrFlags = parseInt(filters.value.mediaAttrFlags)
     if (filters.value.sortBy) params.sortBy = filters.value.sortBy
 
     const res = await videoApi.getList(params)
