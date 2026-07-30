@@ -25,6 +25,7 @@
         <span v-if="video.category && mode=='full'" class="type-tag">{{ video.category }}</span>
         <span v-if="video.likeCount > 0" class="like-count">♥ {{ video.likeCount }}</span>
         <span class="file-size" @click.stop="copyCode" title="点击复制番号">{{ video.fileSize ? formatSize(video.fileSize) : '无文件' }}</span>
+        <span v-if="video.mediaAttrFlags > 0" class="media-flag-tag" :class="'media-' + video.mediaAttrFlags">{{ mediaFlagsText[video.mediaAttrFlags] }}</span>
       </div>
       <!-- 第四行：所属系列名称（可点击，橙色tag） -->
       <div class="info-row" v-if="video.seriesName && mode!='brief'">
@@ -81,6 +82,8 @@ const props = defineProps({
 
 const router = useRouter()
 const emit = defineEmits(['edit', 'select'])
+
+const mediaFlagsText = { 1: '劣质', 2: '无字幕', 3: '完美' }
 
 const copyCode = async (e) => {
   e.stopPropagation()
@@ -366,4 +369,16 @@ const decodeUrl = (url) => {
   background: #f0f0f0;
   cursor: pointer;
 }
+
+.media-flag-tag {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.media-flag-tag.media-1 { background: #fee; color: #c0392b; }
+.media-flag-tag.media-2 { background: #fff3cd; color: #856404; }
+.media-flag-tag.media-3 { background: #d4edda; color: #155724; }
 </style>
