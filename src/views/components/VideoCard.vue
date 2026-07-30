@@ -42,6 +42,7 @@
     </div>
     <!-- 第六行：操作按钮 -->
     <CardActions v-if="mode === 'full' && showActions" @click.stop>
+      <button class="btn" @click.stop="handleReset" :disabled="resetting">{{ resetting ? '重置中...' : '重置' }}</button>
       <button class="btn btn-primary" @click.stop="handleEdit">编辑</button>
       <button class="btn btn-success" @click.stop="goToDetail">详情</button>
     </CardActions>
@@ -49,9 +50,11 @@
 </template>
 
 <script setup>
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import CardActions from './CardActions.vue'
 import { formatSize } from '@/scripts/utils/format'
+import { videoApi } from '@/scripts/api'
 
 const props = defineProps({
   video: {
@@ -129,6 +132,27 @@ const parseActors = (str) => {
 
 const goToActor = (actorId) => {
   if (actorId) router.push(`/actor/${actorId}`)
+}
+
+const resetting = ref(false)
+const handleReset = async () => {
+  if (!props.video?.id || resetting.value) return
+  resetting.value = true
+  try {
+    const res = await videoApi.resetFileSize(props.video.id)
+    if (res.success) {
+      if (res.data?.fileSize !== undefined) props.video.fileSize = res.data.fileSize
+      if (res.data?.filePath !== undefined) props.video.filePath = res.data.filePath
+      if (res.data?.coverPath !== undefined) props.video.coverPath = res.data.coverPath
+      alert('重置完成：' + (res.message || '成功'))
+    } else {
+      alert('重置失败: ' + (res.message || '未知错误'))
+    }
+  } catch (error) {
+    alert('重置失败: ' + (error.message || error))
+  } finally {
+    resetting.value = false
+  }
 }
 
 const handleEdit = () => {
