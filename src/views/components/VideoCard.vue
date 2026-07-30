@@ -144,7 +144,6 @@ const handleReset = async () => {
       if (res.data?.fileSize !== undefined) props.video.fileSize = res.data.fileSize
       if (res.data?.filePath !== undefined) props.video.filePath = res.data.filePath
       if (res.data?.coverPath !== undefined) props.video.coverPath = res.data.coverPath
-      alert('重置完成：' + (res.message || '成功'))
     } else {
       alert('重置失败: ' + (res.message || '未知错误'))
     }

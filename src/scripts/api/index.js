@@ -56,6 +56,7 @@ export const videoApi = {
   getAutoCode: () => api.get('/video/autocode'),
   like: (id) => api.post(`/video/${id}/like`),
   resetFileSize: (id) => api.post(`/video/${id}/reset-file-size`),
+  updateMediaFlags: (id, flags) => api.put(`/video/${id}/media-flags`, { flags }),
   deleteVideoFile: (id) => api.delete(`/video/${id}/file`),
   updateFileInfo: (id, data) => api.put(`/video/${id}/file-info`, data),
   getLikeStats: (year, month) => api.get('/video/likes/stats', { params: { year, month } }),

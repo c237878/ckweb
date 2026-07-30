@@ -27,6 +27,17 @@
                         <span v-if="likeCount > 0" class="like-count">♥ {{ likeCount }}</span>
                         <span class="file-size">{{ video.fileSize?formatSize(video.fileSize):'无文件' }}</span>
                     </div>
+                    <div class="info-row-media">
+                        <span class="media-label">片源：</span>
+                        <template v-if="video.mediaAttrFlags > 0">
+                            <span class="media-tag" :class="'media-' + video.mediaAttrFlags">{{ mediaFlagsText[video.mediaAttrFlags] }}</span>
+                        </template>
+                        <template v-else>
+                            <span class="media-option media-1" @click="setMediaFlags(1)">劣质片源</span>
+                            <span class="media-option media-2" @click="setMediaFlags(2)">无字幕</span>
+                            <span class="media-option media-3" @click="setMediaFlags(3)">完美片源</span>
+                        </template>
+                    </div>
                     <div class="info-row3" v-if="video.seriesName">
                         <span>系列：</span>
                         <a :key="video.seriesId" class="actor-link" @click="goToSeries(video.seriesId)">{{ video.seriesName }}</a>
@@ -207,6 +218,22 @@ const volumeTipVisible = ref(false)
 const speedTipVisible = ref(false)
 const currentSpeed = ref(1)
 let speedTipTimer = null
+
+const mediaFlagsText = { 1: '劣质片源', 2: '无字幕', 3: '完美片源' }
+
+const setMediaFlags = async (flags) => {
+    if (!video.value?.id) return
+    try {
+        const res = await videoApi.updateMediaFlags(video.value.id, flags)
+        if (res.success) {
+            video.value.mediaAttrFlags = flags
+        } else {
+            alert(res.message || '设置失败')
+        }
+    } catch (error) {
+        alert('设置失败: ' + (error.message || error))
+    }
+}
 let volumeTipTimer = null
 
 const videoNaturalWidth = ref(0)
@@ -483,6 +510,7 @@ const resetFileSize = async () => {
             if (res.data?.filePath !== undefined) video.value.file_path = res.data.filePath
             if (res.data?.fileSize !== undefined) video.value.fileSize = res.data.fileSize
             if (res.data?.coverPath !== undefined) video.value.cover_path = res.data.coverPath
+            video.value.mediaAttrFlags = 0
             console.log('重置结果:', res.message)
         } else {
             alert('重置失败: ' + (res.message || '未知错误'))
@@ -696,6 +724,45 @@ const handleLike = async () => {
     border-radius: 4px;
     font-size: 13px;
 }
+
+.info-row-media {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    margin-top: 4px;
+}
+
+.media-label {
+    color: #666;
+}
+
+.media-tag {
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.media-tag.media-1 { background: #fee; color: #c0392b; }
+.media-tag.media-2 { background: #fff3cd; color: #856404; }
+.media-tag.media-3 { background: #d4edda; color: #155724; }
+
+.media-option {
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    border: 1px solid #ddd;
+    transition: all 0.2s;
+}
+
+.media-option.media-1 { color: #c0392b; border-color: #c0392b; }
+.media-option.media-1:hover { background: #c0392b; color: #fff; }
+.media-option.media-2 { color: #856404; border-color: #856404; }
+.media-option.media-2:hover { background: #856404; color: #fff; }
+.media-option.media-3 { color: #155724; border-color: #155724; }
+.media-option.media-3:hover { background: #155724; color: #fff; }
 
 .country-tag {
     background: #fff3e0;
