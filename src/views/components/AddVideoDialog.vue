@@ -216,6 +216,7 @@
     </template>
     <template #actions>
       <button v-if="editingVideo" class="delete-btn" @click="handleDelete">删除</button>
+      <button v-else class="continue-btn" @click="handleSaveContinue">连续添加</button>
     </template>
   </Dialog>
 </template>
@@ -231,7 +232,7 @@ const props = defineProps({
   editingVideo: Object
 })
 
-const emit = defineEmits(['save', 'cancel', 'delete'])
+const emit = defineEmits(['save', 'save-continue', 'cancel', 'delete'])
 
 const actorList = ref([])
 const selectedActors = ref([])
@@ -560,6 +561,32 @@ const handleSave = () => {
   })
 }
 
+const handleSaveContinue = () => {
+  if (!form.value.name.trim()) {
+    alert('请输入影片名称')
+    return
+  }
+  emit('save-continue', {
+    name: form.value.name,
+    code: form.value.code,
+    category: form.value.category,
+    country: form.value.country,
+    seriesId: form.value.seriesId,
+    filePath: form.value.filePath,
+    coverPath: form.value.coverPath,
+    fileSize: form.value.fileSize,
+    actorIds: selectedActors.value.map(a => a.id)
+  })
+  // 清空番号、视频路径、封面路径、演员
+  form.value.code = ''
+  form.value.filePath = ''
+  form.value.coverPath = ''
+  form.value.fileSize = null
+  selectedActors.value = []
+  actorSearch.value = ''
+  matchedActors.value = []
+}
+
 const handleCancel = () => {
   emit('cancel')
 }
@@ -594,6 +621,8 @@ const handleDelete = () => {
 .suggestion-item:hover { background: #f5f5f5; }
 .delete-btn { padding: 8px 16px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; }
 .delete-btn:hover { background: #c0392b; }
+.continue-btn { padding: 8px 16px; background: #27ae60; color: white; border: none; border-radius: 4px; cursor: pointer; }
+.continue-btn:hover { background: #229954; }
 
 /* 路径行 + 上传按钮 */
 .path-row { display: flex; gap: 8px; align-items: center; }

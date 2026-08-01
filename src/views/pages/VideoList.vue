@@ -104,6 +104,7 @@
       :visible="showAddDialog"
       :editing-video="editingVideo"
       @save="handleSaveVideo"
+      @save-continue="handleSaveContinue"
       @cancel="showAddDialog = false; editingVideo = null"
       @delete="handleDeleteVideo"
     />
@@ -293,6 +294,17 @@ const handleSaveVideo = async (formData) => {
     await Promise.all([loadVideos(), loadMeta()])
   } catch (error) {
     console.error('保存失败:', error)
+  }
+}
+
+const handleSaveContinue = async (formData) => {
+  try {
+    await videoApi.add(formData)
+    await Promise.all([loadVideos(), loadMeta()])
+    // 不关闭弹窗，由子组件已清空相关字段
+  } catch (error) {
+    console.error('保存失败:', error)
+    alert('保存失败: ' + (error.message || '未知错误'))
   }
 }
 
