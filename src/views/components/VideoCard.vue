@@ -100,6 +100,9 @@ const copyCode = async (e) => {
     document.execCommand('copy')
     document.body.removeChild(ta)
   }
+  if (!props.video.fileSize) {
+    handleReset();
+  }
 }
 
 const handleClick = () => {

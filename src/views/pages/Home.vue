@@ -60,11 +60,11 @@ onMounted(async () => {
 
     if (homeCats.length > 0) {
       // 有配置 → 只加载指定的分类
-      homeCats.forEach(cat => promises.push(videoApi.getList({ pageIndex: 1, pageSize: count, category: cat, hasFile: true })))
+      homeCats.forEach(cat => promises.push(videoApi.getList({ pageIndex: 1, pageSize: count, category: cat, hasFile: true, prioritizeUnrated: true })))
     } else {
       // 无配置 → 加载全部分类
       const allCats = metaRes.categories || []
-      allCats.forEach(cat => promises.push(videoApi.getList({ pageIndex: 1, pageSize: count, category: cat, hasFile: true })))
+      allCats.forEach(cat => promises.push(videoApi.getList({ pageIndex: 1, pageSize: count, category: cat, hasFile: true, prioritizeUnrated: true })))
     }
 
     const results = await Promise.all(promises)
