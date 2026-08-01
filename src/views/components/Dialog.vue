@@ -7,6 +7,7 @@
         <slot name="actions"></slot>
         <button class="cancel-btn" @click="handleCancel">取消</button>
         <button class="confirm-btn" @click="handleConfirm">保存</button>
+        <slot name="extra-actions"></slot>
       </div>
     </div>
   </div>

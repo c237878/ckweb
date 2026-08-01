@@ -216,7 +216,9 @@
     </template>
     <template #actions>
       <button v-if="editingVideo" class="delete-btn" @click="handleDelete">删除</button>
-      <button v-else class="continue-btn" @click="handleSaveContinue">连续添加</button>
+    </template>
+    <template #extra-actions>
+      <button v-if="!editingVideo" class="continue-btn" @click="handleSaveContinue">连续添加</button>
     </template>
   </Dialog>
 </template>
