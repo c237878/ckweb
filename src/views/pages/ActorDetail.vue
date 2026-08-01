@@ -36,10 +36,19 @@
     </div>
 
     <div class="detail-videos">
-      <h2>参演影片 ({{ videos.length }})</h2>
+      <div class="videos-header">
+        <h2>参演影片 ({{ displayVideos.length }})</h2>
+        <select v-model="mediaAttrFilter" class="media-filter">
+          <option value="">全部片源</option>
+          <option value="0">未设置</option>
+          <option value="1">劣质</option>
+          <option value="2">无字幕</option>
+          <option value="3">完美</option>
+        </select>
+      </div>
       <div class="video-grid">
-        <VideoCard v-for="video in videos" :key="video.id" :video="video" mode="display" />
-        <div v-if="videos.length === 0" class="empty-hint">暂无影片</div>
+        <VideoCard v-for="video in displayVideos" :key="video.id" :video="video" mode="display" />
+        <div v-if="displayVideos.length === 0" class="empty-hint">暂无影片</div>
       </div>
     </div>
 
@@ -63,6 +72,12 @@ import AddActorDialog from '@/views/components/AddActorDialog.vue'
 const route = useRoute()
 const actor = ref(null)
 const videos = ref([])
+const mediaAttrFilter = ref('')
+const displayVideos = computed(() => {
+  if (!mediaAttrFilter.value) return videos.value
+  const f = parseInt(mediaAttrFilter.value)
+  return videos.value.filter(v => (v.mediaAttrFlags || 0) === f)
+})
 const posters = ref([])
 const posterStyles = ref([])
 const lightboxIndex = ref(null)
@@ -325,8 +340,22 @@ watch(
   cursor: default;
 }
 
-.detail-videos h2 {
+.videos-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   margin-bottom: 20px;
+}
+
+.videos-header h2 {
+  margin: 0;
+}
+
+.media-filter {
+  padding: 4px 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 13px;
 }
 
 .video-grid {

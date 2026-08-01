@@ -23,13 +23,22 @@
       📌 拖动影片卡片调整顺序，完成后点击「完成排序」保存
     </div>
     <div class="detail-videos">
-      <h2>系列影片 ({{ videos.length }})</h2>
+      <div class="videos-header">
+        <h2>系列影片 ({{ displayVideos.length }})</h2>
+        <select v-model="mediaAttrFilter" class="media-filter">
+          <option value="">全部片源</option>
+          <option value="0">未设置</option>
+          <option value="1">劣质</option>
+          <option value="2">无字幕</option>
+          <option value="3">完美</option>
+        </select>
+      </div>
       <div
         class="video-grid"
         :class="{ 'sorting-mode': sorting }"
       >
         <div
-          v-for="(video, index) in videos"
+          v-for="(video, index) in displayVideos"
           :key="video.id"
           class="video-card-wrapper"
           :class="{
@@ -46,7 +55,7 @@
           <div v-if="sorting" class="sort-badge">{{ index + 1 }}</div>
           <VideoCard :video="video" mode="display" />
         </div>
-        <div v-if="videos.length === 0" class="empty-hint">暂无影片</div>
+        <div v-if="displayVideos.length === 0" class="empty-hint">暂无影片</div>
       </div>
     </div>
 
@@ -61,7 +70,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { seriesApi } from '@/scripts/api'
 import VideoCard from '@/views/components/VideoCard.vue'
@@ -70,6 +79,12 @@ import AddSeriesDialog from '@/views/components/AddSeriesDialog.vue'
 const route = useRoute()
 const series = ref(null)
 const videos = ref([])
+const mediaAttrFilter = ref('')
+const displayVideos = computed(() => {
+  if (!mediaAttrFilter.value) return videos.value
+  const f = parseInt(mediaAttrFilter.value)
+  return videos.value.filter(v => (v.mediaAttrFlags || 0) === f)
+})
 const showEditDialog = ref(false)
 
 // 排序相关
@@ -334,8 +349,22 @@ const decodeUrl = (url) => {
   font-size: 14px;
 }
 
-.detail-videos h2 {
+.videos-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   margin-bottom: 20px;
+}
+
+.videos-header h2 {
+  margin: 0;
+}
+
+.media-filter {
+  padding: 4px 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 13px;
 }
 
 .video-grid {
