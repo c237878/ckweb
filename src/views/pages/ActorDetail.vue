@@ -8,7 +8,7 @@
         <button class="edit-btn" @click="openEditDialog">编辑</button>
       </div>
       <p v-if="actor.alias" class="alias-row">别名：{{ actor.alias }}</p>
-      <p v-if="actor.bio" class="bio-row">{{ actor.bio }}</p>
+      <p v-if="actor.bio" class="bio-row">{{ decodeBio(actor.bio) }}</p>
     </div>
 
     <!-- 海报墙 -->
@@ -82,6 +82,15 @@ const posters = ref([])
 const posterStyles = ref([])
 const lightboxIndex = ref(null)
 const posterGridRef = ref(null)
+
+// 解码简介中可能包含的 URL 编码文本
+const decodeBio = (text) => {
+  try {
+    return decodeURIComponent(text)
+  } catch {
+    return text
+  }
+}
 
 const actorId = computed(() => route.params.id)
 const showEditDialog = ref(false)
