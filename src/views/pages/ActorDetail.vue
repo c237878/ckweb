@@ -21,7 +21,7 @@
           :style="posterStyles[i]"
           @click="openLightbox(i)"
         >
-          <img :src="`/api/actor/${actorId}/poster/${p}`" :alt="p" />
+          <img :src="`/api/actor/${actorId}/poster/${encodeURIComponent(p)}`" :alt="p" />
         </div>
       </div>
     </div>
@@ -29,7 +29,7 @@
     <!-- 灯箱 -->
     <div class="lightbox-overlay" v-if="lightboxIndex !== null" @click="closeLightbox">
       <img
-        :src="`/api/actor/${actorId}/poster/${posters[lightboxIndex]}`"
+        :src="`/api/actor/${actorId}/poster/${encodeURIComponent(posters[lightboxIndex])}`"
         class="lightbox-image"
         @click.stop
       />
