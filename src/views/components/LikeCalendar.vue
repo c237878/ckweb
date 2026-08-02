@@ -15,9 +15,9 @@
     <div class="cal-body" v-if="!collapsed">
       <!-- 月份切换 -->
       <div class="month-nav">
-        <button class="nav-btn" @click="prevMonth">◀</button>
+        <button class="nav-btn" @click="prevMonth" :disabled="!canPrev" :class="{ disabled: !canPrev }">◀</button>
         <span class="month-label">{{ currentYear }}年{{ currentMonth }}月</span>
-        <button class="nav-btn" @click="nextMonth">▶</button>
+        <button class="nav-btn" @click="nextMonth" :disabled="!canNext" :class="{ disabled: !canNext }">▶</button>
       </div>
 
       <!-- 统计摘要 -->
@@ -162,7 +162,20 @@ const loadStats = async () => {
   }
 }
 
+// 最早2025年5月，最晚当前月
+const MIN_YEAR = 2025
+const MIN_MONTH = 5
+const canPrev = computed(() => {
+  return currentYear.value > MIN_YEAR || (currentYear.value === MIN_YEAR && currentMonth.value > MIN_MONTH)
+})
+const canNext = computed(() => {
+  const now = new Date()
+  return currentYear.value < now.getFullYear() ||
+    (currentYear.value === now.getFullYear() && currentMonth.value < now.getMonth() + 1)
+})
+
 const prevMonth = () => {
+  if (!canPrev.value) return
   if (currentMonth.value === 1) {
     currentMonth.value = 12
     currentYear.value--
@@ -173,6 +186,7 @@ const prevMonth = () => {
 }
 
 const nextMonth = () => {
+  if (!canNext.value) return
   if (currentMonth.value === 12) {
     currentMonth.value = 1
     currentYear.value++
@@ -275,6 +289,15 @@ onMounted(() => {
 
 .nav-btn:hover {
   background: #e0e0e0;
+}
+
+.nav-btn.disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.nav-btn.disabled:hover {
+  background: #f0f0f0;
 }
 
 .month-label {
