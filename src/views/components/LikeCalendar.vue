@@ -30,6 +30,10 @@
           <span class="stat-label">历史</span>
           <span class="stat-value">{{ stats.total }}</span>
         </div>
+        <div class="stat-item" v-if="daysSinceLastLike !== null">
+          <span class="stat-label">距上次</span>
+          <span class="stat-value" :class="{ 'orange': daysSinceLastLike >= 7 }">{{ daysSinceLastLike }}天</span>
+        </div>
       </div>
 
       <!-- 星期头部 -->
@@ -92,6 +96,17 @@ const stats = ref({
   monthly: []
 })
 
+// 距离上次点赞过去多少天
+const daysSinceLastLike = computed(() => {
+  if (!stats.value.lastLikeDate) return null
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const lastDate = new Date(stats.value.lastLikeDate)
+  lastDate.setHours(0, 0, 0, 0)
+  const diff = Math.floor((today - lastDate) / (1000 * 60 * 60 * 24))
+  return diff
+})
+
 // 计算当月1号是星期几（0=周日）
 const firstDayOffset = computed(() => {
   return new Date(currentYear.value, currentMonth.value - 1, 1).getDay()
@@ -105,11 +120,19 @@ const getDayCount = (day) => {
 
 // 获取当天样式类
 const getDayClass = (day) => {
+  const today = new Date()
+  const isToday = currentYear.value === today.getFullYear() &&
+    currentMonth.value === today.getMonth() + 1 &&
+    day === today.getDate()
   const cnt = getDayCount(day)
-  if (cnt === 0) return ''
-  if (cnt >= 5) return 'heat-high'
-  if (cnt >= 3) return 'heat-mid'
-  return 'heat-low'
+  const classes = []
+  if (isToday) classes.push('today')
+  if (cnt === 0 && !isToday) return ''
+  if (cnt === 0 && isToday) return classes.join(' ')
+  if (cnt >= 5) classes.push('heat-high')
+  else if (cnt >= 3) classes.push('heat-mid')
+  else classes.push('heat-low')
+  return classes.join(' ')
 }
 
 const getDayTitle = (day) => {
@@ -291,6 +314,10 @@ onMounted(() => {
   color: #e74c3c;
 }
 
+.stat-value.orange {
+  color: #e67e22;
+}
+
 .weekdays {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
@@ -338,6 +365,15 @@ onMounted(() => {
   padding: 0 3px;
   line-height: 14px;
   margin-top: 1px;
+}
+
+/* 当前日期 */
+.day-cell.today {
+  border: 2px solid #3498db;
+  font-weight: bold;
+}
+.day-cell.today .day-num {
+  color: #3498db;
 }
 
 /* 热度颜色 */
