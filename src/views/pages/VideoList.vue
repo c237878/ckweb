@@ -202,7 +202,10 @@ onMounted(async () => {
   // 恢复筛选状态
   const saved = loadFilterState(STORAGE_KEY)
   if (saved) {
-    if (saved.filters) filters.value = { ...filters.value, ...saved.filters }
+    if (saved.filters) {
+      const { keyword, ...rest } = saved.filters
+      filters.value = { ...filters.value, ...rest }
+    }
     if (saved.page) page.value = saved.page
     if (saved.seriesInput !== undefined) seriesInput.value = saved.seriesInput || ''
   }

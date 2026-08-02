@@ -117,7 +117,7 @@ const filters = ref({ country: '', sortBy: '' })
 const selectedIds = ref([])
 
 // 持久化
-watch(filters, () => saveFilterState(STORAGE_KEY, { filters: filters.value, page: page.value, keyword: keyword.value }), { deep: true })
+watch(filters, () => saveFilterState(STORAGE_KEY, { filters: filters.value, page: page.value }), { deep: true })
 
 const isAllSelected = computed(() => {
   return actors.value.length > 0 && selectedIds.value.length === actors.value.length
@@ -179,7 +179,7 @@ const loadActors = async () => {
 
 const handleSearch = () => {
   page.value = 1
-  saveFilterState(STORAGE_KEY, { filters: filters.value, page: page.value, keyword: keyword.value })
+  saveFilterState(STORAGE_KEY, { filters: filters.value, page: page.value })
   loadActors()
 }
 
@@ -194,7 +194,7 @@ const handleGotoPage = () => {
 
 const changePage = (newPage) => {
   page.value = newPage
-  saveFilterState(STORAGE_KEY, { filters: filters.value, page: page.value, keyword: keyword.value })
+  saveFilterState(STORAGE_KEY, { filters: filters.value, page: page.value })
   loadActors()
 }
 
@@ -251,7 +251,6 @@ onMounted(async () => {
   if (saved) {
     if (saved.filters) filters.value = { ...filters.value, ...saved.filters }
     if (saved.page) page.value = saved.page
-    if (saved.keyword !== undefined) keyword.value = saved.keyword || ''
   }
 
   try {
