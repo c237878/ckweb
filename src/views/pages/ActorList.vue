@@ -55,13 +55,11 @@
             <div class="info-row">
               <span class="name">{{ actor.name }}</span>
               <div class="right-tags">
-                  <span v-if="actor.country" class="country-tag">{{ actor.country }}</span>
                   <span v-if="actor.likeCount > 0" class="like-count">♥ {{ actor.likeCount }}</span>
                   <span v-if="actor.videoCount > 0" class="video-count">{{ actor.videoCount }} 部</span>
+                  <span v-if="actor.country" class="country-tag">{{ actor.country }}</span>
+                  <span v-if="actor.unloadedCount > 0" class="unloaded-badge" title="有 {{ actor.unloadedCount }} 部未下载">⬇{{ actor.unloadedCount }}</span>
                 </div>
-            </div>
-            <div class="info-row bio-row" v-if="actor.bio">
-              <span class="bio">{{ actor.bio }}</span>
             </div>
           </div>
         </div>
@@ -452,7 +450,8 @@ onMounted(async () => {
 
 .info-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  flex-direction: column;
   gap: 6px;
   overflow: hidden;
 }
@@ -576,5 +575,21 @@ onMounted(async () => {
     gap: 12px;
     align-items: flex-start;
   }
+}
+
+.unloaded-badge {
+  font-size: 12px;
+  color: #fff;
+  background: #e74c3c;
+  padding: 2px 8px;
+  border-radius: 3px;
+  white-space: nowrap;
+  font-weight: 600;
+  animation: pulse-badge 2s ease-in-out infinite;
+}
+
+@keyframes pulse-badge {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
 }
 </style>
