@@ -14,7 +14,9 @@
 
     <!-- 分类展示（按配置显示） -->
     <section class="section" v-for="cat in categories" :key="cat.name">
-      <h2 class="section-title">{{ cat.name }}</h2>
+      <div class="section-header">
+        <h2 class="section-title">{{ cat.name }}</h2>
+      </div>
       <div class="video-grid">
         <VideoCard v-for="video in cat.videos" :key="video.id" :video="video" mode="display" />
         <div v-if="cat.videos.length === 0" class="empty-hint">暂无 {{ cat.name }} 影片</div>
