@@ -25,7 +25,7 @@
         @click="goToDetail(comic.id)"
       >
         <div class="card-cover">
-          <img v-if="comic.coverPath" :src="'/api/comic/image/cover/' + encodeURIComponent(comic.coverPath)" @error="handleImgError" alt="封面" />
+          <img v-if="comic.coverPath" :src="comicApi.getCoverUrl(comic.coverPath)" @error="handleImgError" alt="封面" />
           <div v-else class="cover-placeholder">📖</div>
         </div>
         <div class="card-info">

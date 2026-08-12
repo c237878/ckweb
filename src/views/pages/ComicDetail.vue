@@ -425,7 +425,11 @@ const refreshImage = (img) => {
   img.isDecrypted = true
   nextTick(() => {
     const el = document.querySelector(`.image-item[data-filename="${img.fileName}"] img`)
-    if (el) el.src = getImageUrl(img) + '&_=' + Date.now()
+    if (el) {
+      const baseUrl = getImageUrl(img)
+      const sep = baseUrl.includes('?') ? '&' : '?'
+      el.src = baseUrl + sep + '_=' + Date.now()
+    }
   })
 }
 
@@ -440,7 +444,9 @@ const openViewer = (idx) => {
 const updateViewerImage = () => {
   const img = filteredImages.value[viewer.value.index]
   if (!img) return
-  viewer.value.currentSrc = getImageUrl(img) + '&_=' + Date.now()
+  const baseUrl = getImageUrl(img)
+  const sep = baseUrl.includes('?') ? '&' : '?'
+  viewer.value.currentSrc = baseUrl + sep + '_=' + Date.now()
   viewer.value.currentDecrypted = img.isDecrypted
 }
 

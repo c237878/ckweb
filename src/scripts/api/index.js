@@ -54,7 +54,7 @@ export const comicApi = {
   decryptBatch: (data) => api.post('/comic/decrypt/batch', data),
   // 图片访问
   getImageUrl: (chapterId, fileName) => `/api/comic/image/${chapterId}/${encodeURIComponent(fileName)}`,
-  getCoverUrl: (coverPath) => `/api/comic/image/cover/${encodeURIComponent(coverPath)}`
+  getCoverUrl: (coverPath) => `/api/comic/image/cover/${encodeURI(coverPath)}`
 }
 
 // 视频相关API
