@@ -37,7 +37,7 @@
         <input v-model="form.link" type="url" placeholder="系列链接（可选）" />
       </div>
     </template>
-    <template #actions>
+    <template #extra-actions>
       <button v-if="editingSeries" class="delete-btn" @click="handleDelete">删除</button>
     </template>
   </Dialog>

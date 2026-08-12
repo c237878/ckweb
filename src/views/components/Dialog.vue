@@ -4,7 +4,11 @@
       <h3>{{ title }}</h3>
       <slot name="content"></slot>
       <div class="dialog-actions">
-        <slot name="actions"></slot>
+        <slot name="extra-actions"></slot>
+        <slot name="actions">
+          <button class="cancel-btn" @click="handleCancel">取消</button>
+          <button class="confirm-btn" @click="handleConfirm">保存</button>
+        </slot>
       </div>
     </div>
   </div>
