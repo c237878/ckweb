@@ -37,6 +37,26 @@ api.interceptors.response.use(
   }
 )
 
+// 漫画相关API
+export const comicApi = {
+  getList: (params) => api.get('/comic/list', { params }),
+  getDetail: (id) => api.get(`/comic/${id}`),
+  add: (data) => api.post('/comic/add', data),
+  update: (id, data) => api.put(`/comic/${id}`, data),
+  delete: (id) => api.delete(`/comic/${id}`),
+  // 章节
+  addChapter: (comicId, data) => api.post(`/comic/${comicId}/chapters`, data),
+  updateChapter: (chapterId, data) => api.put(`/comic/chapter/${chapterId}`, data),
+  deleteChapter: (chapterId) => api.delete(`/comic/chapter/${chapterId}`),
+  getChapterImages: (chapterId) => api.get(`/comic/chapter/${chapterId}/images`),
+  // 解密
+  decryptImage: (data) => api.post('/comic/decrypt/image', data),
+  decryptBatch: (data) => api.post('/comic/decrypt/batch', data),
+  // 图片访问
+  getImageUrl: (chapterId, fileName) => `/api/comic/image/${chapterId}/${encodeURIComponent(fileName)}`,
+  getCoverUrl: (coverPath) => `/api/comic/image/cover/${encodeURIComponent(coverPath)}`
+}
+
 // 视频相关API
 export const videoApi = {
   getList: (params) => api.get('/video/list', { params }),

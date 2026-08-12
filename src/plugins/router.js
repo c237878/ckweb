@@ -8,6 +8,8 @@ import SeriesList from '@/views/pages/SeriesList.vue'
 import SeriesDetail from '@/views/pages/SeriesDetail.vue'
 import Settings from '@/views/pages/Settings.vue'
 import Highlights from '@/views/pages/Highlights.vue'
+import ComicList from '@/views/pages/ComicList.vue'
+import ComicDetail from '@/views/pages/ComicDetail.vue'
 
 const routes = [
   {
@@ -49,6 +51,16 @@ const routes = [
     path: '/highlights',
     name: 'Highlights',
     component: Highlights
+  },
+  {
+    path: '/comics',
+    name: 'ComicList',
+    component: ComicList
+  },
+  {
+    path: '/comic/:id',
+    name: 'ComicDetail',
+    component: ComicDetail
   },
   {
     path: '/settings',

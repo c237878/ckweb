@@ -5,9 +5,6 @@
       <slot name="content"></slot>
       <div class="dialog-actions">
         <slot name="actions"></slot>
-        <button class="cancel-btn" @click="handleCancel">取消</button>
-        <button class="confirm-btn" @click="handleConfirm">保存</button>
-        <slot name="extra-actions"></slot>
       </div>
     </div>
   </div>
@@ -21,7 +18,7 @@ const props = defineProps({
   title: String
 })
 
-const emit = defineEmits(['confirm', 'cancel'])
+const emit = defineEmits(['update:visible', 'confirm', 'cancel'])
 
 // 与 logbot AddExpense.vue 完全一致的写法
 // 关键：不在 click 里重置 flag，让它保持到下次 mousedown 再覆盖
@@ -38,10 +35,12 @@ function handleOverlayClick() {
 
 const handleConfirm = () => {
   emit('confirm')
+  emit('update:visible', false)
 }
 
 const handleCancel = () => {
   emit('cancel')
+  emit('update:visible', false)
 }
 </script>
 
