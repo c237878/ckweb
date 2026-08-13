@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <Dialog
     :visible="visible"
     :title="editingComic ? '编辑漫画' : '添加漫画'"
@@ -40,8 +40,8 @@
               class="input textarea"
               rows="3"
               maxlength="500"
-            ></textarea>
-            <span class="char-count">{{ draft.description?.length || 0 }} / 500</span>
+              style="resize:none">
+            </textarea>
           </div>
         </section>
 

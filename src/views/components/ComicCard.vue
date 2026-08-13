@@ -28,18 +28,19 @@
       </div>
     </div>
 
-    <div class="card-actions" @click.stop>
+    <CardActions @click.stop>
       <slot name="actions">
-        <button class="btn btn-sm btn-primary" @click="$emit('edit', comic)">编辑</button>
-        <button class="btn btn-sm btn-danger" @click="$emit('delete', comic)">删除</button>
+        <button class="btn btn-primary" @click="$emit('edit', comic)">编辑</button>
+        <button class="btn btn-danger" @click="$emit('delete', comic)">删除</button>
       </slot>
-    </div>
+    </CardActions>
   </div>
 </template>
 
 <script setup>
 import { computed, ref } from 'vue'
 import { comicApi } from '@/scripts/api'
+import CardActions from '@/views/components/CardActions.vue'
 
 const props = defineProps({
   comic: {
@@ -161,43 +162,4 @@ const coverUrl = computed(() => {
   background: #f5f5f5;
   border-radius: 3px;
 }
-
-.card-actions {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 16px;
-  border-top: 1px solid #f0f0f0;
-}
-
-.btn {
-  border: 1px solid #ddd;
-  background: #fff;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 12px;
-}
-
-.btn-sm {
-  font-size: 12px;
-}
-
-.btn-primary {
-  padding: 5px 14px;
-  background: #3498db;
-  color: white;
-  border-color: #3498db;
-}
-
-.btn-primary:hover { background: #2980b9; }
-
-.btn-danger {
-  padding: 5px 14px;
-  background: #e74c3c;
-  color: white;
-  border-color: #e74c3c;
-}
-
-.btn-danger:hover { background: #c0392b; }
 </style>
