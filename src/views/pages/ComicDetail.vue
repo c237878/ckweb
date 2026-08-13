@@ -8,6 +8,7 @@
         <span class="author" v-if="comic.author">作者：{{ comic.author }}</span>
       </div>
       <div class="header-actions">
+        <button class="btn" @click="refreshImages" :disabled="refreshing" title="重新加载章节图片，清除浏览器缓存">{{ refreshing ? '刷新中...' : '🔄 刷新' }}</button>
         <button class="btn btn-primary" @click="showEdit = true">编辑</button>
         <button class="btn btn-danger" @click="handleDelete">删除</button>
       </div>
@@ -301,6 +302,7 @@ const images = ref([])
 const decryptConfig = ref({ rows: 3, order: [2, 0, 1], overwrite: true })
 const orderText = ref('2,0,1')        // 文本形式绑定
 const decrypting = ref(false)
+const refreshing = ref(false)
 
 const viewer = ref({ show: false, index: 0, currentSrc: '', currentDecrypted: false })
 
@@ -408,6 +410,29 @@ const selectChapter = async (ch) => {
   }
 }
 
+const refreshImages = async () => {
+  if (!currentChapter.value) return
+  refreshing.value = true
+  try {
+    // 重新获取章节图片列表（后端会重新扫描目录）
+    const res = await comicApi.getChapterImages(currentChapter.value.id)
+    if (res.success) {
+      images.value = res.data.images || []
+      // 强制刷新所有图片 src（带新时间戳）
+      nextTick(() => {
+        document.querySelectorAll('.image-item img').forEach(el => {
+          const src = el.src.split('?')[0]
+          el.src = src + '?t=' + Date.now()
+        })
+      })
+    }
+  } catch (error) {
+    alert('刷新失败：' + (error.message || error))
+  } finally {
+    refreshing.value = false
+  }
+}
+
 // ---------- 章节操作 ----------
 const openEditChapter = (ch) => {
   editingChapter.value = ch
@@ -478,8 +503,10 @@ const deleteChapter = async (ch) => {
 const getImageUrl = (img) => {
   const base = comicApi.getImageUrl(currentChapter.value.id, img.fileName)
   const sep = base.includes('?') ? '&' : '?'
-  const t = `_${Date.now()}`
-  return img.isDecrypted ? base + sep + 'decrypted=1' + t : base
+  if (img.isDecrypted) {
+    return base + sep + 'decrypted=1&t=' + Date.now()
+  }
+  return base + sep + 't=' + Date.now()
 }
 
 const refreshImage = (img) => {
