@@ -298,8 +298,8 @@ const editForm = ref({ name: '', author: '', description: '', url: '', directory
 const chapterForm = ref({ title: '', directory: '' })
 const images = ref([])
 
-const decryptConfig = ref({ rows: 3, order: [2, 0, 1], overwrite: true })
-const orderText = ref('2,0,1')        // 文本形式绑定
+const decryptConfig = ref({ rows: 3, order: [2, 1, 0], overwrite: true })
+const orderText = ref('2,1,0')        // 文本形式绑定
 const decrypting = ref(false)
 const refreshing = ref(false)
 
@@ -369,13 +369,9 @@ const applyOrderText = () => {
 const syncOrderLength = () => {
   const len = Math.max(2, decryptConfig.value.rows)
   decryptConfig.value.rows = len
-  const arr = decryptConfig.value.order
-  if (arr.length < len) {
-    while (arr.length < len) arr.push(arr.length % len)
-  } else {
-    arr.splice(len)
-  }
-  orderText.value = arr.join(',')
+  // 默认从大到小排列，例如 rows=3 → [2,1,0]
+  decryptConfig.value.order = Array.from({ length: len }, (_, i) => len - 1 - i)
+  orderText.value = decryptConfig.value.order.join(',')
 }
 
 // ---------- 加载 ----------
