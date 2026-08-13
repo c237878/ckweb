@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="comic-list">
     <div class="list-header">
       <h1>漫画管理</h1>
@@ -18,28 +18,19 @@
     </div>
 
     <div class="comic-grid" v-if="comicList.length > 0">
-      <div
-        class="comic-card"
+      <ComicCard
         v-for="comic in comicList"
         :key="comic.id"
-        @click="goToDetail(comic.id)"
+        :comic="comic"
+        @click="goToDetail"
+        @edit="handleEdit"
+        @delete="handleDelete"
       >
-        <div class="card-cover">
-          <img v-if="comic.coverPath" :src="comicApi.getCoverUrl(comic.coverPath)" @error="handleImgError" alt="封面" />
-          <div v-else class="cover-placeholder">📖</div>
-        </div>
-        <div class="card-info">
-          <div class="comic-name">{{ comic.name }}</div>
-          <div class="comic-author" v-if="comic.author">{{ comic.author }}</div>
-          <div class="comic-meta">
-            <span class="chapter-count">{{ comic.chapterCount }} 章</span>
-          </div>
-        </div>
-        <div class="card-actions" @click.stop>
+        <template #actions>
           <button class="btn btn-sm btn-primary" @click="handleEdit(comic)">编辑</button>
           <button class="btn btn-sm btn-danger" @click="handleDelete(comic)">删除</button>
-        </div>
-      </div>
+        </template>
+      </ComicCard>
     </div>
 
     <div class="empty-hint" v-if="comicList.length === 0 && !loading">
@@ -99,6 +90,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { comicApi } from '@/scripts/api'
 import Dialog from '@/views/components/Dialog.vue'
+import ComicCard from '@/views/components/ComicCard.vue'
 
 const router = useRouter()
 const comicList = ref([])
@@ -147,8 +139,8 @@ const changePage = (p) => {
   loadComics()
 }
 
-const goToDetail = (id) => {
-  router.push(`/comic/${id}`)
+const goToDetail = (comic) => {
+  router.push(`/comic/${comic.id}`)
 }
 
 const handleAdd = () => {
@@ -203,10 +195,6 @@ const handleDelete = async (comic) => {
 const handleCancel = () => {
   showDialog.value = false
   editingComic.value = null
-}
-
-const handleImgError = (e) => {
-  e.target.style.display = 'none'
 }
 
 onMounted(() => {
@@ -288,116 +276,6 @@ onMounted(() => {
   gap: 16px;
 }
 
-.comic-card {
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-  overflow: hidden;
-  cursor: pointer;
-  transition: box-shadow 0.3s;
-  display: flex;
-  flex-direction: column;
-}
-
-.comic-card:hover {
-  box-shadow: 0 4px 16px rgba(0,0,0,0.18);
-}
-
-.card-cover {
-  width: 100%;
-  aspect-ratio: 6/4;
-  overflow: hidden;
-  background: #f0f0f0;
-  position: relative;
-}
-
-.card-cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.cover-placeholder {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 48px;
-  background: #e8e8e8;
-}
-
-.card-info {
-  padding: 12px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  flex: 1;
-}
-
-.comic-name {
-  font-size: 15px;
-  font-weight: bold;
-  color: #333;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.comic-author {
-  font-size: 12px;
-  color: #888;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.chapter-count {
-  font-size: 12px;
-  color: #666;
-  background: #f5f5f5;
-  border-radius: 3px;
-}
-
-.card-actions {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 16px;
-  border-top: 1px solid #f0f0f0;
-}
-
-.btn {
-  border: 1px solid #ddd;
-  background: #fff;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 12px;
-}
-
-.btn-sm {
-  font-size: 12px;
-}
-
-.btn-primary {
-  padding: 5px 14px;
-  background: #3498db;
-  color: white;
-  border-color: #3498db;
-}
-
-.btn-primary:hover { background: #2980b9; }
-
-.btn-danger {
-  padding: 5px 14px;
-  background: #e74c3c;
-  color: white;
-  border-color: #e74c3c;
-}
-
-.btn-danger:hover { background: #c0392b; }
-
 .empty-hint {
   text-align: center;
   color: #999;
@@ -409,6 +287,7 @@ onMounted(() => {
   color: #888;
 }
 
+/* 分页器 */
 .pagination {
   display: flex;
   justify-content: center;
@@ -454,7 +333,7 @@ onMounted(() => {
   color: #666;
 }
 
-/* Dialog form styles */
+/* 对话框表单 */
 .form-group {
   margin-bottom: 16px;
 }
@@ -492,6 +371,24 @@ onMounted(() => {
   color: #999;
   font-size: 12px;
 }
+
+/* Dialog 按钮 */
+.btn {
+  border: 1px solid #ddd;
+  background: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 5px 14px;
+}
+
+.btn-primary {
+  background: #3498db;
+  color: white;
+  border-color: #3498db;
+}
+
+.btn-primary:hover { background: #2980b9; }
 
 @media (max-width: 1024px) {
   .comic-grid { grid-template-columns: repeat(3, 1fr); }
