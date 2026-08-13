@@ -671,7 +671,7 @@ onUnmounted(() => {
   white-space: nowrap;
   flex-shrink: 0;
   transition: border-color 0.2s, background 0.2s, color 0.2s;
-  min-width: 60px;
+  min-width: 120px;
 }
 
 .chapter-tab:hover { border-color: #3498db; background: #f0f7ff; }
