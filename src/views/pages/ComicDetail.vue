@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="comic-detail" v-if="comic">
     <!-- 头部 -->
     <div class="detail-header">
@@ -31,6 +31,11 @@
 
     <!-- 章节标签 + 图片区 -->
     <div class="main-area">
+      <!-- 添加章节按钮（独立一行） -->
+      <div class="chapter-add-row">
+        <button class="btn btn-primary btn-sm" @click="showAddChapter = true">+ 添加章节</button>
+      </div>
+
       <!-- 章节标签栏 -->
       <div class="chapter-tabs">
         <div class="chapter-tabs-inner">
@@ -43,17 +48,18 @@
             :title="ch.title"
           >
             <span class="tab-title">{{ ch.title }}</span>
-            <span class="tab-count">{{ ch.imageCount }}</span>
+            <span class="tab-count">{{ ch.imageCount }} 图</span>
+            <div class="tab-actions" @click.stop>
+              <button class="tab-action" title="编辑" @click.stop="openEditChapter(ch)">✎</button>
+              <button class="tab-action tab-action-danger" title="删除" @click.stop="deleteChapter(ch)">✕</button>
+            </div>
           </button>
         </div>
-        <button class="btn btn-primary btn-sm tab-add-btn" @click="showAddChapter = true" title="添加章节">
-          + 章节
-        </button>
       </div>
 
       <!-- 无章节提示 -->
       <div class="no-chapter-hint" v-if="chapters.length === 0">
-        暂无章节， 点击右上角"+ 章节"添加
+        暂无章节， 点击上方"+ 添加章节"按钮新增
       </div>
 
       <!-- 无选中章节提示 -->
@@ -237,16 +243,6 @@
       </template>
     </Dialog>
 
-    <!-- 章节右键菜单 -->
-    <div
-      class="chapter-context-menu"
-      v-if="ctxMenu.show"
-      :style="{ top: ctxMenu.y + 'px', left: ctxMenu.x + 'px' }"
-      @click.stop
-    >
-      <button class="ctx-item" @click="ctxEditChapter">✏ 编辑</button>
-      <button class="ctx-item ctx-danger" @click="ctxDeleteChapter">🗑 删除</button>
-    </div>
   </div>
 
   <div class="loading" v-else-if="loading">加载中…</div>
@@ -282,8 +278,6 @@ const decrypting = ref(false)
 
 const viewer = ref({ show: false, index: 0, currentSrc: '', currentDecrypted: false })
 
-// 章节右键菜单
-const ctxMenu = ref({ show: false, x: 0, y: 0, chapter: null })
 
 const filteredImages = computed(() => {
   return showDecryptedOnly.value
@@ -338,7 +332,6 @@ const selectChapter = async (ch) => {
   currentChapter.value = ch
   showDecryptedOnly.value = false
   viewer.value.show = false
-  ctxMenu.value.show = false
   try {
     const res = await comicApi.getChapterImages(ch.id)
     if (res.success) images.value = res.data.images || []
@@ -412,24 +405,6 @@ const deleteChapter = async (ch) => {
     alert('删除章节失败：' + (error.message || error))
   }
 }
-
-// ---------- 右键菜单 ----------
-const openCtxMenu = (e, ch) => {
-  e.preventDefault()
-  ctxMenu.value = { show: true, x: e.clientX, y: e.clientY, chapter: ch }
-}
-
-const ctxEditChapter = () => {
-  ctxMenu.value.show = false
-  openEditChapter(ctxMenu.value.chapter)
-}
-
-const ctxDeleteChapter = () => {
-  ctxMenu.value.show = false
-  deleteChapter(ctxMenu.value.chapter)
-}
-
-const closeCtxMenu = () => { ctxMenu.value.show = false }
 
 // ---------- 解密 ----------
 const getImageUrl = (img) => {
@@ -567,12 +542,10 @@ watch(showEdit, (val) => {
 onMounted(() => {
   loadComic()
   window.addEventListener('keydown', handleKeydown)
-  window.addEventListener('click', closeCtxMenu)
 })
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
-  window.removeEventListener('click', closeCtxMenu)
 })
 </script>
 
@@ -599,7 +572,6 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 16px;
-  padding-bottom: 20px;
   border-bottom: 1px solid #eee;
 }
 
@@ -725,7 +697,9 @@ onUnmounted(() => {
 
 .chapter-tab.active .tab-count { opacity: 0.85; }
 
-.tab-add-btn { flex-shrink: 0; }
+.chapter-tab {
+  position: relative;
+}
 
 /* 无章节/无选中提示 */
 .no-chapter-hint {
@@ -955,34 +929,41 @@ onUnmounted(() => {
   text-align: center;
 }
 
-/* ---------- 右键菜单 ---------- */
-.chapter-context-menu {
-  position: fixed;
-  background: #fff;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
-  padding: 4px;
-  z-index: 8888;
-  min-width: 120px;
+/* 标签操作按钮（显式展示） */
+.tab-actions {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  display: flex;
+  gap: 2px;
 }
 
-.ctx-item {
-  display: block;
-  width: 100%;
-  padding: 8px 16px;
-  background: none;
+.tab-action {
+  width: 18px;
+  height: 18px;
   border: none;
-  border-radius: 5px;
+  border-radius: 4px;
+  background: rgba(0,0,0,0.06);
+  color: #555;
+  font-size: 11px;
+  line-height: 1;
+  padding: 0;
   cursor: pointer;
-  text-align: left;
-  font-size: 13px;
-  color: #333;
-  transition: background 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
 }
-.ctx-item:hover { background: #f5f5f5; }
-.ctx-danger { color: #e74c3c; }
-.ctx-danger:hover { background: #fdf0ef; }
+
+.tab-action:hover { background: rgba(0,0,0,0.12); color: #222; }
+.tab-action-danger:hover { background: #e74c3c; color: #fff; }
+
+.chapter-tab.active .tab-actions .tab-action {
+  background: rgba(255,255,255,0.25);
+  color: #fff;
+}
+.chapter-tab.active .tab-actions .tab-action:hover { background: rgba(255,255,255,0.4); }
+.chapter-tab.active .tab-actions .tab-action-danger:hover { background: #fff; color: #e74c3c; }
 
 /* ---------- 通用按钮 ---------- */
 .btn {
