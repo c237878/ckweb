@@ -49,39 +49,13 @@
     </div>
 
     <!-- 添加/编辑对话框 -->
-    <Dialog :visible="showDialog" :title="editingComic ? '编辑漫画' : '添加漫画'" @cancel="handleCancel" @confirm="handleSave">
-      <template #content>
-        <div class="form-group">
-          <label>名称 *</label>
-          <input v-model="form.name" type="text" placeholder="漫画名称" />
-        </div>
-        <div class="form-group">
-          <label>作者</label>
-          <input v-model="form.author" type="text" placeholder="作者" />
-        </div>
-        <div class="form-group">
-          <label>介绍</label>
-          <textarea v-model="form.description" placeholder="简介" rows="3"></textarea>
-        </div>
-        <div class="form-group">
-          <label>链接</label>
-          <input v-model="form.url" type="text" placeholder="外部链接（可选）" />
-        </div>
-        <div class="form-group">
-          <label>封面路径</label>
-          <input v-model="form.coverPath" type="text" placeholder="封面图片路径（可选）" />
-        </div>
-        <div class="form-group">
-          <label>目录</label>
-          <input v-model="form.directory" type="text" placeholder="漫画根目录路径" />
-          <small>章节图片所在目录</small>
-        </div>
-      </template>
-      <template #actions>
-        <button class="btn" @click="handleCancel">取消</button>
-        <button class="btn btn-primary" @click="handleSave">保存</button>
-      </template>
-    </Dialog>
+    <ComicFormDialog
+      :visible="showDialog"
+      :editing-comic="editingComic"
+      @update:visible="showDialog = $event"
+      @save="handleSave"
+      @cancel="handleCancel"
+    />
   </div>
 </template>
 
@@ -89,8 +63,8 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { comicApi } from '@/scripts/api'
-import Dialog from '@/views/components/Dialog.vue'
 import ComicCard from '@/views/components/ComicCard.vue'
+import ComicFormDialog from '@/views/components/ComicFormDialog.vue'
 
 const router = useRouter()
 const comicList = ref([])
@@ -101,7 +75,6 @@ const keyword = ref('')
 const loading = ref(false)
 const showDialog = ref(false)
 const editingComic = ref(null)
-const form = ref({ name: '', author: '', description: '', url: '', coverPath: '', directory: '' })
 const gotoVal = ref()
 
 const loadComics = async () => {
@@ -145,33 +118,20 @@ const goToDetail = (comic) => {
 
 const handleAdd = () => {
   editingComic.value = null
-  form.value = { name: '', author: '', description: '', url: '', coverPath: '', directory: '' }
   showDialog.value = true
 }
 
 const handleEdit = (comic) => {
   editingComic.value = comic
-  form.value = {
-    name: comic.name || '',
-    author: comic.author || '',
-    description: comic.description || '',
-    url: comic.url || '',
-    coverPath: comic.coverPath || '',
-    directory: comic.directory || ''
-  }
   showDialog.value = true
 }
 
-const handleSave = async () => {
-  if (!form.value.name?.trim()) {
-    alert('名称不能为空')
-    return
-  }
+const handleSave = async (form) => {
   try {
     if (editingComic.value?.id) {
-      await comicApi.update(editingComic.value.id, form.value)
+      await comicApi.update(editingComic.value.id, form)
     } else {
-      await comicApi.add(form.value)
+      await comicApi.add(form)
     }
   } catch (error) {
     alert('保存失败：' + (error.message || error))
@@ -192,10 +152,7 @@ const handleDelete = async (comic) => {
   }
 }
 
-const handleCancel = () => {
-  showDialog.value = false
-  editingComic.value = null
-}
+
 
 onMounted(() => {
   loadComics()
@@ -333,62 +290,6 @@ onMounted(() => {
   color: #666;
 }
 
-/* 对话框表单 */
-.form-group {
-  margin-bottom: 16px;
-}
-
-.form-group label {
-  display: block;
-  font-size: 14px;
-  font-weight: 500;
-  color: #333;
-  margin-bottom: 6px;
-}
-
-.form-group input,
-.form-group textarea {
-  width: 100%;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  font-size: 14px;
-  box-sizing: border-box;
-}
-
-.form-group input:focus,
-.form-group textarea:focus {
-  outline: none;
-  border-color: #3498db;
-}
-
-.form-group textarea {
-  resize: vertical;
-}
-
-.form-group small {
-  display: block;
-  margin-top: 4px;
-  color: #999;
-  font-size: 12px;
-}
-
-/* Dialog 按钮 */
-.btn {
-  border: 1px solid #ddd;
-  background: #fff;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 12px;
-  padding: 5px 14px;
-}
-
-.btn-primary {
-  background: #3498db;
-  color: white;
-  border-color: #3498db;
-}
-
-.btn-primary:hover { background: #2980b9; }
 
 @media (max-width: 1024px) {
   .comic-grid { grid-template-columns: repeat(3, 1fr); }
