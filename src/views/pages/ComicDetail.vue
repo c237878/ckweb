@@ -537,16 +537,16 @@ onMounted(() => {
 .comic-detail {
   max-width: 1400px;
   margin: 0 auto;
-  padding: 0 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
 .detail-header {
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 16px 0;
   border-bottom: 1px solid #eee;
-  margin-bottom: 16px;
 }
 
 .back-btn {
@@ -573,22 +573,21 @@ onMounted(() => {
 
 .header-actions {
   display: flex;
-  gap: 8px;
+  gap: 6px;
 }
 
 .comic-info {
   background: #f9f9f9;
   border-radius: 8px;
   padding: 16px;
-  margin-bottom: 16px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .info-row {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   font-size: 14px;
 }
 
@@ -598,15 +597,11 @@ onMounted(() => {
 .link:hover { text-decoration: underline; }
 
 /* 章节 */
-.chapter-section {
-  margin-bottom: 20px;
-}
 
 .chapter-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 12px;
 }
 
 .chapter-header h3 {
@@ -618,7 +613,7 @@ onMounted(() => {
 .chapter-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .chapter-item {
@@ -674,13 +669,11 @@ onMounted(() => {
 /* 图片区 */
 .viewer-section { margin-top: 8px; }
 
-.viewer-header { margin-bottom: 12px; }
-
 .decrypt-config {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
   font-size: 14px;
   color: #555;
   background: #f5f7fa;
@@ -713,7 +706,6 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 12px;
 }
 
 .chapter-name {
@@ -912,14 +904,12 @@ onMounted(() => {
 }
 
 /* Dialog form */
-.form-group { margin-bottom: 14px; }
 
 .form-group label {
   display: block;
   font-size: 13px;
   font-weight: 500;
   color: #555;
-  margin-bottom: 5px;
 }
 
 .form-group input,
