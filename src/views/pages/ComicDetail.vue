@@ -123,10 +123,16 @@
             <span class="chapter-name">{{ currentChapter.title }}</span>
             <span class="chapter-img-count">{{ filteredImages.length }} 图</span>
           </div>
-          <label class="show-decrypted-check">
-            <input type="checkbox" v-model="showDecryptedOnly" />
-            <span>仅显示已解密</span>
-          </label>
+          <div class="image-toolbar-filter">
+            <label class="show-decrypted-check">
+              <input type="checkbox" v-model="showDecryptedOnly" />
+              <span>仅显示已解密</span>
+            </label>
+            <label class="show-decrypted-check">
+              <input type="checkbox" v-model="showUndecryptedOnly" />
+              <span>仅显示未解密</span>
+            </label>
+          </div>
         </div>
 
         <div class="image-grid">
@@ -158,7 +164,7 @@
           </div>
 
           <div v-if="filteredImages.length === 0" class="empty-images">
-            <span>{{ showDecryptedOnly ? '当前目录下没有已解密图片' : '该章节暂无图片' }}</span>
+            <span>{{ '该章节暂无图片' }}</span>
           </div>
         </div>
       </div>
@@ -303,6 +309,7 @@ const showAddChapter = ref(false)
 const showEditChapter = ref(false)
 const editingChapter = ref(null)
 const showDecryptedOnly = ref(false)
+const showUndecryptedOnly = ref(false)
 
 const editChapterForm = ref({ title: '', directory: '', sortOrder: 0 })
 const editForm = ref({ name: '', author: '', description: '', url: '', directory: '' })
@@ -361,9 +368,12 @@ const togglePlay = () => {
 
 
 const filteredImages = computed(() => {
-  return showDecryptedOnly.value
-    ? images.value.filter(img => img.isDecrypted)
-    : images.value
+  if (showDecryptedOnly.value) {
+    return images.value.filter(img => img.isDecrypted)
+  } else if (showUndecryptedOnly.value) {
+    return images.value.filter(img => !img.isDecrypted)
+  }
+  return images.value;
 })
 
 const hasDecrypted = computed(() => images.value.some(img => img.isDecrypted))
@@ -410,6 +420,7 @@ const loadComic = async () => {
 const selectChapter = async (ch) => {
   currentChapter.value = ch
   showDecryptedOnly.value = false
+  showUndecryptedOnly.value = false
   viewer.value.show = false
   try {
     const res = await comicApi.getChapterImages(ch.id)
@@ -936,7 +947,8 @@ onUnmounted(() => {
 .overwrite-check input { cursor: pointer; }
 
 /* 图片工具栏 */
-.image-toolbar {
+.image-toolbar,
+.image-toolbar-filter {
   display: flex;
   align-items: center;
   justify-content: space-between;
