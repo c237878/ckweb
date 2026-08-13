@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="comic-list">
     <div class="list-header">
       <h1>漫画管理</h1>
@@ -273,7 +273,7 @@ onMounted(() => {
 
 .goto-input {
   width: 60px;
-  padding: 4px 8px;
+  padding: 10px 8px;
   border: 1px solid #ccc;
   border-radius: 4px;
   font-size: 13px;
