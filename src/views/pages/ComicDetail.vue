@@ -993,7 +993,7 @@ onUnmounted(() => {
 
 .viewer-content img {
   max-width: 100%;
-  max-height: calc(90vh - 110px);
+  max-height: calc(90vh - 50px);
   object-fit: contain;
   border-radius: 4px;
 }
@@ -1001,28 +1001,28 @@ onUnmounted(() => {
 .viewer-info {
   color: rgba(255,255,255,0.8);
   font-size: 14px;
-  margin-top: 12px;
+  margin-top: 6px;
   text-align: center;
 }
 
-/* 自动播放控制条 */
+/* 自动播放控制条（紧凑） */
 .viewer-controls {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 14px;
-  margin-top: 10px;
+  gap: 8px;
+  margin-top: 4px;
   flex-wrap: wrap;
+  justify-content: center;
 }
 
 .viewer-play-btn {
-  min-width: 72px;
-  padding: 8px 18px;
+  min-width: 56px;
+  padding: 4px 14px;
   border: none;
-  border-radius: 20px;
+  border-radius: 12px;
   background: rgba(255,255,255,0.2);
   color: #fff;
-  font-size: 14px;
+  font-size: 12px;
   cursor: pointer;
   transition: background 0.2s;
 }
@@ -1031,35 +1031,35 @@ onUnmounted(() => {
 .speed-control {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   color: rgba(255,255,255,0.85);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .speed-input {
-  width: 72px;
-  padding: 4px 8px;
+  width: 60px;
+  padding: 3px 6px;
   border: 1px solid rgba(255,255,255,0.3);
   border-radius: 4px;
   background: rgba(0,0,0,0.35);
   color: #fff;
-  font-size: 13px;
+  font-size: 12px;
   text-align: center;
 }
 .speed-input:focus { outline: none; border-color: #3498db; }
 
 .speed-presets {
   display: flex;
-  gap: 4px;
+  gap: 3px;
 }
 
 .speed-preset {
-  padding: 4px 10px;
+  padding: 3px 7px;
   border: 1px solid rgba(255,255,255,0.3);
   border-radius: 4px;
   background: transparent;
   color: rgba(255,255,255,0.85);
-  font-size: 12px;
+  font-size: 11px;
   cursor: pointer;
   transition: all 0.15s;
 }
