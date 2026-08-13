@@ -116,6 +116,10 @@ const goToDetail = (comic) => {
   router.push(`/comic/${comic.id}`)
 }
 
+const handleCancel = () => {
+  showDialog.value = false
+}
+
 const handleAdd = () => {
   editingComic.value = null
   showDialog.value = true
