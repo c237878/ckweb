@@ -167,6 +167,32 @@
           {{ viewer.index + 1 }} / {{ filteredImages.length }}
           <span v-if="viewer.currentDecrypted"> ✓ 已解密</span>
         </div>
+        <div class="viewer-controls">
+          <button class="viewer-play-btn" @click="togglePlay" :title="viewerPlaying ? '暂停' : '播放'">
+            {{ viewerPlaying ? '暂停' : '播放' }}
+          </button>
+          <div class="speed-control">
+            <span class="speed-label">间隔</span>
+            <input
+              v-model.number="playSpeed"
+              type="number"
+              min="100"
+              max="10000"
+              step="100"
+              class="speed-input"
+            />
+            <span class="speed-unit">ms</span>
+            <div class="speed-presets">
+              <button
+                v-for="s in [300, 500, 1000, 2000]"
+                :key="s"
+                class="speed-preset"
+                :class="{ active: playSpeed === s }"
+                @click="playSpeed = s"
+              >{{ s }}</button>
+            </div>
+          </div>
+        </div>
       </div>
       <button class="viewer-next" @click="nextImage" :disabled="viewer.index >= filteredImages.length - 1">▶</button>
     </div>
@@ -277,6 +303,48 @@ const orderText = ref('2,0,1')        // 文本形式绑定
 const decrypting = ref(false)
 
 const viewer = ref({ show: false, index: 0, currentSrc: '', currentDecrypted: false })
+
+// ---------- 自动播放 ----------
+const viewerPlaying = ref(false)
+const playSpeed = ref(1000) // 毫秒，最小粒度 100ms
+let playTimer = null
+
+const stopPlay = () => {
+  if (playTimer) {
+    clearTimeout(playTimer)
+    playTimer = null
+  }
+  viewerPlaying.value = false
+}
+
+const schedulePlay = () => {
+  if (!viewerPlaying.value) return
+  const ms = Math.max(100, Number(playSpeed.value) || 1000)
+  playTimer = setTimeout(() => {
+    if (!viewerPlaying.value) return
+    if (viewer.value.index < filteredImages.value.length - 1) {
+      viewer.value.index++
+      updateViewerImage()
+      schedulePlay()
+    } else {
+      stopPlay()
+    }
+  }, ms)
+}
+
+const startPlay = () => {
+  if (viewerPlaying.value || filteredImages.value.length === 0) return
+  if (viewer.value.index >= filteredImages.value.length - 1) {
+    viewer.value.index = 0
+    updateViewerImage()
+  }
+  viewerPlaying.value = true
+  schedulePlay()
+}
+
+const togglePlay = () => {
+  viewerPlaying.value ? stopPlay() : startPlay()
+}
 
 
 const filteredImages = computed(() => {
@@ -467,6 +535,7 @@ const decryptAllImages = async () => {
 
 // ---------- 查看器 ----------
 const openViewer = (idx) => {
+  stopPlay()
   const img = filteredImages.value[idx]
   viewer.value = {
     show: true, index: idx,
@@ -482,9 +551,9 @@ const updateViewerImage = () => {
   viewer.value.currentDecrypted = img.isDecrypted
 }
 
-const prevImage = () => { if (viewer.value.index > 0) { viewer.value.index--; updateViewerImage() } }
-const nextImage = () => { if (viewer.value.index < filteredImages.value.length - 1) { viewer.value.index++; updateViewerImage() } }
-const closeViewer = () => { viewer.value.show = false }
+const prevImage = () => { stopPlay(); if (viewer.value.index > 0) { viewer.value.index--; updateViewerImage() } }
+const nextImage = () => { stopPlay(); if (viewer.value.index < filteredImages.value.length - 1) { viewer.value.index++; updateViewerImage() } }
+const closeViewer = () => { viewer.value.show = false; stopPlay() }
 const handleViewerImgError = (e) => { e.target.style.display = 'none' }
 
 const handleDelete = async () => {
@@ -524,6 +593,7 @@ const handleKeydown = (e) => {
   if (e.key === 'ArrowLeft') prevImage()
   else if (e.key === 'ArrowRight') nextImage()
   else if (e.key === 'Escape') closeViewer()
+  else if (e.key === ' ' || e.code === 'Space') { e.preventDefault(); togglePlay() }
 }
 
 // ---------- 编辑漫画弹窗预填 ----------
@@ -539,6 +609,11 @@ watch(showEdit, (val) => {
   }
 })
 
+// 关闭查看器时停止播放
+watch(() => viewer.value.show, (v) => {
+  if (!v) stopPlay()
+})
+
 onMounted(() => {
   loadComic()
   window.addEventListener('keydown', handleKeydown)
@@ -546,6 +621,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
+  stopPlay()
 })
 </script>
 
@@ -917,7 +993,7 @@ onUnmounted(() => {
 
 .viewer-content img {
   max-width: 100%;
-  max-height: calc(90vh - 40px);
+  max-height: calc(90vh - 110px);
   object-fit: contain;
   border-radius: 4px;
 }
@@ -928,6 +1004,68 @@ onUnmounted(() => {
   margin-top: 12px;
   text-align: center;
 }
+
+/* 自动播放控制条 */
+.viewer-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.viewer-play-btn {
+  min-width: 72px;
+  padding: 8px 18px;
+  border: none;
+  border-radius: 20px;
+  background: rgba(255,255,255,0.2);
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.viewer-play-btn:hover { background: rgba(255,255,255,0.35); }
+
+.speed-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: rgba(255,255,255,0.85);
+  font-size: 13px;
+}
+
+.speed-input {
+  width: 72px;
+  padding: 4px 8px;
+  border: 1px solid rgba(255,255,255,0.3);
+  border-radius: 4px;
+  background: rgba(0,0,0,0.35);
+  color: #fff;
+  font-size: 13px;
+  text-align: center;
+}
+.speed-input:focus { outline: none; border-color: #3498db; }
+
+.speed-presets {
+  display: flex;
+  gap: 4px;
+}
+
+.speed-preset {
+  padding: 4px 10px;
+  border: 1px solid rgba(255,255,255,0.3);
+  border-radius: 4px;
+  background: transparent;
+  color: rgba(255,255,255,0.85);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.speed-preset:hover { background: rgba(255,255,255,0.15); }
+.speed-preset.active { background: #3498db; border-color: #3498db; color: #fff; }
+
 
 /* 标签操作按钮（显式展示） */
 .tab-actions {
