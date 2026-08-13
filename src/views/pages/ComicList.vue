@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="comic-list">
     <div class="list-header">
       <h1>漫画管理</h1>
@@ -34,10 +34,10 @@
           <div class="comic-meta">
             <span class="chapter-count">{{ comic.chapterCount }} 章</span>
           </div>
-          <div class="card-actions" @click.stop>
-            <button class="btn btn-sm btn-primary" @click="handleEdit(comic)">编辑</button>
-            <button class="btn btn-sm btn-danger" @click="handleDelete(comic)">删除</button>
-          </div>
+        </div>
+        <div class="card-actions" @click.stop>
+          <button class="btn btn-sm btn-primary" @click="handleEdit(comic)">编辑</button>
+          <button class="btn btn-sm btn-danger" @click="handleDelete(comic)">删除</button>
         </div>
       </div>
     </div>
@@ -221,14 +221,12 @@ onMounted(() => {
   gap: 20px;
   max-width: 1400px;
   margin: 0 auto;
-  padding: 0 20px 20px;
 }
 
 .list-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 0;
 }
 
 .list-header h1 {
@@ -262,15 +260,17 @@ onMounted(() => {
 }
 
 .filters input[type="text"] {
-  padding: 8px 16px;
+  padding: 8px 12px;
   border: 1px solid #ddd;
   border-radius: 6px;
   font-size: 14px;
-  min-width: 280px;
+  height: 38px;
+  min-width: 200px;
 }
 
 .search-btn {
   padding: 8px 16px;
+  height: 38px;
   background: #3498db;
   color: white;
   border: none;
@@ -305,7 +305,7 @@ onMounted(() => {
 
 .card-cover {
   width: 100%;
-  aspect-ratio: 3/4;
+  aspect-ratio: 6/4;
   overflow: hidden;
   background: #f0f0f0;
   position: relative;
@@ -328,10 +328,10 @@ onMounted(() => {
 }
 
 .card-info {
-  padding: 12px;
+  padding: 12px 16px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   flex: 1;
 }
 
@@ -352,26 +352,23 @@ onMounted(() => {
   white-space: nowrap;
 }
 
-.comic-meta {
-  margin-top: 4px;
-}
-
 .chapter-count {
   font-size: 12px;
   color: #666;
   background: #f5f5f5;
-  padding: 2px 8px;
   border-radius: 3px;
 }
 
 .card-actions {
   display: flex;
+  justify-content: flex-end;
+  align-items: center;
   gap: 6px;
-  margin-top: 8px;
+  padding: 10px 16px;
+  border-top: 1px solid #f0f0f0;
 }
 
 .btn {
-  padding: 4px 12px;
   border: 1px solid #ddd;
   background: #fff;
   border-radius: 4px;
@@ -380,11 +377,11 @@ onMounted(() => {
 }
 
 .btn-sm {
-  padding: 3px 10px;
   font-size: 12px;
 }
 
 .btn-primary {
+  padding: 5px 14px;
   background: #3498db;
   color: white;
   border-color: #3498db;
@@ -393,6 +390,7 @@ onMounted(() => {
 .btn-primary:hover { background: #2980b9; }
 
 .btn-danger {
+  padding: 5px 14px;
   background: #e74c3c;
   color: white;
   border-color: #e74c3c;
@@ -403,21 +401,19 @@ onMounted(() => {
 .empty-hint {
   text-align: center;
   color: #999;
-  padding: 60px;
   font-size: 16px;
 }
 
 .loading-hint {
   text-align: center;
   color: #888;
-  padding: 40px;
 }
 
 .pagination {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 12px;
+  gap: 15px;
 }
 
 .pagination button {
@@ -427,6 +423,11 @@ onMounted(() => {
   border-radius: 6px;
   cursor: pointer;
   font-size: 14px;
+  transition: background 0.2s;
+}
+
+.pagination button:hover:not(:disabled) {
+  background: #f5f5f5;
 }
 
 .pagination button:disabled {
@@ -441,6 +442,11 @@ onMounted(() => {
   border-radius: 4px;
   font-size: 13px;
   text-align: center;
+}
+
+.goto-input:focus {
+  outline: none;
+  border-color: #3498db;
 }
 
 .pagination span {
@@ -464,7 +470,6 @@ onMounted(() => {
 .form-group input,
 .form-group textarea {
   width: 100%;
-  padding: 8px 12px;
   border: 1px solid #ddd;
   border-radius: 6px;
   font-size: 14px;

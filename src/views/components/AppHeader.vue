@@ -6,11 +6,11 @@
       </div>
       <nav class="nav-menu">
         <router-link to="/" class="nav-item">首页</router-link>
-        <router-link to="/videos" class="nav-item">影片列表</router-link>
-        <router-link to="/series" class="nav-item">影视系列</router-link>
-        <router-link to="/actors" class="nav-item">演员列表</router-link>
-        <router-link to="/highlights" class="nav-item">精彩瞬间</router-link>
+        <router-link to="/videos" class="nav-item">影片</router-link>
+        <router-link to="/series" class="nav-item">系列</router-link>
+        <router-link to="/actors" class="nav-item">演员</router-link>
         <router-link to="/comics" class="nav-item">漫画</router-link>
+        <router-link to="/highlights" class="nav-item">精彩瞬间</router-link>
         <router-link to="/settings" class="nav-item">设置</router-link>
       </nav>
     </div>

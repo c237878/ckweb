@@ -32,6 +32,8 @@ img {
   display: block;
 }
 
+input {outline: none;}
+
 /* 响应式布局 */
 @media (max-width: 768px) {
   .header-content {
