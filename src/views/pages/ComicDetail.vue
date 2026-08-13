@@ -107,6 +107,14 @@
           >
             {{ decrypting ? '解密中…' : '批量解密' }}
           </button>
+          <button
+            v-if="hasDecrypted"
+            class="btn"
+            @click="restoreAllImages"
+            :disabled="restoring"
+          >
+            {{ restoring ? '还原中…' : '批量还原' }}
+          </button>
         </div>
 
         <!-- 图片网格 -->
@@ -142,6 +150,9 @@
             <div class="image-actions">
               <button class="btn btn-xs" @click.stop="decryptSingle(img)">
                 {{ img.isDecrypted ? '重解密' : '解密' }}
+              </button>
+              <button v-if="img.isDecrypted" class="btn btn-xs btn-warning" @click.stop="restoreSingle(img)">
+                还原
               </button>
             </div>
           </div>
@@ -302,6 +313,7 @@ const decryptConfig = ref({ rows: 3, order: [2, 1, 0], overwrite: true })
 const orderText = ref('2,1,0')        // 文本形式绑定
 const decrypting = ref(false)
 const refreshing = ref(false)
+const restoring = ref(false)
 
 const viewer = ref({ show: false, index: 0, currentSrc: '', currentDecrypted: false })
 
@@ -353,6 +365,8 @@ const filteredImages = computed(() => {
     ? images.value.filter(img => img.isDecrypted)
     : images.value
 })
+
+const hasDecrypted = computed(() => images.value.some(img => img.isDecrypted))
 
 // ---------- 解密配置文本同步 ----------
 const applyOrderText = () => {
@@ -552,6 +566,53 @@ const decryptAllImages = async () => {
     alert('批量解密失败：' + (error.message || error))
   } finally {
     decrypting.value = false
+  }
+}
+
+const restoreSingle = async (img) => {
+  try {
+    const res = await comicApi.restoreImage({
+      chapterId: currentChapter.value.id,
+      imageName: img.fileName
+    })
+    if (res.success) {
+      img.isDecrypted = false
+      nextTick(() => {
+        const el = document.querySelector(`.image-item[data-filename="${img.fileName}"] img`)
+        if (el) {
+          const base = comicApi.getImageUrl(currentChapter.value.id, img.fileName)
+          el.src = base + '?t=' + Date.now()
+        }
+      })
+    } else {
+      alert(res.message || '还原失败')
+    }
+  } catch (error) {
+    alert('还原失败：' + (error.message || error))
+  }
+}
+
+const restoreAllImages = async () => {
+  if (restoring.value || !currentChapter.value) return
+  try {
+    restoring.value = true
+    const res = await comicApi.restoreBatch({ chapterId: currentChapter.value.id })
+    if (res.success) {
+      images.value.forEach(img => { img.isDecrypted = false })
+      nextTick(() => {
+        document.querySelectorAll('.image-item img').forEach(el => {
+          const src = el.src.split('?')[0]
+          el.src = src + '?t=' + Date.now()
+        })
+      })
+      alert(res.message || '还原完成')
+    } else {
+      alert(res.message || '还原失败')
+    }
+  } catch (error) {
+    alert('批量还原失败：' + (error.message || error))
+  } finally {
+    restoring.value = false
   }
 }
 
