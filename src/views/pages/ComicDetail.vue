@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="comic-detail" v-if="comic">
     <div class="detail-header">
       <button class="back-btn" @click="$router.back()">← 返回</button>
@@ -197,7 +197,7 @@
         </div>
         <div class="form-group">
           <label>简介</label>
-          <textarea v-model="editForm.description" rows="3"></textarea>
+          <textarea v-model="editForm.description" rows="3" style="resize:none"></textarea>
         </div>
         <div class="form-group">
           <label>链接</label>
@@ -935,7 +935,6 @@ onMounted(() => {
 .form-group input:focus,
 .form-group textarea:focus { outline: none; border-color: #3498db; }
 
-.form-group textarea { resize: vertical; }
 
 .form-group small {
   display: block;
