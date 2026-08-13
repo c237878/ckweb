@@ -78,7 +78,6 @@
               v-model.number="decryptConfig.rows"
               type="number"
               min="2"
-              max="10"
               class="decrypt-input"
               @change="syncOrderLength"
             />
@@ -368,7 +367,7 @@ const applyOrderText = () => {
 }
 
 const syncOrderLength = () => {
-  const len = Math.max(2, Math.min(10, decryptConfig.value.rows))
+  const len = Math.max(2, decryptConfig.value.rows)
   decryptConfig.value.rows = len
   const arr = decryptConfig.value.order
   if (arr.length < len) {
