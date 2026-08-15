@@ -672,16 +672,16 @@ const setAsCover = async (img) => {
   if (!currentChapter.value || !comic.value) return
   try {
     settingCover.value = true
-    const fullPath = currentChapter.value.directory + '/' + img.fileName
+    // 优先使用解密图路径
+    const baseName = img.fileName.replace(/\.[^.]+$/, '')
+    const decryptedPath = currentChapter.value.directory + '/_decrypted/' + baseName + '.jpg'
+    const fullPath = img.isDecrypted ? decryptedPath : currentChapter.value.directory + '/' + img.fileName
     const res = await comicApi.update(comic.value.id, { ...comic.value, coverPath: fullPath })
     if (res.success) {
       comic.value.coverPath = fullPath
-      alert('已设置为封面')
-    } else {
-      alert(res.message || '设置失败')
     }
   } catch (error) {
-    alert('设置封面失败：' + (error.message || error))
+    console.error('设置封面失败:', error)
   } finally {
     settingCover.value = false
   }
