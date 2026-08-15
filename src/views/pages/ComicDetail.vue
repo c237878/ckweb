@@ -50,7 +50,7 @@
           >
             <span class="tab-title">{{ ch.title }}</span>
             <span class="tab-count">{{ ch.imageCount }} 图</span>
-            <div class="tab-actions" @click.stop>
+            <div class="tab-actions" v-if="!isCompleted" @click.stop>
               <button class="tab-action" title="编辑" @click.stop="openEditChapter(ch)">✎</button>
               <button class="tab-action tab-action-danger" title="删除" @click.stop="deleteChapter(ch)">✕</button>
             </div>
