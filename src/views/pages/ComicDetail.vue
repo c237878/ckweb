@@ -8,13 +8,12 @@
         <span class="author" v-if="comic.author">作者：{{ comic.author }}</span>
       </div>
       <div class="header-actions">
-        <button class="btn like-btn" @click="handleLike" :disabled="likeDisabled">
-          <span>♥ 点赞</span>
-          <span v-if="likeCount > 0" class="like-count-badge">{{ likeCount }}</span>
+        <button class="action-btn like-btn" @click="handleLike" :disabled="likeDisabled">
+          <span>点赞</span>
         </button>
-        <button class="btn" @click="refreshImages" :disabled="refreshing" title="重新加载章节图片，清除浏览器缓存">{{ refreshing ? '刷新中...' : '🔄 刷新' }}</button>
-        <button class="btn btn-primary" @click="showEdit = true">编辑</button>
-        <button class="btn btn-danger" @click="handleDelete">删除</button>
+        <button v-if="!isCompleted" class="btn" @click="refreshImages" :disabled="refreshing" title="重新加载章节图片，清除浏览器缓存">{{ refreshing ? '刷新中...' : '🔄 刷新' }}</button>
+        <button v-if="!isCompleted" class="btn btn-primary" @click="showEdit = true">编辑</button>
+        <button v-if="!isCompleted" class="btn btn-danger" @click="handleDelete">删除</button>
       </div>
     </div>
 
@@ -884,25 +883,39 @@ onUnmounted(() => {
   align-items: center;
 }
 
-.like-btn {
+.action-btn {
+  height: 32px;
+  padding: 0 12px;
   display: flex;
+  justify-content: center;
   align-items: center;
-  gap: 4px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  color: #333;
+  transition: all 0.2s;
 }
 
-.like-btn:disabled {
+.action-btn:hover {
+  border-color: #3498db;
+  color: #3498db;
+  background: #f0f8ff;
+}
+
+.action-btn.like-btn {
+  border-color: #e74c3c;
+  color: #e74c3c;
+}
+
+.action-btn.like-btn:hover {
+  background: #fdf2f2;
+}
+
+.action-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-}
-
-.like-count-badge {
-  display: inline-block;
-  padding: 1px 6px;
-  font-size: 12px;
-  font-weight: bold;
-  color: #fff;
-  background: #e74c3c;
-  border-radius: 10px;
 }
 
 /* ---------- 基本信息 ---------- */

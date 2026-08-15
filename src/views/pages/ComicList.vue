@@ -19,6 +19,11 @@
         <option :value="0">连载中</option>
         <option :value="1">完结</option>
       </select>
+      <select v-model="sortBy" @change="handleSearch" class="status-select">
+        <option value="">默认排序</option>
+        <option value="name">按名称</option>
+        <option value="likes">按点赞</option>
+      </select>
       <button class="search-btn" @click="handleSearch">搜索</button>
     </div>
 
@@ -78,6 +83,7 @@ const pageSize = ref(24)
 const total = ref(0)
 const keyword = ref('')
 const statusFilter = ref(-1)
+const sortBy = ref('')
 const loading = ref(false)
 const showDialog = ref(false)
 const editingComic = ref(null)
@@ -89,6 +95,7 @@ const loadComics = async () => {
     const params = { pageIndex: page.value, pageSize: pageSize.value }
     if (keyword.value) params.keyword = keyword.value
     if (statusFilter.value >= 0) params.status = statusFilter.value
+    if (sortBy.value) params.sortBy = sortBy.value
     const res = await comicApi.getList(params)
     if (res.success) {
       comicList.value = res.data?.list || []
