@@ -1059,7 +1059,7 @@ onUnmounted(() => {
 }
 
 .order-text {
-  width: 235px;
+  width: 220px;
   text-align: left;
   font-family: monospace;
 }
