@@ -94,6 +94,14 @@
             />
             <span class="form-hint">章节扫描将以此目录为基础路径</span>
           </div>
+
+          <div class="form-group">
+            <label>状态</label>
+            <select v-model.number="draft.status" class="input">
+              <option :value="0">连载中</option>
+              <option :value="1">完结</option>
+            </select>
+          </div>
         </section>
       </div>
     </template>
@@ -130,7 +138,8 @@ const draft = ref({
   description: '',
   url: '',
   coverPath: '',
-  directory: ''
+  directory: '',
+  status: 0
 })
 
 // 封面预览 URL
@@ -149,10 +158,11 @@ watch(() => props.visible, (val) => {
         description: props.editingComic.description || '',
         url: props.editingComic.url || '',
         coverPath: props.editingComic.coverPath || '',
-        directory: props.editingComic.directory || ''
+        directory: props.editingComic.directory || '',
+        status: props.editingComic.status || 0
       }
     } else {
-      draft.value = { name: '', author: '', description: '', url: '', coverPath: '', directory: '' }
+      draft.value = { name: '', author: '', description: '', url: '', coverPath: '', directory: '', status: 0 }
     }
   }
 })

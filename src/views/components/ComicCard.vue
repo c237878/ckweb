@@ -21,7 +21,10 @@
     </div>
 
     <div class="card-info">
-      <div class="comic-name">{{ comic.name }}</div>
+      <div class="comic-name">
+        {{ comic.name }}
+        <span v-if="comic.status === 1" class="badge-completed">完结</span>
+      </div>
       <div class="comic-author" v-if="comic.author">{{ comic.author }}</div>
       <div class="comic-meta">
         <span class="chapter-count">{{ comic.chapterCount }} 章</span>
@@ -141,6 +144,20 @@ const coverUrl = computed(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.badge-completed {
+  display: inline-block;
+  padding: 1px 6px;
+  font-size: 11px;
+  font-weight: bold;
+  color: #fff;
+  background: #e74c3c;
+  border-radius: 3px;
+  flex-shrink: 0;
 }
 
 .comic-author {

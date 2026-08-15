@@ -4,7 +4,7 @@
     <div class="detail-header">
       <button class="back-btn" @click="$router.back()">← 返回</button>
       <div class="comic-title">
-        <h1>{{ comic.name }}</h1>
+        <h1>{{ comic.name }} <span v-if="comic.status === 1" class="badge-completed">完结</span></h1>
         <span class="author" v-if="comic.author">作者：{{ comic.author }}</span>
       </div>
       <div class="header-actions">
@@ -33,7 +33,7 @@
     <!-- 章节标签 + 图片区 -->
     <div class="main-area">
       <!-- 添加章节按钮（独立一行） -->
-      <div class="chapter-add-row">
+      <div class="chapter-add-row" v-if="!isCompleted">
         <button class="btn btn-primary btn-sm" @click="showAddChapter = true">+ 添加章节</button>
       </div>
 
@@ -71,7 +71,7 @@
       <!-- 图片区 -->
       <div class="viewer-section" v-if="currentChapter">
         <!-- 解密工具栏 -->
-        <div class="decrypt-toolbar" :class="{ floating: floatMode }">
+        <div v-if="!isCompleted" class="decrypt-toolbar" :class="{ floating: floatMode }">
           <div class="decrypt-group">
             <span class="group-label">切割行数</span>
             <input
@@ -178,7 +178,7 @@
               <div class="img-badge badge-decrypted" v-if="img.isDecrypted">✓</div>
               <div class="img-badge badge-index">{{ idx + 1 }}</div>
             </div>
-            <div class="image-actions">
+            <div class="image-actions" v-if="!isCompleted">
               <button v-if="!img.isDecrypted" class="btn btn-xs" @click.stop="decryptSingle(img)">解密</button>
               <button v-else class="btn btn-xs btn-warning" @click.stop="restoreSingle(img)">还原</button>
               <button v-if="!comic.coverPath" class="btn btn-xs" @click.stop="setAsCover(img)" :disabled="settingCover">设为封面</button>
@@ -301,6 +301,13 @@
           <label>目录</label>
           <input v-model="editForm.directory" type="text" />
         </div>
+        <div class="form-group">
+          <label>状态</label>
+          <select v-model.number="editForm.status">
+            <option :value="0">连载中</option>
+            <option :value="1">完结</option>
+          </select>
+        </div>
       </template>
       <template #actions>
         <button class="btn" @click="showEdit = false">取消</button>
@@ -335,7 +342,7 @@ const showUndecryptedOnly = ref(false)
 const displayImages = ref([])  // 实际显示的图片列表，切换筛选/章节时才重新筛选
 
 const editChapterForm = ref({ title: '', directory: '', sortOrder: 0 })
-const editForm = ref({ name: '', author: '', description: '', url: '', directory: '' })
+const editForm = ref({ name: '', author: '', description: '', url: '', directory: '', status: 0 })
 const chapterForm = ref({ title: '', directory: '' })
 const images = ref([])
 
@@ -405,6 +412,7 @@ const applyFilter = () => {
 const filteredImages = computed(() => displayImages.value)
 
 const hasDecrypted = computed(() => images.value.some(img => img.isDecrypted))
+const isCompleted = computed(() => comic.value?.status === 1)
 
 // ---------- 解密配置文本同步 ----------
 const applyOrderText = () => {
@@ -759,7 +767,8 @@ watch(showEdit, (val) => {
       author: comic.value?.author || '',
       description: comic.value?.description || '',
       url: comic.value?.url || '',
-      directory: comic.value?.directory || ''
+      directory: comic.value?.directory || '',
+      status: comic.value?.status || 0
     }
   }
 })
@@ -830,7 +839,18 @@ onUnmounted(() => {
   gap: 12px;
   min-width: 0;
 }
-.comic-title h1 { margin: 0; font-size: 24px; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.comic-title h1 { margin: 0; font-size: 24px; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 6px; }
+
+.badge-completed {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 13px;
+  font-weight: bold;
+  color: #fff;
+  background: #e74c3c;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
 .author { font-size: 14px; color: #888; white-space: nowrap; flex-shrink: 0; }
 
 .header-actions {
