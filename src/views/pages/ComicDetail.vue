@@ -8,6 +8,10 @@
         <span class="author" v-if="comic.author">作者：{{ comic.author }}</span>
       </div>
       <div class="header-actions">
+        <button class="btn like-btn" @click="handleLike" :disabled="likeDisabled">
+          <span>♥ 点赞</span>
+          <span v-if="likeCount > 0" class="like-count-badge">{{ likeCount }}</span>
+        </button>
         <button class="btn" @click="refreshImages" :disabled="refreshing" title="重新加载章节图片，清除浏览器缓存">{{ refreshing ? '刷新中...' : '🔄 刷新' }}</button>
         <button class="btn btn-primary" @click="showEdit = true">编辑</button>
         <button class="btn btn-danger" @click="handleDelete">删除</button>
@@ -353,6 +357,8 @@ const refreshing = ref(false)
 const restoring = ref(false)
 const settingCover = ref(false)
 const floatMode = ref(false)
+const likeCount = ref(0)
+const likeDisabled = ref(false)
 
 const viewer = ref({ show: false, index: 0, currentSrc: '', currentDecrypted: false })
 
@@ -441,6 +447,7 @@ const loadComic = async () => {
     const res = await comicApi.getDetail(route.params.id)
     if (res.success) {
       comic.value = res.data.comic
+      likeCount.value = res.data.comic?.likeCount || 0
       chapters.value = res.data.chapters || []
       if (chapters.value.length > 0 && !currentChapter.value) {
         selectChapter(chapters.value[0])
@@ -730,6 +737,21 @@ const handleDelete = async () => {
   }
 }
 
+const handleLike = async () => {
+  if (likeDisabled.value) return
+  likeDisabled.value = true
+  try {
+    const res = await comicApi.like(route.params.id)
+    if (res.success) {
+      likeCount.value = res.likeCount
+    }
+  } catch (error) {
+    console.error('点赞失败:', error)
+  } finally {
+    setTimeout(() => { likeDisabled.value = false }, 3000)
+  }
+}
+
 const handleUpdate = async () => {
   try {
     const res = await comicApi.update(route.params.id, {
@@ -859,6 +881,28 @@ onUnmounted(() => {
   display: flex;
   gap: 6px;
   flex-shrink: 0;
+  align-items: center;
+}
+
+.like-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.like-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.like-count-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  font-size: 12px;
+  font-weight: bold;
+  color: #fff;
+  background: #e74c3c;
+  border-radius: 10px;
 }
 
 /* ---------- 基本信息 ---------- */

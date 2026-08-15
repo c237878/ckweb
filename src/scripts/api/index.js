@@ -56,7 +56,9 @@ export const comicApi = {
   restoreBatch: (data) => api.post('/comic/restore/batch', data),
   // 图片访问
   getImageUrl: (chapterId, fileName) => `/api/comic/image/${chapterId}/${encodeURIComponent(fileName)}`,
-  getCoverUrl: (coverPath) => `/api/comic/image/cover/${encodeURI(coverPath)}`
+  getCoverUrl: (coverPath) => `/api/comic/image/cover/${encodeURI(coverPath)}`,
+  // 点赞
+  like: (id) => api.post(`/comic/${id}/like`)
 }
 
 // 视频相关API

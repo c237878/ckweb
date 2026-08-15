@@ -28,6 +28,7 @@
       <div class="comic-author" v-if="comic.author">{{ comic.author }}</div>
       <div class="comic-meta">
         <span class="chapter-count">{{ comic.chapterCount }} 章</span>
+        <span v-if="comic.likeCount > 0" class="like-count">♥ {{ comic.likeCount }}</span>
       </div>
     </div>
 
@@ -178,5 +179,11 @@ const coverUrl = computed(() => {
   color: #666;
   background: #f5f5f5;
   border-radius: 3px;
+}
+
+.like-count {
+  font-size: 12px;
+  color: #e74c3c;
+  font-weight: bold;
 }
 </style>
