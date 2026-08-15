@@ -545,6 +545,28 @@ const refreshImage = (img, delayUpdate = false) => {
   }
 }
 
+// 还原时也延迟更新，避免筛选条件下图片立即消失
+const restoreImageDisplay = (img, delayUpdate = false) => {
+  if (delayUpdate) {
+    nextTick(() => {
+      const el = document.querySelector(`.image-item[data-filename="${img.fileName}"] img`)
+      if (el) {
+        const base = comicApi.getImageUrl(currentChapter.value.id, img.fileName)
+        el.src = base + '?t=' + Date.now()
+      }
+    })
+  } else {
+    img.isDecrypted = false
+    nextTick(() => {
+      const el = document.querySelector(`.image-item[data-filename="${img.fileName}"] img`)
+      if (el) {
+        const base = comicApi.getImageUrl(currentChapter.value.id, img.fileName)
+        el.src = base + '?t=' + Date.now()
+      }
+    })
+  }
+}
+
 const decryptSingle = async (img) => {
   try {
     const res = await comicApi.decryptImage({
@@ -555,7 +577,7 @@ const decryptSingle = async (img) => {
     })
     if (res.success) {
       // 仅显示未解密时，延迟更新 isDecrypted，避免图片立即消失
-      const delay = showUndecryptedOnly.value
+      const delay = showDecryptedOnly.value || showUndecryptedOnly.value
       refreshImage(img, delay)
     } else {
       alert(res.message || '解密失败')
@@ -577,7 +599,7 @@ const decryptAllImages = async () => {
     })
     if (res.success) {
       const successCount = res.data.results.filter(r => r.success).length
-      const delay = showUndecryptedOnly.value
+      const delay = showDecryptedOnly.value || showUndecryptedOnly.value
       filteredImages.value.forEach(img => {
         if (res.data.results.some(r => r.success && r.imageName === img.fileName)) {
           refreshImage(img, delay)
@@ -601,14 +623,8 @@ const restoreSingle = async (img) => {
       imageName: img.fileName
     })
     if (res.success) {
-      img.isDecrypted = false
-      nextTick(() => {
-        const el = document.querySelector(`.image-item[data-filename="${img.fileName}"] img`)
-        if (el) {
-          const base = comicApi.getImageUrl(currentChapter.value.id, img.fileName)
-          el.src = base + '?t=' + Date.now()
-        }
-      })
+      const delay = showDecryptedOnly.value || showUndecryptedOnly.value
+      restoreImageDisplay(img, delay)
     } else {
       alert(res.message || '还原失败')
     }
@@ -623,13 +639,24 @@ const restoreAllImages = async () => {
     restoring.value = true
     const res = await comicApi.restoreBatch({ chapterId: currentChapter.value.id })
     if (res.success) {
-      images.value.forEach(img => { img.isDecrypted = false })
-      nextTick(() => {
-        document.querySelectorAll('.image-item img').forEach(el => {
-          const src = el.src.split('?')[0]
-          el.src = src + '?t=' + Date.now()
+      const delay = showDecryptedOnly.value || showUndecryptedOnly.value
+      if (delay) {
+        // 延迟更新：只刷新图片显示，不改 isDecrypted
+        nextTick(() => {
+          document.querySelectorAll('.image-item img').forEach(el => {
+            const src = el.src.split('?')[0]
+            el.src = src + '?t=' + Date.now()
+          })
         })
-      })
+      } else {
+        images.value.forEach(img => { img.isDecrypted = false })
+        nextTick(() => {
+          document.querySelectorAll('.image-item img').forEach(el => {
+            const src = el.src.split('?')[0]
+            el.src = src + '?t=' + Date.now()
+          })
+        })
+      }
       alert(res.message || '还原完成')
     } else {
       alert(res.message || '还原失败')
