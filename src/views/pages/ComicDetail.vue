@@ -84,12 +84,34 @@
           </div>
 
           <div class="decrypt-group">
+            <span class="group-label">顶部留高</span>
+            <input
+              v-model.number="decryptConfig.topPadding"
+              type="number"
+              min="0"
+              class="decrypt-input"
+              placeholder="0"
+            />
+          </div>
+
+          <div class="decrypt-group">
+            <span class="group-label">底部留高</span>
+            <input
+              v-model.number="decryptConfig.bottomPadding"
+              type="number"
+              min="0"
+              class="decrypt-input"
+              placeholder="0"
+            />
+          </div>
+
+          <div class="decrypt-group">
             <span class="group-label">排列顺序</span>
             <input
               v-model="orderText"
               type="text"
               class="decrypt-input order-text"
-              placeholder="如 2,0,1"
+              placeholder="如 2,1,0"
               @blur="applyOrderText"
             />
             <small class="group-hint">{{ decryptConfig.rows }} 个 0~{{ decryptConfig.rows - 1 }} 的整数</small>
@@ -317,7 +339,7 @@ const editForm = ref({ name: '', author: '', description: '', url: '', directory
 const chapterForm = ref({ title: '', directory: '' })
 const images = ref([])
 
-const decryptConfig = ref({ rows: 3, order: [2, 1, 0], overwrite: true })
+const decryptConfig = ref({ rows: 3, order: [2, 1, 0], overwrite: true, topPadding: 0, bottomPadding: 0 })
 const orderText = ref('2,1,0')        // 文本形式绑定
 const decrypting = ref(false)
 const refreshing = ref(false)
