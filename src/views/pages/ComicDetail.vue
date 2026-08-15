@@ -529,12 +529,20 @@ const getImageUrl = (img) => {
   return base + sep + 't=' + Date.now()
 }
 
-const refreshImage = (img) => {
-  img.isDecrypted = true
-  nextTick(() => {
-    const el = document.querySelector(`.image-item[data-filename="${img.fileName}"] img`)
-    if (el) el.src = getImageUrl(img)
-  })
+const refreshImage = (img, delayUpdate = false) => {
+  if (delayUpdate) {
+    // 延迟更新 isDecrypted，避免筛选条件下图片立即消失
+    nextTick(() => {
+      const el = document.querySelector(`.image-item[data-filename="${img.fileName}"] img`)
+      if (el) el.src = getImageUrl({ ...img, isDecrypted: true })
+    })
+  } else {
+    img.isDecrypted = true
+    nextTick(() => {
+      const el = document.querySelector(`.image-item[data-filename="${img.fileName}"] img`)
+      if (el) el.src = getImageUrl(img)
+    })
+  }
 }
 
 const decryptSingle = async (img) => {
@@ -545,8 +553,13 @@ const decryptSingle = async (img) => {
       config: decryptConfig.value,
       overwrite: decryptConfig.value.overwrite
     })
-    if (res.success) refreshImage(img)
-    else alert(res.message || '解密失败')
+    if (res.success) {
+      // 仅显示未解密时，延迟更新 isDecrypted，避免图片立即消失
+      const delay = showUndecryptedOnly.value
+      refreshImage(img, delay)
+    } else {
+      alert(res.message || '解密失败')
+    }
   } catch (error) {
     alert('解密失败：' + (error.message || error))
   }
@@ -564,9 +577,10 @@ const decryptAllImages = async () => {
     })
     if (res.success) {
       const successCount = res.data.results.filter(r => r.success).length
+      const delay = showUndecryptedOnly.value
       filteredImages.value.forEach(img => {
         if (res.data.results.some(r => r.success && r.imageName === img.fileName)) {
-          refreshImage(img)
+          refreshImage(img, delay)
         }
       })
       alert(`解密完成：成功 ${successCount} 张，失败 ${res.data.results.length - successCount} 张`)
