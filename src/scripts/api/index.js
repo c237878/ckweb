@@ -61,6 +61,12 @@ export const comicApi = {
   like: (id) => api.post(`/comic/${id}/like`)
 }
 
+export const likeApi = {
+  getList: (params) => api.get('/like/list', { params }),
+  delete: (id) => api.delete(`/like/${id}`),
+  batchDelete: (ids) => api.post('/like/batch-delete', { ids })
+}
+
 // 视频相关API
 export const videoApi = {
   getList: (params) => api.get('/video/list', { params }),

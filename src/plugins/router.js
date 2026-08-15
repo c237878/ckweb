@@ -10,6 +10,7 @@ import Settings from '@/views/pages/Settings.vue'
 import Highlights from '@/views/pages/Highlights.vue'
 import ComicList from '@/views/pages/ComicList.vue'
 import ComicDetail from '@/views/pages/ComicDetail.vue'
+import LikeList from '@/views/pages/LikeList.vue'
 
 const routes = [
   {
@@ -61,6 +62,11 @@ const routes = [
     path: '/comic/:id',
     name: 'ComicDetail',
     component: ComicDetail
+  },
+  {
+    path: '/likes',
+    name: 'LikeList',
+    component: LikeList
   },
   {
     path: '/settings',

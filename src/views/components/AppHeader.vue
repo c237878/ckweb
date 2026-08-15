@@ -10,6 +10,7 @@
         <router-link to="/series" class="nav-item">系列</router-link>
         <router-link to="/actors" class="nav-item">演员</router-link>
         <router-link to="/comics" class="nav-item">漫画</router-link>
+        <router-link to="/likes" class="nav-item">点赞</router-link>
         <router-link to="/highlights" class="nav-item">精彩瞬间</router-link>
         <router-link to="/settings" class="nav-item">设置</router-link>
       </nav>
