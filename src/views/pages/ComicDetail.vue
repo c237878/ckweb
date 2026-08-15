@@ -148,7 +148,7 @@
             <span class="chapter-name">{{ currentChapter.title }}</span>
             <span class="chapter-img-count">{{ filteredImages.length }} 图</span>
           </div>
-          <div class="image-toolbar-filter">
+          <div v-if="!isCompleted" class="image-toolbar-filter">
             <label class="show-decrypted-check">
               <input type="checkbox" v-model="showDecryptedOnly" />
               <span>仅显示已解密</span>
