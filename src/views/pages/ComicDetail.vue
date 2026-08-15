@@ -71,7 +71,7 @@
       <!-- 图片区 -->
       <div class="viewer-section" v-if="currentChapter">
         <!-- 解密工具栏 -->
-        <div class="decrypt-toolbar">
+        <div class="decrypt-toolbar" :class="{ floating: floatMode }">
           <div class="decrypt-group">
             <span class="group-label">切割行数</span>
             <input
@@ -114,6 +114,9 @@
             :disabled="restoring"
           >
             {{ restoring ? '还原中…' : '批量还原' }}
+          </button>
+          <button class="btn btn-sm float-toggle" @click="floatMode = !floatMode" :title="floatMode ? '取消漂浮' : '漂浮模式'">
+            {{ floatMode ? '📌' : '📍' }}
           </button>
         </div>
 
@@ -320,6 +323,7 @@ const decrypting = ref(false)
 const refreshing = ref(false)
 const restoring = ref(false)
 const settingCover = ref(false)
+const floatMode = ref(false)
 
 const viewer = ref({ show: false, index: 0, currentSrc: '', currentDecrypted: false })
 
@@ -941,6 +945,47 @@ onUnmounted(() => {
   border-radius: 8px;
   font-size: 14px;
   color: #555;
+}
+
+.decrypt-toolbar.floating {
+  position: fixed;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1000;
+  flex-direction: column;
+  align-items: stretch;
+  flex-wrap: nowrap;
+  gap: 8px;
+  padding: 12px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  background: #fff;
+  width: 180px;
+}
+
+.decrypt-toolbar.floating .decrypt-group {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.decrypt-toolbar.floating .decrypt-input {
+  width: 100%;
+}
+
+.decrypt-toolbar.floating .overwrite-check {
+  flex-direction: row;
+  align-items: center;
+}
+
+.decrypt-toolbar.floating .btn {
+  width: 100%;
+}
+
+.float-toggle {
+  padding: 4px 8px !important;
+  font-size: 16px;
+  line-height: 1;
 }
 
 .decrypt-group {
