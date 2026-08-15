@@ -154,12 +154,8 @@
               <div class="img-badge badge-index">{{ idx + 1 }}</div>
             </div>
             <div class="image-actions">
-              <button class="btn btn-xs" @click.stop="decryptSingle(img)">
-                {{ img.isDecrypted ? '重解密' : '解密' }}
-              </button>
-              <button v-if="img.isDecrypted" class="btn btn-xs btn-warning" @click.stop="restoreSingle(img)">
-                还原
-              </button>
+              <button class="btn btn-xs" @click.stop="decryptSingle(img)">解密</button>
+              <button class="btn btn-xs btn-warning" @click.stop="restoreSingle(img)">还原</button>
             </div>
           </div>
 
