@@ -14,6 +14,11 @@
         type="text"
         @keyup.enter="handleSearch"
       />
+      <select v-model.number="statusFilter" @change="handleSearch" class="status-select">
+        <option :value="-1">全部状态</option>
+        <option :value="0">连载中</option>
+        <option :value="1">完结</option>
+      </select>
       <button class="search-btn" @click="handleSearch">搜索</button>
     </div>
 
@@ -72,6 +77,7 @@ const page = ref(1)
 const pageSize = ref(24)
 const total = ref(0)
 const keyword = ref('')
+const statusFilter = ref(-1)
 const loading = ref(false)
 const showDialog = ref(false)
 const editingComic = ref(null)
@@ -82,6 +88,7 @@ const loadComics = async () => {
   try {
     const params = { pageIndex: page.value, pageSize: pageSize.value }
     if (keyword.value) params.keyword = keyword.value
+    if (statusFilter.value >= 0) params.status = statusFilter.value
     const res = await comicApi.getList(params)
     if (res.success) {
       comicList.value = res.data?.list || []
@@ -206,6 +213,14 @@ onMounted(() => {
   display: flex;
   gap: 8px;
   align-items: center;
+}
+
+.status-select {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
 }
 
 .filters input[type="text"] {
