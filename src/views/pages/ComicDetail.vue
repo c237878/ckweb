@@ -307,6 +307,7 @@ const showEditChapter = ref(false)
 const editingChapter = ref(null)
 const showDecryptedOnly = ref(false)
 const showUndecryptedOnly = ref(false)
+const displayImages = ref([])  // 实际显示的图片列表，切换筛选/章节时才重新筛选
 
 const editChapterForm = ref({ title: '', directory: '', sortOrder: 0 })
 const editForm = ref({ name: '', author: '', description: '', url: '', directory: '' })
@@ -365,14 +366,17 @@ const togglePlay = () => {
 }
 
 
-const filteredImages = computed(() => {
+const applyFilter = () => {
   if (showDecryptedOnly.value) {
-    return images.value.filter(img => img.isDecrypted)
+    displayImages.value = images.value.filter(img => img.isDecrypted)
   } else if (showUndecryptedOnly.value) {
-    return images.value.filter(img => !img.isDecrypted)
+    displayImages.value = images.value.filter(img => !img.isDecrypted)
+  } else {
+    displayImages.value = [...images.value]
   }
-  return images.value;
-})
+}
+
+const filteredImages = computed(() => displayImages.value)
 
 const hasDecrypted = computed(() => images.value.some(img => img.isDecrypted))
 
@@ -422,9 +426,13 @@ const selectChapter = async (ch) => {
   viewer.value.show = false
   try {
     const res = await comicApi.getChapterImages(ch.id)
-    if (res.success) images.value = res.data.images || []
+    if (res.success) {
+      images.value = res.data.images || []
+      applyFilter()
+    }
   } catch {
     images.value = []
+    applyFilter()
   }
 }
 
@@ -436,6 +444,7 @@ const refreshImages = async () => {
     const res = await comicApi.getChapterImages(currentChapter.value.id)
     if (res.success) {
       images.value = res.data.images || []
+      applyFilter()
       // 强制刷新所有图片 src（带新时间戳）
       nextTick(() => {
         document.querySelectorAll('.image-item img').forEach(el => {
@@ -527,42 +536,23 @@ const getImageUrl = (img) => {
   return base + sep + 't=' + Date.now()
 }
 
-const refreshImage = (img, delayUpdate = false) => {
-  if (delayUpdate) {
-    // 延迟更新 isDecrypted，避免筛选条件下图片立即消失
-    nextTick(() => {
-      const el = document.querySelector(`.image-item[data-filename="${img.fileName}"] img`)
-      if (el) el.src = getImageUrl({ ...img, isDecrypted: true })
-    })
-  } else {
-    img.isDecrypted = true
-    nextTick(() => {
-      const el = document.querySelector(`.image-item[data-filename="${img.fileName}"] img`)
-      if (el) el.src = getImageUrl(img)
-    })
-  }
+const refreshImage = (img) => {
+  img.isDecrypted = true
+  nextTick(() => {
+    const el = document.querySelector(`.image-item[data-filename="${img.fileName}"] img`)
+    if (el) el.src = getImageUrl(img)
+  })
 }
 
-// 还原时也延迟更新，避免筛选条件下图片立即消失
-const restoreImageDisplay = (img, delayUpdate = false) => {
-  if (delayUpdate) {
-    nextTick(() => {
-      const el = document.querySelector(`.image-item[data-filename="${img.fileName}"] img`)
-      if (el) {
-        const base = comicApi.getImageUrl(currentChapter.value.id, img.fileName)
-        el.src = base + '?t=' + Date.now()
-      }
-    })
-  } else {
-    img.isDecrypted = false
-    nextTick(() => {
-      const el = document.querySelector(`.image-item[data-filename="${img.fileName}"] img`)
-      if (el) {
-        const base = comicApi.getImageUrl(currentChapter.value.id, img.fileName)
-        el.src = base + '?t=' + Date.now()
-      }
-    })
-  }
+const restoreImageDisplay = (img) => {
+  img.isDecrypted = false
+  nextTick(() => {
+    const el = document.querySelector(`.image-item[data-filename="${img.fileName}"] img`)
+    if (el) {
+      const base = comicApi.getImageUrl(currentChapter.value.id, img.fileName)
+      el.src = base + '?t=' + Date.now()
+    }
+  })
 }
 
 const decryptSingle = async (img) => {
@@ -574,9 +564,7 @@ const decryptSingle = async (img) => {
       overwrite: decryptConfig.value.overwrite
     })
     if (res.success) {
-      // 仅显示未解密时，延迟更新 isDecrypted，避免图片立即消失
-      const delay = showDecryptedOnly.value || showUndecryptedOnly.value
-      refreshImage(img, delay)
+      refreshImage(img)
     } else {
       alert(res.message || '解密失败')
     }
@@ -597,10 +585,9 @@ const decryptAllImages = async () => {
     })
     if (res.success) {
       const successCount = res.data.results.filter(r => r.success).length
-      const delay = showDecryptedOnly.value || showUndecryptedOnly.value
       filteredImages.value.forEach(img => {
         if (res.data.results.some(r => r.success && r.imageName === img.fileName)) {
-          refreshImage(img, delay)
+          refreshImage(img)
         }
       })
       alert(`解密完成：成功 ${successCount} 张，失败 ${res.data.results.length - successCount} 张`)
@@ -621,8 +608,7 @@ const restoreSingle = async (img) => {
       imageName: img.fileName
     })
     if (res.success) {
-      const delay = showDecryptedOnly.value || showUndecryptedOnly.value
-      restoreImageDisplay(img, delay)
+      restoreImageDisplay(img)
     } else {
       alert(res.message || '还原失败')
     }
@@ -637,24 +623,13 @@ const restoreAllImages = async () => {
     restoring.value = true
     const res = await comicApi.restoreBatch({ chapterId: currentChapter.value.id })
     if (res.success) {
-      const delay = showDecryptedOnly.value || showUndecryptedOnly.value
-      if (delay) {
-        // 延迟更新：只刷新图片显示，不改 isDecrypted
-        nextTick(() => {
-          document.querySelectorAll('.image-item img').forEach(el => {
-            const src = el.src.split('?')[0]
-            el.src = src + '?t=' + Date.now()
-          })
+      images.value.forEach(img => { img.isDecrypted = false })
+      nextTick(() => {
+        document.querySelectorAll('.image-item img').forEach(el => {
+          const src = el.src.split('?')[0]
+          el.src = src + '?t=' + Date.now()
         })
-      } else {
-        images.value.forEach(img => { img.isDecrypted = false })
-        nextTick(() => {
-          document.querySelectorAll('.image-item img').forEach(el => {
-            const src = el.src.split('?')[0]
-            el.src = src + '?t=' + Date.now()
-          })
-        })
-      }
+      })
       alert(res.message || '还原完成')
     } else {
       alert(res.message || '还原失败')
@@ -761,6 +736,11 @@ watch(showEdit, (val) => {
       directory: comic.value?.directory || ''
     }
   }
+})
+
+// 切换筛选项时重新筛选
+watch([showDecryptedOnly, showUndecryptedOnly], () => {
+  applyFilter()
 })
 
 // 关闭查看器时停止播放
