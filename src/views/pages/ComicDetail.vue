@@ -156,6 +156,7 @@
             <div class="image-actions">
               <button class="btn btn-xs" @click.stop="decryptSingle(img)">解密</button>
               <button class="btn btn-xs btn-warning" @click.stop="restoreSingle(img)">还原</button>
+              <button v-if="!comic.coverPath" class="btn btn-xs" @click.stop="setAsCover(img)" :disabled="settingCover">设为封面</button>
             </div>
           </div>
 
@@ -317,6 +318,7 @@ const orderText = ref('2,1,0')        // 文本形式绑定
 const decrypting = ref(false)
 const refreshing = ref(false)
 const restoring = ref(false)
+const settingCover = ref(false)
 
 const viewer = ref({ show: false, index: 0, currentSrc: '', currentDecrypted: false })
 
@@ -661,6 +663,27 @@ const restoreAllImages = async () => {
     alert('批量还原失败：' + (error.message || error))
   } finally {
     restoring.value = false
+  }
+}
+
+// ---------- 查看器 ----------
+
+const setAsCover = async (img) => {
+  if (!currentChapter.value || !comic.value) return
+  try {
+    settingCover.value = true
+    const fullPath = currentChapter.value.directory + '/' + img.fileName
+    const res = await comicApi.update(comic.value.id, { ...comic.value, coverPath: fullPath })
+    if (res.success) {
+      comic.value.coverPath = fullPath
+      alert('已设置为封面')
+    } else {
+      alert(res.message || '设置失败')
+    }
+  } catch (error) {
+    alert('设置封面失败：' + (error.message || error))
+  } finally {
+    settingCover.value = false
   }
 }
 
