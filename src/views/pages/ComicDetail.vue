@@ -737,7 +737,9 @@ const handleUpdate = async () => {
       author: editForm.value.author || undefined,
       description: editForm.value.description || undefined,
       url: editForm.value.url || undefined,
-      directory: editForm.value.directory || undefined
+      directory: editForm.value.directory || undefined,
+      coverPath: comic.value.coverPath || undefined,
+      status: editForm.value.status
     })
     if (res.success) {
       showEdit.value = false
@@ -1049,15 +1051,15 @@ onUnmounted(() => {
 }
 
 .decrypt-input {
+  width: 50px;
   padding: 4px 8px;
   border: 1px solid #ccc;
   border-radius: 4px;
   font-size: 13px;
-  text-align: center;
 }
 
 .order-text {
-  width: 120px;
+  width: 235px;
   text-align: left;
   font-family: monospace;
 }
