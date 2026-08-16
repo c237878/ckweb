@@ -116,7 +116,7 @@ const endDate = ref('')
 const selectedIds = ref([])
 const gotoVal = ref()
 
-const totalPages = computed(() => Math.ceil(total.value / pageSize.value))
+const totalPages = computed(() => Math.ceil(total.value / pageSize))
 const allChecked = computed(() =>
   likeList.value.length > 0 && likeList.value.every(i => selectedIds.value.includes(i.id))
 )
