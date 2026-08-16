@@ -4,8 +4,10 @@
     <div class="detail-header">
       <button class="back-btn" @click="$router.back()">← 返回</button>
       <div class="comic-title">
-        <h1>{{ comic.name }} <span v-if="comic.status === 1" class="badge-completed">完结</span></h1>
+        <h1>{{ comic.name }}</h1>
         <span class="author" v-if="comic.author">作者：{{ comic.author }}</span>
+        <span v-if="comic.status === 1" class="badge-completed">完结</span>
+        <span v-if="likeCount" class="like-count">♥ {{ likeCount }}</span>
       </div>
       <div class="header-actions">
         <button class="action-btn like-btn" @click="handleLike" :disabled="likeDisabled">
@@ -884,13 +886,13 @@ onUnmounted(() => {
 }
 
 .action-btn {
-  height: 32px;
+  height: 37px;
   padding: 0 12px;
   display: flex;
   justify-content: center;
   align-items: center;
   border: 1px solid #ddd;
-  border-radius: 8px;
+  border-radius: 6px;
   background: #fff;
   cursor: pointer;
   font-size: 13px;
@@ -946,6 +948,7 @@ onUnmounted(() => {
 .value { color: #333; word-break: break-all; }
 .link { color: #3498db; text-decoration: none; }
 .link:hover { text-decoration: underline; }
+.like-count { color: #e74c3c; font-weight: bold; }
 
 /* ---------- 主区域 ---------- */
 .main-area {

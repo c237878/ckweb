@@ -8,23 +8,23 @@
     </div>
 
     <div class="filters">
+      <select v-model.number="statusFilter" @change="handleSearch" class="status-select">
+        <option :value="-1">全部状态</option>
+        <option :value="0">连载中</option>
+        <option :value="1">完结</option>
+      </select>
       <input
         v-model="keyword"
         placeholder="搜索漫画名称或作者..."
         type="text"
         @keyup.enter="handleSearch"
       />
-      <select v-model.number="statusFilter" @change="handleSearch" class="status-select">
-        <option :value="-1">全部状态</option>
-        <option :value="0">连载中</option>
-        <option :value="1">完结</option>
-      </select>
+      <button class="search-btn" @click="handleSearch">搜索</button>
       <select v-model="sortBy" @change="handleSearch" class="status-select">
         <option value="">默认排序</option>
         <option value="name">按名称</option>
         <option value="likes">按点赞</option>
       </select>
-      <button class="search-btn" @click="handleSearch">搜索</button>
     </div>
 
     <div class="comic-grid" v-if="comicList.length > 0">
