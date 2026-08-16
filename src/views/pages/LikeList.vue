@@ -320,6 +320,10 @@ onMounted(() => {
   font-weight: 600;
 }
 
+.like-table td:nth-child(2) {
+  width: 104px;
+}
+
 .col-check {
   width: 40px;
 }
@@ -329,7 +333,7 @@ onMounted(() => {
 }
 
 .row-cover {
-  width: 40px;
+  width: 84px;
   height: 56px;
   object-fit: cover;
   border-radius: 4px;
@@ -358,6 +362,7 @@ onMounted(() => {
 }
 
 .type-badge {
+  width: 40px;
   display: inline-block;
   padding: 2px 8px;
   border-radius: 10px;
