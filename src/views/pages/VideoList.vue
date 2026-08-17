@@ -200,9 +200,10 @@ const handleSelectVideo = (videoId) => {
 }
 
 const batchDelete = async () => {
-  if (!confirm(`确定要删除选中的 ${selectedIds.value.length} 部影片吗？`)) return
+  const choice = await showDeleteConfirm()
+  if (choice === 'cancel') return
   try {
-    await videoApi.batchDelete(selectedIds.value)
+    await videoApi.batchDelete(selectedIds.value, { deleteFiles: choice === 'deleteAll' })
     selectedIds.value = []
     await loadVideos()
   } catch (error) {
