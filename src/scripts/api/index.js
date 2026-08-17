@@ -74,7 +74,7 @@ export const videoApi = {
   getRecommend: (id, limit = 8) => api.get(`/video/${id}/recommend`, { params: { limit } }),
   add: (data) => api.post('/video/add', data),
   update: (id, data) => api.put(`/video/${id}`, data),
-  delete: (id) => api.delete(`/video/${id}`),
+  delete: (id, params) => api.delete(`/video/${id}`, { params }),
   batchDelete: (ids) => api.delete('/video/batch', { data: { ids } }),
   scan: (data) => api.post('/video/scan-directory', data),
   scanAll: () => api.post('/video/scan'),

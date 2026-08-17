@@ -108,6 +108,19 @@
       @cancel="showAddDialog = false; editingVideo = null"
       @delete="handleDeleteVideo"
     />
+
+    <!-- 删除确认弹窗 -->
+    <div v-if="deleteConfirmVisible" class="delete-confirm-overlay" @click="handleDeleteChoice('cancel')">
+      <div class="delete-confirm-dialog" @click.stop>
+        <h3>确认删除</h3>
+        <p>确定要删除这部影片吗？</p>
+        <div class="delete-confirm-actions">
+          <button class="delete-cancel-btn" @click="handleDeleteChoice('cancel')">取消</button>
+          <button class="delete-record-btn" @click="handleDeleteChoice('deleteRecordOnly')">仅删记录</button>
+          <button class="delete-all-btn" @click="handleDeleteChoice('deleteAll')">删除记录和文件</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -312,14 +325,35 @@ const handleSaveContinue = async (formData) => {
 }
 
 const handleDeleteVideo = async (videoId) => {
-  if (!confirm('确定要删除这部影片吗？')) return
+  // 二次确认，让用户选择是否删除文件
+  const choice = await showDeleteConfirm(videoId)
+  if (choice === 'cancel') return
+  
   try {
-    await videoApi.delete(videoId)
+    await videoApi.delete(videoId, { deleteFiles: choice === 'deleteAll' })
     showAddDialog.value = false
     editingVideo.value = null
     await loadVideos()
   } catch (error) {
     console.error('删除失败:', error)
+    alert('删除失败：' + error.message)
+  }
+}
+
+// 自定义删除确认弹窗
+const deleteConfirmVisible = ref(false)
+const deleteConfirmResolve = ref(null)
+const showDeleteConfirm = (videoId) => {
+  return new Promise((resolve) => {
+    deleteConfirmResolve.value = resolve
+    deleteConfirmVisible.value = true
+  })
+}
+const handleDeleteChoice = (choice) => {
+  deleteConfirmVisible.value = false
+  if (deleteConfirmResolve.value) {
+    deleteConfirmResolve.value(choice)
+    deleteConfirmResolve.value = null
   }
 }
 </script>
@@ -558,4 +592,80 @@ const handleDeleteVideo = async (videoId) => {
 .batch-delete-btn:hover {
   background: #c0392b;
 }
+.delete-confirm-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+.delete-confirm-dialog {
+  background: #fff;
+  border-radius: 8px;
+  padding: 24px;
+  max-width: 400px;
+  width: 90%;
+}
+
+.delete-confirm-dialog h3 {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
+
+.delete-confirm-dialog p {
+  margin: 0 0 20px;
+  color: #666;
+}
+
+.delete-confirm-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.delete-cancel-btn {
+  padding: 8px 16px;
+  background: #f0f0f0;
+  color: #333;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.delete-cancel-btn:hover {
+  background: #e0e0e0;
+}
+
+.delete-record-btn {
+  padding: 8px 16px;
+  background: #f39c12;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.delete-record-btn:hover {
+  background: #d68910;
+}
+
+.delete-all-btn {
+  padding: 8px 16px;
+  background: #e74c3c;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.delete-all-btn:hover {
+  background: #c0392b;
+}
+
 </style>
