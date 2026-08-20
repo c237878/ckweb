@@ -92,7 +92,8 @@ export const videoApi = {
   getLikeStats: (year, month) => api.get('/video/likes/stats', { params: { year, month } }),
   getDailyRecommend: (count, refresh = false) => api.get('/video/daily-recommend', { params: { count, refresh } }),
   getRecentlyLiked: (count) => api.get('/video/recently-liked', { params: { count } }),
-  getTopLiked: (count) => api.get('/video/top-liked', { params: { count } })
+  getTopLiked: (count) => api.get('/video/top-liked', { params: { count } }),
+  renameToCode: () => api.post('/video/rename-to-code'),
 }
 
 // 演员相关API

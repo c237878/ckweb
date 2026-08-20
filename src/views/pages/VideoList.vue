@@ -10,6 +10,9 @@
         <button v-if="selectedIds.length > 0" class="batch-delete-btn" @click="batchDelete">
           批量删除 ({{ selectedIds.length }})
         </button>
+        <button class="rename-check-btn" :disabled="renaming" @click="checkAndRename">
+          {{ renaming ? '检查中...' : '校验文件名' }}
+        </button>
         <button class="add-btn" @click="showAddDialog = true">添加影片</button>
       </div>
     </div>
@@ -150,6 +153,37 @@ const filters = ref({
   mediaAttrFlags: ''
 })
 const showAddDialog = ref(false)
+const renaming = ref(false)
+
+const checkAndRename = async () => {
+    if (renaming.value) return
+    if (!confirm('将检查所有影片的视频文件名和封面文件名是否与番号一致，不一致的自动重命名。是否继续？')) return
+    renaming.value = true
+    try {
+        const res = await videoApi.renameToCode()
+        if (res.success) {
+            const d = res.data
+            const lines = d.details.slice(0, 20).map(item => {
+                if (item.errors?.length > 0) {
+                    return `⚠️ ${item.code}：${item.errors.join('；')}`
+                }
+                const parts = []
+                if (item.fileRenamed) parts.push(`视频 ${item.oldFile.split('/').pop()}→${item.newFile.split('/').pop()}`)
+                if (item.coverRenamed) parts.push(`封面 ${item.oldCover.split('/').pop()}→${item.newCover.split('/').pop()}`)
+                return `✅ ${item.code}：${parts.join('，')}`
+            })
+            const more = d.details.length > 20 ? `\n...还有 ${d.details.length - 20} 条` : ''
+            alert(`检查完成：重命名 ${d.renamed} 条，已一致 ${d.skipped} 条，失败 ${d.failed} 条\n\n${lines.join('\n')}${more}`)
+            await loadVideos()
+        } else {
+            alert('检查失败: ' + (res.message || '未知错误'))
+        }
+    } catch (error) {
+        console.error('校验文件名失败:', error)
+        alert('检查失败: ' + error.message)
+    }
+    renaming.value = false
+}
 const editingVideo = ref(null)
 const selectedIds = ref([])
 const showSeriesDropdown = ref(false)
@@ -378,6 +412,26 @@ const handleDeleteChoice = (choice) => {
   font-size: 28px;
   color: #333;
   margin: 0;
+}
+
+.rename-check-btn {
+  padding: 10px 20px;
+  background: #8e44ad;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.2s;
+}
+
+.rename-check-btn:hover:not(:disabled) {
+  background: #7d3c98;
+}
+
+.rename-check-btn:disabled {
+  background: #95a5a6;
+  cursor: not-allowed;
 }
 
 .add-btn {
