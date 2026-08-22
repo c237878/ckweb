@@ -173,7 +173,7 @@ const checkAndRename = async () => {
                 return `✅ ${item.code}：${parts.join('，')}`
             })
             const more = d.details.length > 20 ? `\n...还有 ${d.details.length - 20} 条` : ''
-            alert(`检查完成：重命名 ${d.renamed} 条，已一致 ${d.skipped} 条，失败 ${d.failed} 条\n\n${lines.join('\n')}${more}`)
+            alert(`检查完成：重命名 ${d.renamed} 条，跳过 ${d.skipped} 条，失败 ${d.failed} 条\n\n${lines.join('\n')}${more}`)
             await loadVideos()
         } else {
             alert('检查失败: ' + (res.message || '未知错误'))
