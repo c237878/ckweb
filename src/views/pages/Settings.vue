@@ -21,17 +21,11 @@
       </div>
     </div>
 
-    <!-- 扫描目录管理 -->
+    <!-- 文件目录管理 -->
     <div class="settings-section">
       <h2>
-        扫描目录
+        文件目录
         <button class="add-btn" @click="openAddScanDirDialog">+ 添加目录</button>
-        <button class="scan-all-btn" @click="scanAllDirs" :disabled="scanning || scanDirList.length === 0">
-          {{ scanning ? '扫描中...' : '扫描全部' }}
-        </button>
-        <span v-if="scanning && scanProgress.status === 'running'" class="scan-progress">
-          发现 {{ scanProgress.found }} | 新增 {{ scanProgress.added }} | 清理 {{ scanProgress.cleared }}
-        </span>
       </h2>
       <div class="scan-list" v-if="scanDirList.length > 0">
         <div class="scan-item" v-for="item in scanDirList" :key="item.id">
@@ -39,37 +33,28 @@
             <div class="scan-path">{{ item.path }}</div>
             <div class="scan-meta">
               <span class="meta-tag" v-if="item.category">{{ item.category }}</span>
-              <span class="meta-tag green" v-if="item.recursive">递归</span>
-              <span class="meta-tag green" v-if="item.autoCreateSeries">自动系列</span>
             </div>
           </div>
           <div class="scan-actions">
-            <button class="btn-scan" @click="scanSingleDir(item)" :disabled="scanningDirs.has(item.id) || scanning">
-              {{ scanningDirs.has(item.id) ? '扫描中...' : '扫描' }}
-            </button>
             <button class="btn-edit" @click="openEditScanDirDialog(item)">编辑</button>
             <button class="btn-delete" @click="deleteScanDir(item)">删除</button>
           </div>
         </div>
       </div>
-      <div class="empty-tip" v-else>暂无扫描目录，点击上方按钮添加</div>
+      <div class="empty-tip" v-else>暂无目录，点击上方按钮添加</div>
     </div>
 
-    <!-- 扫描目录弹窗 -->
+    <!-- 文件目录弹窗 -->
     <div class="dialog-overlay" v-if="showScanDirDialog"
          @mousedown="handleScanDirOverlayDown"
          @click="handleScanDirOverlayClick">
       <div class="dialog">
         <div class="dialog-header">
-          <h3>{{ editingScanDir ? '编辑扫描目录' : '添加扫描目录' }}</h3>
+          <h3>{{ editingScanDir ? '编辑文件目录' : '添加文件目录' }}</h3>
         </div>
         <div class="dialog-body">
           <div class="form-group">
-            <label>目录路径 *</label>
-            <input v-model="scanDirForm.path" placeholder="如: /Volumes/wdc4t/视频" />
-          </div>
-          <div class="form-group">
-            <label>分类</label>
+            <label>目录分类 *</label>
             <div class="combobox-wrap">
               <input
                 v-model="scanDirForm.category"
@@ -78,16 +63,15 @@
                 @blur="hideCatDropdown"
               />
               <div v-if="showCatDropdown" class="combobox-dropdown">
-                <div class="combobox-option" @mousedown.prevent="selectCat('')">（无分类）</div>
-                <div v-for="c in categories" :key="c" class="combobox-option" @mousedown.prevent="selectCat(c)">{{ c }}</div>
+                <div class="combobox-option" @mousedown.prevent="selectCat('视频')">视频</div>
+                <div class="combobox-option" @mousedown.prevent="selectCat('封面')">封面</div>
+                <div class="combobox-option" @mousedown.prevent="selectCat('字幕')">字幕</div>
               </div>
             </div>
           </div>
-          <div class="form-group form-check">
-            <label><input type="checkbox" v-model="scanDirForm.recursive" /> 递归扫描子目录</label>
-          </div>
-          <div class="form-group form-check">
-            <label><input type="checkbox" v-model="scanDirForm.autoCreateSeries" /> 自动添加新系列</label>
+          <div class="form-group">
+            <label>目录路径 *</label>
+            <input v-model="scanDirForm.path" placeholder="如: /Volumes/wdc4t/视频" />
           </div>
         </div>
         <div class="dialog-footer">
@@ -164,11 +148,10 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { settingApi, videoApi, friendLinkApi, scanDirectoryApi } from '@/scripts/api'
+import { settingApi, friendLinkApi } from '@/scripts/api'
 
 const settingsList = ref([
   { id: 'siteName', label: '网站名称', value: '', placeholder: '影视网站' },
-  { id: 'scanType', label: '扫描类型', value: '', placeholder: '如: .mp4,.mkv,.avi（多个后缀以逗号分隔）' },
   { id: 'pageSize', label: '每页数量', value: '', placeholder: '列表每页显示数量，默认 24' },
   { id: 'homePageCategories', label: '首页展示分类', value: '', placeholder: '多个分类用逗号分隔，留空显示全部' },
   { id: 'homePageCategoryCount', label: '首页分类数量', value: '', placeholder: '每个分类/板块显示数量，默认 12' },
@@ -192,28 +175,17 @@ function clearDialogTip() {
   dialogTip.value.show = false
 }
 
-// 扫描目录
+// 文件目录
 const scanDirList = ref([])
 const showScanDirDialog = ref(false)
 const editingScanDir = ref(null)
-const scanDirForm = ref({ path: '', recursive: true, category: '', autoCreateSeries: false })
+const scanDirForm = ref({ path: '', recursive: false, category: '', autoCreateSeries: false })
 const showCatDropdown = ref(false)
-const categories = ref([])
-const scanningDirs = ref(new Set()) // 记录正在被扫描的目录ID
 
 const hideCatDropdown = () => { setTimeout(() => { showCatDropdown.value = false }, 200) }
 const selectCat = (val) => { scanDirForm.value.category = val; showCatDropdown.value = false }
 
-const loadCategories = async () => {
-  try {
-    const res = await videoApi.getMeta()
-    if (res.success) categories.value = res.categories || []
-  } catch (error) {
-    console.error('加载分类失败:', error)
-  }
-}
 const saving = ref(false)
-const scanning = ref(false)
 
 // 弹窗点击穿透处理
 let mouseDownOnDialog = false
@@ -232,7 +204,6 @@ function closeScanDirDialog() {
 onMounted(async () => {
   await loadSettings()
   await loadScanDirList()
-  await loadCategories()
   await loadFriendLinkList()
 })
 
@@ -284,19 +255,19 @@ const checkDirExists = async (path) => {
   }
 }
 
-// 扫描目录管理
+// 文件目录管理
 const loadScanDirList = async () => {
   try {
     const res = await fetch('/api/scandirectory').then(r => r.json())
     if (res.success) scanDirList.value = res.data || []
   } catch (error) {
-    console.error('加载扫描目录失败:', error)
+    console.error('加载文件目录失败:', error)
   }
 }
 
 const openAddScanDirDialog = () => {
   editingScanDir.value = null
-  scanDirForm.value = { path: '', recursive: true, category: '', autoCreateSeries: false }
+  scanDirForm.value = { path: '', recursive: false, category: '', autoCreateSeries: false }
   clearDialogTip()
   showScanDirDialog.value = true
 }
@@ -305,9 +276,9 @@ const openEditScanDirDialog = (item) => {
   editingScanDir.value = item
   scanDirForm.value = {
     path: item.path,
-    recursive: item.recursive,
+    recursive: false,
     category: item.category || '',
-    autoCreateSeries: item.autoCreateSeries || false
+    autoCreateSeries: false
   }
   clearDialogTip()
   showScanDirDialog.value = true
@@ -353,7 +324,7 @@ const saveScanDir = async () => {
 }
 
 const deleteScanDir = async (item) => {
-  if (!confirm(`确定删除扫描目录 "${item.path}" 吗？`)) return
+  if (!confirm(`确定删除文件目录 "${item.path}" 吗？`)) return
   try {
     const res = await fetch(`/api/scandirectory/${item.id}`, { method: 'DELETE' }).then(r => r.json())
     if (res.success) {
@@ -364,89 +335,6 @@ const deleteScanDir = async (item) => {
     }
   } catch (error) {
     showPageTip('删除失败: ' + error.message, 'error')
-  }
-}
-
-// 扫描单个目录
-const scanSingleDir = async (dir) => {
-  if (scanningDirs.value.has(dir.id)) return
-  if (!confirm(`确定扫描目录：${dir.path}？`)) return
-  scanningDirs.value.add(dir.id)
-  try {
-    const res = await scanDirectoryApi.scan(dir.path, dir.recursive !== false)
-    if (res.success) {
-      showPageTip(`扫描任务已启动！`, 'success')
-      const taskId = res.data?.taskId
-      // 轮询该任务状态，结束后从 Set 中移除
-      const poll = async () => {
-        const r = await fetch(`/api/video/scan/${taskId}`).then(x => x.json())
-        if (r.success && r.data?.status === 'pending') {
-          setTimeout(poll, 500)
-        } else {
-          scanningDirs.value.delete(dir.id)
-        }
-      }
-      poll()
-    } else {
-      showPageTip(res.message || '扫描失败', 'error')
-      scanningDirs.value.delete(dir.id)
-    }
-  } catch (error) {
-    showPageTip('扫描失败: ' + error.message, 'error')
-    scanningDirs.value.delete(dir.id)
-  }
-}
-
-// 扫描所有目录
-const scanAllDirs = async () => {
-  if (scanDirList.value.length === 0) return
-  if (!confirm(`确定扫描全部 ${scanDirList.value.length} 个目录吗？`)) return
-  scanning.value = true
-  scanProgress.value = { status: 'pending', found: 0, added: 0, cleared: 0 }
-  try {
-    const res = await videoApi.scanAll()
-    if (res.success) {
-      const taskId = res.data?.taskId
-      showPageTip(`扫描任务已启动！`, 'success')
-      // 轮询任务状态
-      pollScanProgress(taskId)
-    } else {
-      showPageTip(res.message || '扫描失败', 'error')
-      scanning.value = false
-    }
-  } catch (error) {
-    showPageTip('扫描失败: ' + error.message, 'error')
-    scanning.value = false
-  }
-}
-
-const scanProgress = ref({ status: 'pending', found: 0, added: 0, cleared: 0 })
-
-const pollScanProgress = async (taskId) => {
-  try {
-    const res = await fetch(`/api/video/scan/${taskId}`).then(r => r.json())
-    if (res.success) {
-      const task = res.data
-      scanProgress.value = {
-        status: task.status,
-        found: task.files_found || 0,
-        added: task.files_added || 0,
-        cleared: task.files_updated || 0
-      }
-      
-      if (task.status === 'running' || task.status === 'pending') {
-        setTimeout(() => pollScanProgress(taskId), 500)
-      } else if (task.status === 'completed') {
-        showPageTip(`扫描完成！发现 ${task.files_found} 个文件，新增 ${task.files_added} 个，清理 ${task.files_updated} 个`, 'success')
-        scanning.value = false
-      } else if (task.status === 'failed') {
-        showPageTip('扫描失败: ' + (task.errors || '未知错误'), 'error')
-        scanning.value = false
-      }
-    }
-  } catch (error) {
-    console.error('轮询扫描进度失败:', error)
-    scanning.value = false
   }
 }
 

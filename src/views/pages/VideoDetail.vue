@@ -269,7 +269,7 @@ const initCkplayer = async () => {
 
     // 检查字幕
     try {
-        const subRes = await videoApi.checkSubtitle(video.value.id)
+        const subRes = await videoApi.checkSubtitle(video.value.code)
         if (subRes.success && subRes.hasSubtitle) {
             subtitleInfo.value = subRes
         } else {

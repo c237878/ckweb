@@ -76,12 +76,9 @@ export const videoApi = {
   update: (id, data) => api.put(`/video/${id}`, data),
   delete: (id, params) => api.delete(`/video/${id}`, { params }),
   batchDelete: (ids, params) => api.delete('/video/batch', { data: { ids }, params }),
-  scan: (data) => api.post('/video/scan-directory', data),
-  scanAll: () => api.post('/video/scan'),
-  getScanStatus: (taskId) => api.get(`/video/scan/${taskId}`),
   getStreamUrl: (id) => `/api/video/stream/${id}`,
   getCoverUrl: (id) => `/api/video/cover/${id}`,
-  checkSubtitle: (id) => api.get(`/video/${id}/subtitle/check`),
+  checkSubtitle: (code) => api.get(`/video/${code}/subtitle/check`),
   getMeta: () => api.get('/video/meta'),
   getAutoCode: () => api.get('/video/autocode'),
   like: (id) => api.post(`/video/${id}/like`),
@@ -127,14 +124,12 @@ export const seriesApi = {
   updateSort: (id, data) => api.post(`/series/${id}/sort`, data)
 }
 
-// 扫描目录相关API
+// 文件目录相关API
 export const scanDirectoryApi = {
   getList: () => api.get('/scanDirectory'),
   add: (data) => api.post('/scanDirectory', data),
   update: (id, data) => api.put(`/scanDirectory/${id}`, data),
   delete: (id) => api.delete(`/scanDirectory/${id}`),
-  // 扫描单个目录（复用 videoApi.scan）
-  scan: (path, recursive = true) => api.post('/video/scan-directory', { targetPath: path, recursive })
 }
 
 export const uploadApi = {

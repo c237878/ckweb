@@ -104,14 +104,9 @@
         <div v-if="showVideoDirDropdown" class="upload-dir-panel">
           <div class="upload-dir-header">选择保存目录</div>
           <div class="upload-dir-list">
-            <div
-              v-for="dir in scanDirectories"
-              :key="dir.id"
-              class="upload-dir-item"
-              @click="pickVideoFile(dir.path)"
-            >
-              {{ dir.path }}
-            </div>
+            <template v-for="dir in scanDirectories" :key="dir.id">
+              <div class="upload-dir-item" @click="pickVideoFile(dir.path)" v-if="dir.category === '视频'">{{ dir.path }}</div>
+            </template>
           </div>
           <div class="upload-dir-custom">
             <input
@@ -146,14 +141,11 @@
         <div v-if="showCoverDirDropdown" class="upload-dir-panel">
           <div class="upload-dir-header">选择保存目录</div>
           <div class="upload-dir-list">
-            <div
-              v-for="dir in scanDirectories"
-              :key="dir.id"
-              class="upload-dir-item"
-              @click="pickCoverFile(dir.path)"
-            >
-              {{ dir.path.replace(/[\\/]video$/i, '/cover').replace(/[\\/]video[\\/]/i, '/cover/') }}
-            </div>
+            <template v-for="dir in scanDirectories" :key="dir.id">
+              <div class="upload-dir-item" @click="pickCoverFile(dir.path)" v-if="dir.category === '封面'">
+                {{ dir.path.replace(/[\\/]video$/i, '/cover').replace(/[\\/]video[\\/]/i, '/cover/') }}
+              </div>
+            </template>
           </div>
           <div class="upload-dir-custom">
             <input
@@ -298,7 +290,7 @@ const loadScanDirectories = async () => {
       scanDirectories.value = res.data || []
     }
   } catch (e) {
-    console.error('加载扫描目录失败:', e)
+    console.error('加载文件目录失败:', e)
   }
 }
 
