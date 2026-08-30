@@ -87,6 +87,7 @@
         <label>视频路径</label>
         <div class="path-row">
           <input v-model="form.filePath" type="text" placeholder="视频文件完整路径（如 /Volumes/disk1/movies/...）" />
+          <button class="fill-btn" @click="fillVideoPath" title="根据番号自动填充">填充</button>
           <button class="upload-btn" @click="showVideoUploadDir" :disabled="uploading">
             <span v-if="uploading && uploadTarget === 'video'">上传中 {{ uploadProgress }}%</span>
             <span v-else>上传视频</span>
@@ -125,6 +126,7 @@
         <label>封面路径</label>
         <div class="path-row">
           <input v-model="form.coverPath" type="text" placeholder="封面图片路径（选填，如 /Volumes/disk1/cover.jpg）" />
+          <button class="fill-btn" @click="fillCoverPath" title="根据番号自动填充">填充</button>
           <button class="upload-btn" @click="showCoverUploadDir" :disabled="uploading">
             <span v-if="uploading && uploadTarget === 'cover'">上传中 {{ uploadProgress }}%</span>
             <span v-else>上传封面</span>
@@ -281,6 +283,43 @@ const form = ref({
   coverPath: '',
   fileSize: null
 })
+
+// 一键填充视频路径：保存目录/番号.mp4
+const fillVideoPath = () => {
+  if (!form.value.code) {
+    alert('请先填写番号')
+    return
+  }
+  const videoDirs = scanDirectories.value.filter(d => d.category === '视频')
+  if (videoDirs.length === 0) {
+    alert('没有配置视频保存目录')
+    return
+  }
+  const dir = videoDirs[0].path.replace(/\/+$/, '')
+  form.value.filePath = `${dir}/${form.value.code}.mp4`
+}
+
+// 一键填充封面路径：保存目录/番号.jpg
+const fillCoverPath = () => {
+  if (!form.value.code) {
+    alert('请先填写番号')
+    return
+  }
+  const coverDirs = scanDirectories.value.filter(d => d.category === '封面')
+  if (coverDirs.length > 0) {
+    const dir = coverDirs[0].path.replace(/\/+$/, '')
+    form.value.coverPath = `${dir}/${form.value.code}.jpg`
+  } else {
+    // 没有封面目录，尝试从视频目录推导
+    const videoDirs = scanDirectories.value.filter(d => d.category === '视频')
+    if (videoDirs.length > 0) {
+      const dir = videoDirs[0].path.replace(/[\\/]video$/i, '/cover').replace(/[\\/]video[\\/]/i, '/cover/').replace(/\/+$/, '')
+      form.value.coverPath = `${dir}/${form.value.code}.jpg`
+    } else {
+      alert('没有配置封面保存目录')
+    }
+  }
+}
 
 // ===== 上传相关 =====
 const loadScanDirectories = async () => {
@@ -620,16 +659,31 @@ const handleDelete = () => {
 .path-row { display: flex; gap: 8px; align-items: center; }
 .path-row input { flex: 1; }
 .upload-btn {
+  white-space: nowrap;
   padding: 8px 14px;
-  background: #3498db;
-  color: white;
-  border: none;
+  border: 1px solid #4a9eff;
+  background: #4a9eff;
+  color: #fff;
   border-radius: 4px;
   cursor: pointer;
   font-size: 13px;
-  white-space: nowrap;
-  flex-shrink: 0;
 }
+
+.fill-btn {
+  white-space: nowrap;
+  padding: 8px 14px;
+  border: 1px solid #27ae60;
+  background: #27ae60;
+  color: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.fill-btn:hover {
+  background: #229954;
+}
+
 .upload-btn:hover { background: #2980b9; }
 .upload-btn:disabled { background: #b0bec5; cursor: not-allowed; }
 
