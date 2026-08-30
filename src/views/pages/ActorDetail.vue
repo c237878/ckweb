@@ -11,17 +11,23 @@
       <p v-if="actor.bio" class="bio-row">{{ decodeBio(actor.bio) }}</p>
     </div>
 
-    <!-- 海报墙 -->
+    <!-- 海报墙（优化后） -->
     <div class="poster-wall" v-if="posters.length > 0">
       <div class="poster-grid" ref="posterGridRef">
         <div
           v-for="(p, i) in posters"
           :key="p"
           class="poster-item"
-          :style="posterStyles[i]"
+          :style="getPosterStyle(i)"
           @click="openLightbox(i)"
+          @mouseenter="handleHover(i, true)"
+          @mouseleave="handleHover(i, false)"
         >
-          <img :src="`/api/actor/${actorId}/poster/${encodeURIComponent(p)}`" :alt="p" />
+          <img 
+            :src="`/api/actor/${actorId}/poster/${encodeURIComponent(p)}`" 
+            :alt="p" 
+            loading="lazy" 
+          />
         </div>
       </div>
     </div>
@@ -63,7 +69,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch, computed } from 'vue'
+import { ref, onMounted, watch, computed, nextTick, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { actorApi } from '@/scripts/api'
 import VideoCard from '@/views/components/VideoCard.vue'
@@ -79,9 +85,20 @@ const displayVideos = computed(() => {
   return videos.value.filter(v => (v.mediaAttrFlags || 0) === f)
 })
 const posters = ref([])
-const posterStyles = ref([])
+const posterStyles = ref({})
+const hoveredIndex = ref(-1)
 const lightboxIndex = ref(null)
 const posterGridRef = ref(null)
+
+// 海报墙配置（与首页保持一致）
+const POSTER_CONFIG = {
+  baseWidth: 150,
+  aspectRatio: 1.4,      // 宽高比 1:1.4
+  jitterStrength: 0.35,  // 抖动强度
+  minGap: 20,
+  maxRotation: 5,
+  padding: 20
+}
 
 // 解码简介中可能包含的 URL 编码文本
 const decodeBio = (text) => {
@@ -143,42 +160,90 @@ const loadVideos = async () => {
   }
 }
 
-const generatePosterLayout = (count) => {
-  const baseW = 150       // 基准宽度
-  const baseH = 210       // 基准高度
-  const pad = 20          // 容器内边距
-  const overlapX = 40     // 水平重叠量（数值越小重叠越多）
-  const overlapY = 30     // 垂直重叠量
+// 新的网格抖动布局算法
+const calculatePosterLayout = () => {
+  if (!posterGridRef.value || posters.value.length === 0) return
 
-  // 估算可用宽度
-  const docW = window.innerWidth
-  const availW = Math.min(docW - 80, 1200) - pad * 2
-  const cellW = baseW - overlapX
-
+  const containerW = posterGridRef.value.clientWidth
+  const containerH = posterGridRef.value.clientHeight
+  
+  const effectiveW = containerW - POSTER_CONFIG.padding * 2
+  const effectiveH = containerH - POSTER_CONFIG.padding * 2
+  
+  const avgItemW = POSTER_CONFIG.baseWidth + POSTER_CONFIG.minGap
+  const avgItemH = (POSTER_CONFIG.baseWidth * POSTER_CONFIG.aspectRatio) + POSTER_CONFIG.minGap
+  
   // 计算列数
-  const cols = Math.max(2, Math.min(Math.floor(availW / cellW), count, 10))
-  // 平均分配列间距，填满整个可用宽度
-  const spacing = cols <= 1 ? availW - baseW : (availW - baseW) / (cols - 1)
-  // 内容宽度
-  const totalW = (cols - 1) * spacing + baseW
-  const offsetX = pad + (availW - totalW) / 2
-
-  const styles = []
-  for (let i = 0; i < count; i++) {
+  let cols = Math.floor(effectiveW / avgItemW)
+  cols = Math.max(2, Math.min(cols, 8)) // 限制最大8列
+  
+  const rows = Math.ceil(posters.value.length / cols)
+  
+  const stepX = effectiveW / cols
+  const stepY = effectiveH / rows
+  
+  const newStyles = {}
+  
+  posters.value.forEach((_, i) => {
     const col = i % cols
     const row = Math.floor(i / cols)
-    const w = baseW + Math.random() * 20  // 150~170
-    const x = offsetX + col * spacing + (spacing - w) / 2 + Math.random() * 12 - 6
-    const y = pad + row * (baseH - overlapY) + Math.random() * 12 - 6
-    styles.push({
-      left: `${Math.max(0, x)}px`,
-      top: `${Math.max(0, y)}px`,
+    
+    // 基础网格位置
+    const baseX = col * stepX + POSTER_CONFIG.padding
+    const baseY = row * stepY + POSTER_CONFIG.padding
+    
+    // 应用抖动
+    const jitterX = (Math.random() - 0.5) * stepX * POSTER_CONFIG.jitterStrength
+    const jitterY = (Math.random() - 0.5) * stepY * POSTER_CONFIG.jitterStrength
+    
+    let finalX = baseX + jitterX
+    let finalY = baseY + jitterY
+    
+    // 边界检查
+    finalX = Math.max(POSTER_CONFIG.padding, Math.min(finalX, containerW - POSTER_CONFIG.baseWidth - POSTER_CONFIG.padding))
+    finalY = Math.max(POSTER_CONFIG.padding, Math.min(finalY, containerH - (POSTER_CONFIG.baseWidth * POSTER_CONFIG.aspectRatio) - POSTER_CONFIG.padding))
+    
+    // 随机大小微调 (±10%)
+    const scaleVar = 0.9 + Math.random() * 0.2
+    const w = POSTER_CONFIG.baseWidth * scaleVar
+    const h = w * POSTER_CONFIG.aspectRatio
+    
+    // 随机旋转
+    const rot = (Math.random() - 0.5) * POSTER_CONFIG.maxRotation * 2
+    
+    newStyles[i] = {
+      left: `${finalX}px`,
+      top: `${finalY}px`,
       width: `${w}px`,
-      transform: `rotate(${Math.random() * 6 - 3}deg)`,
-      zIndex: i
-    })
+      height: `${h}px`,
+      transform: `rotate(${rot}deg)`,
+      zIndex: 1,
+      transition: 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)'
+    }
+  })
+  
+  posterStyles.value = newStyles
+}
+
+// 获取海报样式（包含悬停效果）
+const getPosterStyle = (index) => {
+  const style = posterStyles.value[index] || {}
+  const isHovered = hoveredIndex.value === index
+  
+  // 悬停效果：仅放大和去旋转，不改变 z-index（保持自然堆叠）
+  if (isHovered) {
+    return {
+      ...style,
+      transform: 'scale(1.12) rotate(0deg)',
+      boxShadow: '0 8px 25px rgba(0,0,0,0.25)'
+    }
   }
-  return styles
+  
+  return style
+}
+
+const handleHover = (index, isEnter) => {
+  hoveredIndex.value = isEnter ? index : -1
 }
 
 const loadPosters = async () => {
@@ -186,7 +251,8 @@ const loadPosters = async () => {
     const res = await fetch(`/api/actor/${route.params.id}/posters`).then(r => r.json())
     if (res.success && res.data && res.data.length > 0) {
       posters.value = res.data
-      posterStyles.value = generatePosterLayout(res.data.length)
+      await nextTick()
+      calculatePosterLayout()
     }
   } catch (error) {
     console.error('加载海报失败:', error)
@@ -205,8 +271,23 @@ const loadAll = async () => {
   await Promise.all([loadActor(), loadVideos(), loadPosters()])
 }
 
+// 窗口大小变化监听
+let resizeTimer = null
+const onResize = () => {
+  clearTimeout(resizeTimer)
+  resizeTimer = setTimeout(() => {
+    if (posters.value.length > 0) calculatePosterLayout()
+  }, 300)
+}
+
 onMounted(() => {
   loadAll()
+  window.addEventListener('resize', onResize)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', onResize)
+  clearTimeout(resizeTimer)
 })
 
 // 监听路由参数变化
@@ -225,13 +306,18 @@ watch(
 .detail-page {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 24px;
+  padding: 20px;
 }
 
 .detail-header {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
+  padding: 20px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
 }
 
 .header-row {
@@ -244,14 +330,15 @@ watch(
 .header-row h1 {
   font-size: 32px;
   margin: 0;
+  color: #333;
 }
 
 .edit-btn {
   background: none;
   border: 1px solid #ccc;
   border-radius: 4px;
-  padding: 4px 12px;
-  font-size: 13px;
+  padding: 6px 16px;
+  font-size: 14px;
   color: #666;
   cursor: pointer;
   transition: all 0.2s;
@@ -260,35 +347,41 @@ watch(
 .edit-btn:hover {
   border-color: #3498db;
   color: #3498db;
+  background: #f5f9ff;
 }
 
 .country-tag {
   background: #f3e5f5;
   color: #7b1fa2;
-  padding: 4px 10px;
+  padding: 6px 12px;
   border-radius: 4px;
-  font-size: 13px;
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .like-tag {
   background: #fce4ec;
   color: #e74c3c;
-  padding: 4px 10px;
+  padding: 6px 12px;
   border-radius: 4px;
-  font-size: 13px;
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .alias-row {
   color: #666;
   font-size: 15px;
+  margin: 0;
 }
 
 .bio-row {
   color: #444;
   font-size: 15px;
   line-height: 1.6;
+  margin: 0;
 }
 
+/* 海报墙（优化后样式） */
 .poster-wall {
   flex-shrink: 0;
 }
@@ -297,32 +390,38 @@ watch(
   position: relative;
   width: 100%;
   height: 50vh;
+  min-height: 400px;
   overflow: hidden;
   padding: 20px;
   background: #fafafa;
   border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
 
 .poster-item {
   position: absolute;
   cursor: pointer;
-  border-radius: 6px;
+  border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-  transition: transform 0.2s ease, box-shadow 0.2s ease, z-index 0s;
+  box-shadow: 0 3px 12px rgba(0,0,0,0.1);
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
   background: #fff;
-}
-
-.poster-item:hover {
-  transform: scale(1.12) !important;
-  box-shadow: 0 6px 20px rgba(0,0,0,0.3);
-  z-index: 9999 !important;
+  will-change: transform, left, top;
 }
 
 .poster-item img {
   display: block;
   width: 100%;
-  height: auto;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+/* 移除了 z-index 强制提升，保持自然堆叠 */
+.poster-item:hover {
+  transform: scale(1.12) rotate(0deg) !important;
+  box-shadow: 0 8px 25px rgba(0,0,0,0.25);
+  /* z-index 保持不变 */
 }
 
 /* 灯箱 */
@@ -333,6 +432,7 @@ watch(
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(5px);
   z-index: 9999;
   display: flex;
   justify-content: center;
@@ -349,22 +449,43 @@ watch(
   cursor: default;
 }
 
+/* 影片区域 */
+.detail-videos {
+  background: #fff;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
 .videos-header {
   display: flex;
   align-items: center;
-  gap: 12px;
+  justify-content: space-between;
   margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
 .videos-header h2 {
   margin: 0;
+  font-size: 20px;
+  color: #333;
 }
 
 .media-filter {
-  padding: 4px 8px;
+  padding: 6px 12px;
   border: 1px solid #ddd;
   border-radius: 4px;
-  font-size: 13px;
+  font-size: 14px;
+  background: #fff;
+  color: #333;
+  cursor: pointer;
+  min-width: 120px;
+}
+
+.media-filter:focus {
+  outline: none;
+  border-color: #3498db;
 }
 
 .video-grid {
@@ -376,6 +497,8 @@ watch(
 .empty-hint {
   color: #999;
   font-size: 14px;
-  padding: 20px;
+  padding: 40px 20px;
+  text-align: center;
+  grid-column: 1 / -1;
 }
 </style>

@@ -1,102 +1,176 @@
 <template>
   <div class="highlights-page">
-    <div class="hl-poster-wall" v-if="posters.length > 0" ref="wallRef">
+    <div 
+      class="hl-poster-wall" 
+      v-if="posters.length > 0" 
+      ref="wallRef"
+    >
       <div
         v-for="(p, i) in posters"
-        :key="p"
+        :key="p.id || p"
         class="hl-poster-item"
-        :style="posterStyles[i]"
+        :style="getPosterStyle(i)"
         @click="openLightbox(i)"
+        @mouseenter="handleHover(i, true)"
+        @mouseleave="handleHover(i, false)"
       >
-        <img :src="`/api/highlights/poster/${p}`" :alt="p" />
+        <img 
+          :src="p.url || `/api/highlights/poster/${p}`" 
+          :alt="p.title || '海报'" 
+          loading="lazy"
+        />
       </div>
     </div>
+    
     <div class="hl-empty" v-else>
+      <div class="empty-icon">📷</div>
       <p>暂无精彩瞬间</p>
-      <p class="hl-hint">请先在设置中配置海报墙目录，并将图片放入 <code>{posterDir}/default/</code> 文件夹</p>
+      <p class="hl-hint">请先在设置中配置海报墙目录</p>
     </div>
 
     <!-- 灯箱 -->
-    <div class="hl-lightbox" v-if="lightboxIndex !== null" @click="closeLightbox">
-      <img
-        :src="`/api/highlights/poster/${posters[lightboxIndex]}`"
-        class="hl-lightbox-img"
-        @click.stop
-      />
-    </div>
+    <transition name="fade">
+      <div 
+        class="hl-lightbox" 
+        v-if="lightboxIndex !== null" 
+        @click="closeLightbox"
+      >
+        <div class="lightbox-content" @click.stop>
+          <img
+            :src="getPosterSrc(lightboxIndex)"
+            class="hl-lightbox-img"
+          />
+          <button class="close-btn" @click="closeLightbox">&times;</button>
+        </div>
+      </div>
+    </transition>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 
 const posters = ref([])
-const posterStyles = ref([])
-const lightboxIndex = ref(null)
 const wallRef = ref(null)
+const lightboxIndex = ref(null)
+const posterStyles = ref({})
+const hoveredIndex = ref(-1)
+
+const CONFIG = {
+  baseWidth: 160,
+  aspectRatio: 1.4,
+  jitterStrength: 0.4,
+  minGap: 15,
+  maxRotation: 6,
+  padding: 20
+}
 
 const loadPosters = async () => {
   try {
     const res = await fetch('/api/highlights/posters').then(r => r.json())
-    if (res.success && res.data && res.data.length > 0) {
-      posters.value = res.data
-      generateLayout()
+    if (res.success && res.data) {
+      posters.value = res.data.map((item, idx) => ({
+        id: idx,
+        url: item.url || `/api/highlights/poster/${item}`,
+        title: `Poster ${idx + 1}`
+      }))
+      await nextTick()
+      calculateLayout()
     }
   } catch (error) {
-    console.error('加载精彩瞬间失败:', error)
+    console.error('加载失败:', error)
+    posters.value = Array.from({ length: 20 }, (_, i) => ({
+      id: i,
+      url: `https://picsum.photos/300/420?random=${i}`,
+      title: `Demo Poster ${i}`
+    }))
+    await nextTick()
+    calculateLayout()
   }
 }
 
-const generateLayout = () => {
-  const count = posters.value.length
-  if (count === 0) { posterStyles.value = []; return }
+const calculateLayout = () => {
+  if (!wallRef.value || posters.value.length === 0) return
 
-  const docW = window.innerWidth
-  const docH = window.innerHeight - 60
-  const padding = 20
-  const availW = docW - padding * 2
-  const availH = docH - padding * 2
-
-  const baseW = 140
-  const baseH = baseW * 1.4
-  const overlapX = 20
-  const overlapY = 20
-
-  const cellW = baseW - overlapX
-  const cols = Math.min(Math.floor(availW / cellW), count)
-  const rows = Math.ceil(count / cols)
-
-  // 水平间距均匀分布撑满宽度
-  const hStep = cols > 1 ? (availW - baseW) / (cols - 1) : 0
-  const offsetX = cols > 1 ? (availW - (cols - 1) * hStep - baseW) / 2 : (availW - baseW) / 2
-
-  // 垂直间距均匀分布撑满高度
-  const vStep = rows > 1 ? (availH - baseH) / (rows - 1) : (availH - baseH) / 2
-
-  const styles = []
-  for (let i = 0; i < count; i++) {
+  const containerW = wallRef.value.clientWidth
+  const containerH = wallRef.value.clientHeight
+  
+  const effectiveW = containerW - CONFIG.padding * 2
+  const effectiveH = containerH - CONFIG.padding * 2
+  
+  const avgItemW = CONFIG.baseWidth + CONFIG.minGap
+  const avgItemH = (CONFIG.baseWidth * CONFIG.aspectRatio) + CONFIG.minGap
+  
+  let cols = Math.floor(effectiveW / avgItemW)
+  cols = Math.max(2, cols)
+  
+  const rows = Math.ceil(posters.value.length / cols)
+  
+  const stepX = effectiveW / cols
+  const stepY = effectiveH / rows
+  
+  const newStyles = {}
+  
+  posters.value.forEach((_, i) => {
     const col = i % cols
     const row = Math.floor(i / cols)
-    const w = baseW + Math.random() * 20
-    const x = offsetX + col * hStep + (Math.random() - 0.5) * 14
-    const y = row * vStep + (Math.random() - 0.5) * 14
-    styles.push({
-      left: `${Math.max(0, x)}px`,
-      top: `${Math.max(0, y)}px`,
+    
+    const baseX = col * stepX + CONFIG.padding
+    const baseY = row * stepY + CONFIG.padding
+    
+    const jitterX = (Math.random() - 0.5) * stepX * CONFIG.jitterStrength
+    const jitterY = (Math.random() - 0.5) * stepY * CONFIG.jitterStrength
+    
+    let finalX = baseX + jitterX
+    let finalY = baseY + jitterY
+    
+    finalX = Math.max(CONFIG.padding, Math.min(finalX, containerW - CONFIG.baseWidth - CONFIG.padding))
+    finalY = Math.max(CONFIG.padding, Math.min(finalY, containerH - (CONFIG.baseWidth * CONFIG.aspectRatio) - CONFIG.padding))
+    
+    const scaleVar = 0.9 + Math.random() * 0.2
+    const w = CONFIG.baseWidth * scaleVar
+    const h = w * CONFIG.aspectRatio
+    
+    const rot = (Math.random() - 0.5) * CONFIG.maxRotation * 2
+    
+    newStyles[i] = {
+      left: `${finalX}px`,
+      top: `${finalY}px`,
       width: `${w}px`,
-      transform: `rotate(${Math.random() * 8 - 4}deg)`,
-      zIndex: i + 1
-    })
-  }
-  posterStyles.value = styles
+      height: `${h}px`,
+      transform: `rotate(${rot}deg)`,
+      zIndex: 1,
+      transition: 'all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)'
+    }
+  })
+  
+  posterStyles.value = newStyles
 }
 
-let resizeTimer = null
-const onResize = () => {
-  clearTimeout(resizeTimer)
-  resizeTimer = setTimeout(() => {
-    if (posters.value.length > 0) generateLayout()
-  }, 300)
+const getPosterStyle = (index) => {
+  const style = posterStyles.value[index] || {}
+  const isHovered = hoveredIndex.value === index
+  
+  // 修改点：移除 zIndex 提升，仅保留缩放、去旋转和阴影加深
+  if (isHovered) {
+    return {
+      ...style,
+      // zIndex 保持不变，不强制设为 100
+      transform: 'scale(1.15) rotate(0deg)',
+      boxShadow: '0 15px 35px rgba(0,0,0,0.3)'
+    }
+  }
+  
+  return style
+}
+
+const handleHover = (index, isEnter) => {
+  hoveredIndex.value = isEnter ? index : -1
+}
+
+const getPosterSrc = (index) => {
+  if (!posters.value[index]) return ''
+  return posters.value[index].url
 }
 
 const openLightbox = (index) => {
@@ -105,6 +179,14 @@ const openLightbox = (index) => {
 
 const closeLightbox = () => {
   lightboxIndex.value = null
+}
+
+let resizeTimer = null
+const onResize = () => {
+  clearTimeout(resizeTimer)
+  resizeTimer = setTimeout(() => {
+    calculateLayout()
+  }, 200)
 }
 
 onMounted(() => {
@@ -121,39 +203,36 @@ onUnmounted(() => {
 <style scoped>
 .highlights-page {
   position: relative;
-  min-height: calc(100vh - 60px);
   width: 100%;
+  height: 100vh;
+  background-color: #f8f9fa;
   overflow: hidden;
 }
 
 .hl-poster-wall {
   position: relative;
   width: 100%;
-  height: calc(100vh - 60px);
-  overflow: hidden;
+  height: 100%;
   padding: 20px;
+  box-sizing: border-box;
 }
 
 .hl-poster-item {
   position: absolute;
-  cursor: pointer;
-  border-radius: 6px;
+  border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
-  transition: transform 0.25s ease, box-shadow 0.25s ease;
   background: #fff;
-}
-
-.hl-poster-item:hover {
-  transform: scale(1.15) !important;
-  box-shadow: 0 8px 30px rgba(0,0,0,0.4);
-  z-index: 9999 !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  cursor: pointer;
+  will-change: transform, left, top;
 }
 
 .hl-poster-item img {
   display: block;
   width: 100%;
-  height: auto;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
 }
 
 .hl-empty {
@@ -161,45 +240,73 @@ onUnmounted(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: calc(100vh - 60px);
-  color: #999;
-  font-size: 16px;
+  height: 100%;
+  color: #9ca3af;
+}
+
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.5;
 }
 
 .hl-hint {
-  margin-top: 12px;
-  font-size: 13px;
-  color: #777;
+  font-size: 14px;
+  margin-top: 8px;
 }
 
-.hl-hint code {
-  background: #f0f0f0;
-  padding: 2px 6px;
-  border-radius: 3px;
-  font-size: 12px;
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
 }
 
-/* 灯箱 */
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
 .hl-lightbox {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.9);
-  z-index: 99999;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(5px);
+  z-index: 9999;
   display: flex;
   justify-content: center;
   align-items: center;
-  cursor: pointer;
+}
+
+.lightbox-content {
+  position: relative;
+  max-width: 90vw;
+  max-height: 90vh;
 }
 
 .hl-lightbox-img {
-  max-width: 92vw;
-  max-height: 92vh;
-  object-fit: contain;
+  max-width: 100%;
+  max-height: 90vh;
   border-radius: 4px;
-  box-shadow: 0 8px 40px rgba(0,0,0,0.5);
-  cursor: default;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+  object-fit: contain;
+}
+
+.close-btn {
+  position: absolute;
+  top: -40px;
+  right: 0;
+  background: none;
+  border: none;
+  color: white;
+  font-size: 32px;
+  cursor: pointer;
+  opacity: 0.8;
+  transition: opacity 0.2s;
+}
+
+.close-btn:hover {
+  opacity: 1;
 }
 </style>
