@@ -20,6 +20,7 @@
         @keyup.enter="handleSearch"
       />
       <button class="search-btn" @click="handleSearch">搜索</button>
+      <button class="reset-btn" @click="handleReset">重置</button>
       <select v-model="sortBy" @change="handleSearch" class="status-select">
         <option value="">默认排序</option>
         <option value="name">按名称</option>
@@ -70,13 +71,15 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { comicApi } from '@/scripts/api'
+import { loadFilterState, saveFilterState } from '@/scripts/utils/filterPersist'
 import ComicCard from '@/views/components/ComicCard.vue'
 import ComicFormDialog from '@/views/components/ComicFormDialog.vue'
 
 const router = useRouter()
+const STORAGE_KEY = 'comic-list'
 const comicList = ref([])
 const page = ref(1)
 const pageSize = ref(24)
@@ -88,6 +91,9 @@ const loading = ref(false)
 const showDialog = ref(false)
 const editingComic = ref(null)
 const gotoVal = ref()
+
+// 筛选持久化（keyword 不缓存）
+watch([statusFilter, sortBy], () => saveFilterState(STORAGE_KEY, { statusFilter: statusFilter.value, sortBy: sortBy.value, page: page.value }))
 
 const loadComics = async () => {
   loading.value = true
@@ -110,6 +116,17 @@ const loadComics = async () => {
 
 const handleSearch = () => {
   page.value = 1
+  saveFilterState(STORAGE_KEY, { statusFilter: statusFilter.value, sortBy: sortBy.value, page: page.value })
+  loadComics()
+}
+
+// 重置筛选
+const handleReset = () => {
+  keyword.value = ''
+  statusFilter.value = -1
+  sortBy.value = ''
+  page.value = 1
+  saveFilterState(STORAGE_KEY, { statusFilter: -1, sortBy: '', page: 1 })
   loadComics()
 }
 
@@ -123,6 +140,7 @@ const handleGotoPage = () => {
 
 const changePage = (p) => {
   page.value = p
+  saveFilterState(STORAGE_KEY, { statusFilter: statusFilter.value, sortBy: sortBy.value, page: page.value })
   loadComics()
 }
 
@@ -173,6 +191,12 @@ const handleDelete = async (comic) => {
 
 
 onMounted(() => {
+  const saved = loadFilterState(STORAGE_KEY)
+  if (saved) {
+    statusFilter.value = saved.statusFilter ?? -1
+    sortBy.value = saved.sortBy ?? ''
+    page.value = saved.page ?? 1
+  }
   loadComics()
 })
 </script>
@@ -257,6 +281,20 @@ onMounted(() => {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 16px;
+}
+.reset-btn {
+  padding: 8px 16px;
+  background: #e74c3c;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.reset-btn:hover {
+  background: #c0392b;
 }
 
 .empty-hint {

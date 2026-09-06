@@ -73,6 +73,7 @@
         @keyup.enter="handleSearch"
       />
       <button class="search-btn" @click="handleSearch">搜索</button>
+      <button class="reset-btn" @click="handleReset">重置</button>
       <select v-model="filters.sortBy" @change="page = 1; loadVideos()" class="sort-select">
         <option value="">默认排序</option>
         <option value="code">按番号</option>
@@ -309,6 +310,16 @@ const loadVideos = async () => {
 
 const handleSearch = () => {
   page.value = 1
+  saveFilterState(STORAGE_KEY, { filters: filters.value, page: page.value, seriesInput: seriesInput.value })
+  loadVideos()
+}
+
+// 重置筛选
+const handleReset = () => {
+  filters.value = { country: '', category: '', seriesId: '', keyword: '', downloaded: '', mediaAttrFlags: '', sortBy: '' }
+  seriesInput.value = ''
+  page.value = 1
+  saveFilterState(STORAGE_KEY, { filters: filters.value, page: 1, seriesInput: '' })
   loadVideos()
 }
 
@@ -546,6 +557,20 @@ const handleDeleteChoice = (choice) => {
 }
 .search-btn:hover {
   background: #2980b9;
+}
+.reset-btn {
+  padding: 8px 16px;
+  background: #e74c3c;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.reset-btn:hover {
+  background: #c0392b;
 }
 
 .video-grid {

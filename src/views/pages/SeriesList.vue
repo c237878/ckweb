@@ -26,6 +26,7 @@
         @keyup.enter="handleSearch"
       />
       <button class="search-btn" @click="handleSearch">搜索</button>
+      <button class="reset-btn" @click="handleReset">重置</button>
       <select v-model="filters.sortBy" @change="page = 1; loadSeries()" class="sort-select">
         <option value="">默认排序</option>
         <option value="name">按名称</option>
@@ -182,6 +183,15 @@ const loadSeries = async () => {
 const handleSearch = () => {
   page.value = 1
   saveFilterState(STORAGE_KEY, { filters: filters.value, page: page.value })
+  loadSeries()
+}
+
+// 重置筛选
+const handleReset = () => {
+  keyword.value = ''
+  filters.value = { country: '', sortBy: '' }
+  page.value = 1
+  saveFilterState(STORAGE_KEY, { filters: { country: '', sortBy: '' }, page: 1 })
   loadSeries()
 }
 
@@ -397,6 +407,20 @@ onMounted(async () => {
 }
 .search-btn:hover {
   background: #2980b9;
+}
+.reset-btn {
+  padding: 8px 16px;
+  background: #e74c3c;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.reset-btn:hover {
+  background: #c0392b;
 }
 
 .series-grid {

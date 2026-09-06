@@ -35,6 +35,7 @@
         class="date-input"
       />
       <button class="search-btn" @click="handleSearch">搜索</button>
+      <button class="reset-btn" @click="handleReset">重置</button>
     </div>
 
     <div v-if="loading" class="loading">加载中...</div>
@@ -98,12 +99,13 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { likeApi, videoApi, comicApi } from '@/scripts/api'
+import { loadFilterState, saveFilterState } from '@/scripts/utils/filterPersist'
 
 const router = useRouter()
-
+const STORAGE_KEY = 'like-list'
 const likeList = ref([])
 const total = ref(0)
 const page = ref(1)
@@ -115,6 +117,9 @@ const startDate = ref('')
 const endDate = ref('')
 const selectedIds = ref([])
 const gotoVal = ref()
+
+// 筛选持久化（keyword 不缓存）
+watch([targetType, startDate, endDate], () => saveFilterState(STORAGE_KEY, { targetType: targetType.value, startDate: startDate.value, endDate: endDate.value, page: page.value }))
 
 const totalPages = computed(() => Math.ceil(total.value / pageSize))
 const allChecked = computed(() =>
@@ -159,6 +164,19 @@ const loadList = async () => {
 const handleSearch = () => {
   page.value = 1
   selectedIds.value = []
+  saveFilterState(STORAGE_KEY, { targetType: targetType.value, startDate: startDate.value, endDate: endDate.value, page: page.value })
+  loadList()
+}
+
+// 重置筛选
+const handleReset = () => {
+  keyword.value = ''
+  targetType.value = ''
+  startDate.value = ''
+  endDate.value = ''
+  page.value = 1
+  selectedIds.value = []
+  saveFilterState(STORAGE_KEY, { targetType: '', startDate: '', endDate: '', page: 1 })
   loadList()
 }
 
@@ -166,6 +184,7 @@ const changePage = (p) => {
   if (p < 1 || p > totalPages.value) return
   page.value = p
   selectedIds.value = []
+  saveFilterState(STORAGE_KEY, { targetType: targetType.value, startDate: startDate.value, endDate: endDate.value, page: page.value })
   loadList()
 }
 
@@ -219,6 +238,13 @@ const handleBatchDelete = async () => {
 }
 
 onMounted(() => {
+  const saved = loadFilterState(STORAGE_KEY)
+  if (saved) {
+    targetType.value = saved.targetType ?? ''
+    startDate.value = saved.startDate ?? ''
+    endDate.value = saved.endDate ?? ''
+    page.value = saved.page ?? 1
+  }
   loadList()
 })
 </script>
@@ -294,6 +320,20 @@ onMounted(() => {
 
 .search-btn:hover {
   background: #2980b9;
+}
+.reset-btn {
+  padding: 8px 16px;
+  background: #e74c3c;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.reset-btn:hover {
+  background: #c0392b;
 }
 
 .loading, .empty {
