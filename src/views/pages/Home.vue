@@ -24,11 +24,6 @@
     </section>
 
     <div v-if="topSections.length === 0 && categories.length === 0" class="empty-hint" style="text-align:center;padding:60px">暂无影片</div>
-
-    <!-- 悬浮日历 -->
-    <div class="floating-calendar">
-      <LikeCalendar />
-    </div>
   </div>
 </template>
 
@@ -36,7 +31,6 @@
 import { ref, onMounted } from 'vue'
 import { videoApi } from '@/scripts/api'
 import VideoCard from '@/views/components/VideoCard.vue'
-import LikeCalendar from '@/views/components/LikeCalendar.vue'
 
 const topSections = ref([])
 const categories = ref([])
@@ -140,11 +134,4 @@ const refreshDaily = async () => {
   gap: 20px;
 }
 .empty-hint { color: #999; font-size: 14px; padding: 20px; }
-
-.floating-calendar {
-  position: fixed;
-  right: 20px;
-  bottom: 20px;
-  z-index: 100;
-}
 </style>

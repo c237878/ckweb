@@ -1,7 +1,7 @@
 <template>
   <div class="like-calendar" :class="{ collapsed: collapsed }">
     <!-- 头部 -->
-    <div class="cal-header" @click="collapsed && (collapsed = false)">
+    <div title="观影日历" class="cal-header" @click="collapsed && (collapsed = false)">
       <div class="cal-title">
         <span class="cal-icon">📅</span>
         <span>观影日历</span>
@@ -36,31 +36,34 @@
         </div>
       </div>
 
-      <!-- 星期头部 -->
-      <div class="weekdays">
-        <span v-for="d in ['日','一','二','三','四','五','六']" :key="d">{{ d }}</span>
-      </div>
-
       <!-- 日期网格 -->
-      <div class="days-grid">
-        <!-- 空白填充 -->
-        <div v-for="n in firstDayOffset" :key="'blank'+n" class="day-cell blank"></div>
-        <!-- 日期 -->
-        <div
-          v-for="day in stats.monthDays"
-          :key="day"
-          class="day-cell"
-          :class="getDayClass(day)"
-          :title="getDayTitle(day)"
-        >
-          <span class="day-num">{{ day }}</span>
-          <span v-if="getDayCount(day) > 0" class="day-count">{{ getDayCount(day) }}</span>
+      <div class="weektables">
+        <!-- 星期头部 -->
+        <div class="weekdays">
+          <span v-for="d in ['日','一','二','三','四','五','六']" :key="d">{{ d }}</span>
+        </div>
+        <!-- 日期网格 -->
+        <div class="days-grid">
+          <!-- 空白填充 -->
+          <div v-for="n in firstDayOffset" :key="'blank'+n" class="day-cell blank"></div>
+          <!-- 日期 -->
+          <div
+            v-for="day in stats.monthDays"
+            :key="day"
+            class="day-cell"
+            :class="getDayClass(day)"
+          >
+            <span class="day-num">{{ day }}</span>
+            <span v-if="getDayCount(day) > 0" class="day-count">{{ getDayCount(day) }}</span>
+          </div>
+          <!-- 空白填充 -->
+          <div v-for="n in lastDayOffset" :key="'blank'+n" class="day-cell blank"></div>
         </div>
       </div>
 
       <!-- 月度趋势 -->
       <div class="monthly-trend" v-if="stats.monthly?.length">
-        <div class="trend-title">近12月趋势</div>
+        <div class="trend-title">近12月趋势({{ pastYearCount }}次)</div>
         <div class="trend-bars">
           <div
             v-for="m in stats.monthly"
@@ -74,6 +77,7 @@
               :class="{ active: m.year === currentYear && m.month === currentMonth }"
             ></div>
             <span class="trend-label">{{ m.month }}</span>
+            <div class="trend-count">{{ m.count }}</div>
           </div>
         </div>
       </div>
@@ -96,6 +100,13 @@ const stats = ref({
   monthly: []
 })
 
+// 计算最近12个月的点赞总数
+const pastYearCount = computed(() => {
+  const list = stats.value?.monthly;
+  if (!list || !Array.isArray(list)) return 0;
+  return list.reduce((sum, item) => sum + (item.count || 0), 0);
+});
+
 // 距离上次点赞过去多少天
 const daysSinceLastLike = computed(() => {
   if (!stats.value.lastLikeDate) return null
@@ -110,6 +121,13 @@ const daysSinceLastLike = computed(() => {
 // 计算当月1号是星期几（0=周日）
 const firstDayOffset = computed(() => {
   return new Date(currentYear.value, currentMonth.value - 1, 1).getDay()
+})
+
+// 计算全部42个格子中，排除firstDayOffset和当月天数后剩余的空白格子数
+const lastDayOffset = computed(() => {
+  const totalCells = 42
+  const monthDays = stats.value.monthDays || 30
+  return totalCells - firstDayOffset.value - monthDays
 })
 
 // 获取某天的点赞数
@@ -133,12 +151,6 @@ const getDayClass = (day) => {
   else if (cnt >= 3) classes.push('heat-mid')
   else classes.push('heat-low')
   return classes.join(' ')
-}
-
-const getDayTitle = (day) => {
-  const cnt = getDayCount(day)
-  if (cnt === 0) return ` ${day}日: 无点赞`
-  return ` ${day}日: ${cnt}次点赞`
 }
 
 // 趋势图最高值
@@ -209,7 +221,7 @@ onMounted(() => {
   overflow: hidden;
   width: 240px;
   flex-shrink: 0;
-  transition: width 0.3s ease, height 0.3s ease;
+  /* transition: width 0.3s ease, height 0.3s ease; */
 }
 
 .like-calendar.collapsed {
@@ -268,13 +280,15 @@ onMounted(() => {
 
 .cal-body {
   padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .month-nav {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 10px;
 }
 
 .nav-btn {
@@ -309,7 +323,6 @@ onMounted(() => {
 .stats-row {
   display: flex;
   gap: 8px;
-  margin-bottom: 12px;
 }
 
 .stat-item {
@@ -324,7 +337,6 @@ onMounted(() => {
   display: block;
   font-size: 11px;
   color: #999;
-  margin-bottom: 2px;
 }
 
 .stat-value {
@@ -341,11 +353,15 @@ onMounted(() => {
   color: #e67e22;
 }
 
+.weektables {
+  display: flex;
+  flex-direction: column;
+}
+
 .weekdays {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   text-align: center;
-  margin-bottom: 4px;
 }
 
 .weekdays span {
@@ -357,7 +373,6 @@ onMounted(() => {
 .days-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 2px;
 }
 
 .day-cell {
@@ -381,18 +396,17 @@ onMounted(() => {
 }
 
 .day-count {
-  font-size: 9px;
+  font-size: 10px;
+  color: #e74c3c;
+}
+.heat-mid .day-count {
   color: #fff;
-  background: #e74c3c;
-  border-radius: 8px;
-  padding: 0 3px;
-  line-height: 14px;
-  margin-top: 1px;
+  font-weight: 900;
 }
 
 /* 当前日期 */
 .day-cell.today {
-  border: 2px solid #3498db;
+  border: 1px solid #3498db;
   font-weight: bold;
 }
 .day-cell.today .day-num {
@@ -408,15 +422,16 @@ onMounted(() => {
 
 /* 趋势图 */
 .monthly-trend {
-  margin-top: 12px;
   border-top: 1px solid #eee;
   padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .trend-title {
   font-size: 11px;
   color: #999;
-  margin-bottom: 8px;
 }
 
 .trend-bars {
@@ -427,6 +442,7 @@ onMounted(() => {
 }
 
 .trend-bar-wrap {
+  position: relative;
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -451,5 +467,13 @@ onMounted(() => {
 .trend-label {
   font-size: 9px;
   color: #bbb;
+}
+
+.trend-count {
+  position: absolute;
+  font-size: 9px;
+  top: 25%;
+  color: #333;
+  cursor: default;
 }
 </style>

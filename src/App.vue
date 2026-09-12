@@ -1,8 +1,9 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
+import { settingApi } from '@/scripts/api'
 import AppHeader from '@/views/components/AppHeader.vue'
 import AppFooter from '@/views/components/AppFooter.vue'
-import { settingApi } from '@/scripts/api'
+import LikeCalendar from '@/views/components/LikeCalendar.vue'
 
 const siteName = ref('影视网站')
 
@@ -47,6 +48,10 @@ const handleSettingsUpdate = (event) => {
       <AppFooter />
     </footer>
   </div>
+  <!-- 悬浮日历 -->
+  <div class="floating-calendar">
+    <LikeCalendar />
+  </div>
 </template>
 
 <style scoped>
@@ -71,5 +76,12 @@ const handleSettingsUpdate = (event) => {
 #footer {
   flex-shrink: 0;
   margin-top: auto;
+}
+
+.floating-calendar {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 100;
 }
 </style>
