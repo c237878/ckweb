@@ -10,7 +10,8 @@ const api = axios.create({
 
 // 上传专用实例 - 跳过 Vite 代理，直连后端（避免大文件断流）
 // baseURL 包含 /api 前缀，因为 UploadController 路由为 api/[controller]
-const LAN_IP = '192.168.110.67'
+// 局域网地址从 .env.development 的 VITE_API_LAN_HOST 读取，默认兜底
+const LAN_IP = import.meta.env.VITE_API_LAN_HOST || '192.168.110.67'
 const uploadAxios = axios.create({
   baseURL: import.meta.env.DEV
     ? `http://${LAN_IP}:5033/api`

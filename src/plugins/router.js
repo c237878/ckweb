@@ -1,16 +1,18 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import Home from '@/views/pages/Home.vue'
-import VideoList from '@/views/pages/VideoList.vue'
-import VideoDetail from '@/views/pages/VideoDetail.vue'
-import ActorList from '@/views/pages/ActorList.vue'
-import ActorDetail from '@/views/pages/ActorDetail.vue'
-import SeriesList from '@/views/pages/SeriesList.vue'
-import SeriesDetail from '@/views/pages/SeriesDetail.vue'
-import Settings from '@/views/pages/Settings.vue'
-import Highlights from '@/views/pages/Highlights.vue'
-import ComicList from '@/views/pages/ComicList.vue'
-import ComicDetail from '@/views/pages/ComicDetail.vue'
-import LikeList from '@/views/pages/LikeList.vue'
+
+// 路由懒加载：每个页面单独分包，首屏只加载当前页面
+const Home = () => import('@/views/pages/Home.vue')
+const VideoList = () => import('@/views/pages/VideoList.vue')
+const VideoDetail = () => import('@/views/pages/VideoDetail.vue')
+const ActorList = () => import('@/views/pages/ActorList.vue')
+const ActorDetail = () => import('@/views/pages/ActorDetail.vue')
+const SeriesList = () => import('@/views/pages/SeriesList.vue')
+const SeriesDetail = () => import('@/views/pages/SeriesDetail.vue')
+const Settings = () => import('@/views/pages/Settings.vue')
+const Highlights = () => import('@/views/pages/Highlights.vue')
+const ComicList = () => import('@/views/pages/ComicList.vue')
+const ComicDetail = () => import('@/views/pages/ComicDetail.vue')
+const LikeList = () => import('@/views/pages/LikeList.vue')
 
 const routes = [
   {
