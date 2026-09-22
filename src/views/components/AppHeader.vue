@@ -43,11 +43,16 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useAppStore } from '@/scripts/store/app'
 
 const app = useAppStore()
+const route = useRoute()
 const navOpen = ref(false)
+
+// 窄屏菜单是覆盖在内容上的，跳完页不收起就会挡住新页面顶部
+watch(() => route.path, () => { navOpen.value = false })
 
 const navItems = [
   { to: '/', label: '首页', exact: true },

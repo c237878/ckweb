@@ -132,6 +132,40 @@ src/
 **主题**：`:root` 是暗色（影院金强调），`html[data-theme='light']` 覆盖为亮色；切换按钮在页头，选择记在 `localStorage.ck_theme`，`index.html` 内联脚本在首帧前落地避免闪白。
 写样式时**不要新增硬编码色值**，一律用 `--bg-elev` `--text-dim` `--accent` 这类令牌；`main.css` 里已有的 `.btn/.tag/.card/.field/.dialog/.empty/.skeleton` 优先复用。
 
+### 样式约定
+
+- **元素间距只用 flex/grid 的 `gap`**，由父容器声明，不用 margin 撑。margin 只允许四种用途：
+  `margin: 0 auto` 容器居中、`margin-left/right/top: auto` 推到另一端、`.sr-only` 的 `-1px` 裁剪、
+  `appearance:none` 配套的 spin-button 复位。
+- **控件尺寸用高度 token 定死**，不靠 padding 撑：`--ctl-h-xs`(24) 标签、`--ctl-h-sm`(32) 小按钮、
+  `--ctl-h` (38) 标准按钮/输入框/下拉框；纵向不留 padding，水平内缩用 `--ctl-pad-x*`。
+  文字居中靠 `display:flex + align-items/justify-content`。
+- **同功能元素只有一个类**，对照表在 `main.css` 的「布局」段注释里：
+  页面主标题 `.page-title` / 区块标题 `.section-title` / 卡片标题 `.card-title` / 元信息 `.meta` /
+  标签 `.tag + .tag--*` / 控件 `.btn .input .select`。不要在页面里再造同义类。
+
+### 可复用控件
+
+`ComboBox` 是带输入过滤的下拉，选项多时（如 711 个系列）替代原生 `<select>`；
+选项只有几项的枚举（排序、片源、状态、地区）继续用原生 `<select class="select">` 更合适。
+
+```vue
+<ComboBox v-model="filters.seriesId" :options="seriesList"
+          placeholder="筛选系列..." all-label="全部系列" @change="applyFilter" />
+```
+
+| prop | 说明 |
+| --- | --- |
+| `modelValue` | 选中项的 `id`，字符串 |
+| `options` | `[{ id, name }]`，传入即用 |
+| `placeholder` | 输入框占位文案 |
+| `all-label` | 顶部"全部"项文案，传空串则不渲染该项 |
+| `limit` | 下拉最多渲染条数，默认 50 |
+
+emit：`update:modelValue`（配合 `v-model`）、`change`（值真正变化时）。
+已支持键盘上下/Enter/Esc、点击外部收起、清除按钮。
+
+
 播放器 ckplayer 只在影片详情页按需注入（`scripts/utils/ckplayer.js`），不再全局加载。
 注意播放器容器 `div#ckplayer` 会让浏览器把同名元素挂到 `window.ckplayer` 上，判断库是否就绪必须用 `typeof === 'function'`。
 
