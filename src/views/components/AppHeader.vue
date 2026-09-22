@@ -1,106 +1,195 @@
 <template>
-  <header class="app-header">
+  <header class="app-header" :class="{ 'nav-open': navOpen }">
     <div class="header-content">
       <div class="logo">
-        <router-link to="/">{{ siteName }}</router-link>
+        <router-link to="/">{{ app.siteName }}</router-link>
       </div>
-      <nav class="nav-menu">
-        <router-link to="/" class="nav-item">首页</router-link>
-        <router-link to="/videos" class="nav-item">影片</router-link>
-        <router-link to="/series" class="nav-item">系列</router-link>
-        <router-link to="/actors" class="nav-item">演员</router-link>
-        <router-link to="/comics" class="nav-item">漫画</router-link>
-        <router-link to="/likes" class="nav-item">点赞</router-link>
-        <router-link to="/highlights" class="nav-item">精彩瞬间</router-link>
-        <router-link to="/settings" class="nav-item">设置</router-link>
+
+      <nav class="nav-menu" aria-label="主导航">
+        <router-link
+          v-for="item in navItems"
+          :key="item.to"
+          :to="item.to"
+          class="nav-item"
+          :active-class="item.exact ? '' : 'is-active'"
+          exact-active-class="is-active"
+        >
+{{ item.label }}
+</router-link>
       </nav>
+
+      <div class="header-tools">
+        <button
+          class="theme-toggle"
+          type="button"
+          :title="app.themeLabel"
+          :aria-label="app.themeLabel"
+          @click="app.toggleTheme()"
+        >
+          <span aria-hidden="true">{{ app.theme === 'dark' ? '☾' : '☀' }}</span>
+        </button>
+        <button
+          class="nav-trigger"
+          type="button"
+          :aria-expanded="navOpen ? 'true' : 'false'"
+          aria-label="展开导航"
+          @click="navOpen = !navOpen"
+        >
+          <span aria-hidden="true">☰</span>
+        </button>
+      </div>
     </div>
   </header>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
-import { settingApi } from '@/scripts/api'
+import { ref } from 'vue'
+import { useAppStore } from '@/scripts/store/app'
 
-const siteName = ref('影视网站')
+const app = useAppStore()
+const navOpen = ref(false)
 
-const loadSiteName = async () => {
-  try {
-    const res = await settingApi.getByName('siteName')
-    if (res.success && res.data) {
-      siteName.value = res.data
-    }
-  } catch (error) {
-    console.error('加载网站名称失败:', error)
-  }
-}
-
-const handleSettingsUpdate = () => {
-  // 任意设置保存后都重新拉取网站名称
-  loadSiteName()
-}
-
-onMounted(() => {
-  loadSiteName()
-  window.addEventListener('settingsUpdated', handleSettingsUpdate)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('settingsUpdated', handleSettingsUpdate)
-})
+const navItems = [
+  { to: '/', label: '首页', exact: true },
+  { to: '/videos', label: '影片' },
+  { to: '/series', label: '系列' },
+  { to: '/actors', label: '演员' },
+  { to: '/comics', label: '漫画' },
+  { to: '/likes', label: '点赞' },
+  { to: '/highlights', label: '精彩瞬间' },
+  { to: '/settings', label: '设置' }
+]
 </script>
 
 <style scoped>
 .app-header {
-  background: #2c3e50;
-  color: white;
-  padding: 15px 0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  position: sticky;
+  top: 0;
+  z-index: var(--z-header);
+  background: var(--bg-elev);
+  border-bottom: 1px solid var(--border);
 }
 
 .header-content {
-  max-width: 1200px;
+  max-width: var(--container);
   margin: 0 auto;
-  padding: 0 20px;
+  padding: 0 var(--s5);
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: var(--s5);
+  min-height: 58px;
 }
 
 .logo a {
-  font-size: 24px;
-  font-weight: bold;
-  color: white;
-  text-decoration: none;
+  font-size: var(--f-xl);
+  font-weight: 750;
+  letter-spacing: .3px;
+  color: var(--text);
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+}
+
+.logo a::before {
+  content: '◐';
+  color: var(--accent);
 }
 
 .nav-menu {
   display: flex;
-  gap: 30px;
+  align-items: center;
+  gap: var(--s1);
+  flex: 1;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.nav-menu::-webkit-scrollbar {
+  display: none;
 }
 
 .nav-item {
-  color: white;
-  text-decoration: none;
-  transition: color 0.3s;
-  font-size: 16px;
+  padding: 7px 12px;
+  border-radius: var(--r1);
+  font-size: var(--f-md);
+  color: var(--text-dim);
+  white-space: nowrap;
+  transition: color var(--dur) var(--ease), background var(--dur) var(--ease);
 }
 
-.nav-item:hover,
-.nav-item.router-link-active {
-  color: #e74c3c;
+.nav-item:hover {
+  color: var(--text);
+  background: var(--bg-hover);
 }
 
-@media (max-width: 768px) {
+.nav-item.is-active {
+  color: var(--accent);
+  background: var(--accent-soft);
+  font-weight: 600;
+}
+
+.header-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--s1);
+  margin-left: auto;
+}
+
+.theme-toggle,
+.nav-trigger {
+  display: grid;
+  place-items: center;
+  width: var(--ctl-h-sm);
+  height: var(--ctl-h-sm);
+  border-radius: var(--r1);
+  color: var(--text-dim);
+  font-size: var(--f-lg);
+}
+
+.theme-toggle:hover,
+.nav-trigger:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.nav-trigger {
+  display: none;
+}
+
+@media (max-width: 900px) {
   .header-content {
-    flex-direction: column;
-    gap: 15px;
+    padding: 0 var(--s4);
+    gap: var(--s3);
   }
 
+  .nav-trigger {
+    display: grid;
+  }
+
+  /* 窄屏收成下拉，避免 8 个链接折成三行把内容挤到首屏外 */
   .nav-menu {
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 15px;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    display: none;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+    padding: var(--s2) var(--s3) var(--s3);
+    background: var(--bg-elev);
+    border-bottom: 1px solid var(--border);
+    box-shadow: var(--shadow-2);
+    overflow: visible;
+  }
+
+  .app-header.nav-open .nav-menu {
+    display: flex;
+  }
+
+  .nav-item {
+    padding: 10px 12px;
   }
 }
 </style>

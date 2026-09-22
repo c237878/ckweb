@@ -1,244 +1,290 @@
 <template>
-  <Dialog :visible="visible" :title="editingVideo ? '编辑影片' : '添加影片'" @confirm="handleSave" @cancel="handleCancel">
+  <Dialog
+    :visible="visible"
+    :title="editingVideo ? '编辑影片' : '添加影片'"
+    size="wide"
+    @confirm="handleSave"
+    @cancel="handleCancel"
+  >
     <template #content>
-      <div class="form-item">
-        <label>番号</label>
-        <div class="code-row">
-          <input v-model="form.code" type="text" placeholder="如: ABC-123" />
-          <button type="button" class="autocode-btn" @click="generateCode" :disabled="codeLoading">{{ codeLoading ? '生成中...' : '自动编号' }}</button>
-        </div>
-      </div>
-      <div class="form-item">
-        <label>名称 *</label>
-        <input v-model="form.name" type="text" placeholder="影片名称（必填）" />
-      </div>
-      <div class="form-item">
-        <label>地区</label>
-        <div class="combobox-wrap">
-          <input
-            v-model="form.country"
-            type="text"
-            placeholder="选择或输入地区"
-            @focus="showCountryDropdown = true"
-            @blur="hideDropdown('country')"
-          />
-          <div v-if="showCountryDropdown" class="combobox-dropdown">
-            <div
-              v-for="c in filteredCountries"
-              :key="c"
-              class="combobox-option"
-              @mousedown.prevent="selectCountry(c)"
-            >
-              {{ c }}
-            </div>
-            <div v-if="filteredCountries.length === 0" class="combobox-empty">暂无已有地区</div>
+      <div class="form">
+        <div class="field">
+          <label for="av-code">番号</label>
+          <div class="row">
+            <input
+              id="av-code"
+              v-model="form.code"
+              class="input"
+              type="text"
+              placeholder="如: ABC-123"
+            />
+            <button type="button" class="btn btn--sm" :disabled="codeLoading" @click="generateCode">
+              {{ codeLoading ? '生成中...' : '自动编号' }}
+            </button>
           </div>
         </div>
-      </div>
-      <div class="form-item">
-        <label>分类</label>
-        <div class="combobox-wrap">
+
+        <div class="field">
+          <label for="av-name">名称 <span class="req">*</span></label>
           <input
-            v-model="form.category"
+            id="av-name"
+            v-model="form.name"
+            class="input"
             type="text"
-            placeholder="选择或输入分类"
-            @focus="showCatDropdown = true"
-            @blur="hideDropdown('cat')"
+            placeholder="影片名称（必填）"
+            maxlength="200"
           />
-          <div v-if="showCatDropdown" class="combobox-dropdown">
-            <div
-              v-for="c in filteredCategories"
-              :key="c"
-              class="combobox-option"
-              @mousedown.prevent="selectCategory(c)"
-            >
-              {{ c }}
-            </div>
-            <div v-if="filteredCategories.length === 0" class="combobox-empty">暂无已有分类</div>
-          </div>
         </div>
-      </div>
-      <div class="form-item">
-        <label>所属系列</label>
-        <div class="combobox-wrap">
-          <input
-            v-model="seriesInput"
-            type="text"
+
+        <div class="row row--two">
+          <!-- 地区 / 分类：优先从已有值里挑，也可以手填一个新值 -->
+          <label class="field">
+            <span class="field__label">地区</span>
+            <ComboBox
+              v-if="!customCountry"
+              v-model="form.country"
+              :options="countryOptions"
+              placeholder="选择或输入地区"
+              all-label=""
+            />
+            <input
+              v-else
+              v-model="form.country"
+              class="input"
+              type="text"
+              placeholder="输入新的地区"
+              maxlength="20"
+            />
+            <button type="button" class="switch" @click="customCountry = !customCountry">
+              {{ customCountry ? '从已有地区中选择' : '填写新的地区' }}
+            </button>
+          </label>
+
+          <label class="field">
+            <span class="field__label">分类</span>
+            <ComboBox
+              v-if="!customCategory"
+              v-model="form.category"
+              :options="categoryOptions"
+              placeholder="选择或输入分类"
+              all-label=""
+            />
+            <input
+              v-else
+              v-model="form.category"
+              class="input"
+              type="text"
+              placeholder="输入新的分类"
+              maxlength="20"
+            />
+            <button type="button" class="switch" @click="customCategory = !customCategory">
+              {{ customCategory ? '从已有分类中选择' : '填写新的分类' }}
+            </button>
+          </label>
+        </div>
+
+        <label class="field">
+          <span class="field__label">所属系列</span>
+          <ComboBox
+            v-model="form.seriesId"
+            :options="seriesOptions"
             placeholder="选择或输入系列名称"
-            @focus="showSeriesDropdown = true"
-            @blur="hideDropdown('series')"
+            all-label="（无系列）"
           />
-          <div v-if="showSeriesDropdown" class="combobox-dropdown">
-            <div
-              v-for="s in filteredSeries"
-              :key="s.id"
-              class="combobox-option"
-              @mousedown.prevent="selectSeries(s)"
-            >
-              {{ s.name }}
+        </label>
+
+        <!-- 视频路径：手动输入 + 自动填充 + 上传 -->
+        <div class="field">
+          <label for="av-file-path">视频路径</label>
+          <div class="row">
+            <input
+              id="av-file-path"
+              v-model="form.filePath"
+              class="input"
+              type="text"
+              placeholder="视频文件完整路径（如 /Volumes/disk1/movies/...）"
+            />
+            <button type="button" class="btn btn--sm" title="根据番号自动填充" @click="fillVideoPath">填充</button>
+            <button type="button" class="btn btn--sm" :disabled="uploading" @click="showVideoUploadDir">
+              <span v-if="uploading && uploadTarget === 'video'">上传中 {{ uploadProgress }}%</span>
+              <span v-else>上传视频</span>
+            </button>
+          </div>
+
+          <div v-if="uploading && uploadTarget === 'video'" class="progress">
+            <div class="progress__bar">
+              <div class="progress__fill" :style="{ width: uploadProgress + '%' }"></div>
             </div>
-            <div v-if="filteredSeries.length === 0" class="combobox-empty">暂无已有系列</div>
+            <div class="progress__text">
+              {{ uploadingFileName }}{{ uploadProgress === 100 ? '（处理中...' : '' }}
+            </div>
           </div>
-        </div>
-      </div>
+          <p v-else-if="!uploading && form.fileSize" class="hint">文件大小：{{ formatSize(form.fileSize) }}</p>
 
-      <!-- 视频路径：手动输入 + 上传按钮 -->
-      <div class="form-item">
-        <label>视频路径</label>
-        <div class="path-row">
-          <input v-model="form.filePath" type="text" placeholder="视频文件完整路径（如 /Volumes/disk1/movies/...）" />
-          <button class="fill-btn" @click="fillVideoPath" title="根据番号自动填充">填充</button>
-          <button class="upload-btn" @click="showVideoUploadDir" :disabled="uploading">
-            <span v-if="uploading && uploadTarget === 'video'">上传中 {{ uploadProgress }}%</span>
-            <span v-else>上传视频</span>
-          </button>
-        </div>
-        <!-- 上传进度条 -->
-        <div v-if="uploading && uploadTarget === 'video'" class="upload-progress">
-          <div class="upload-progress-bar">
-            <div class="upload-progress-fill" :style="{ width: uploadProgress + '%' }"></div>
-          </div>
-          <div class="upload-progress-text">{{ uploadingFileName }}{{ uploadProgress === 100 ? '（处理中...' : '' }}</div>
-        </div>
-        <div v-if="!uploading && form.fileSize" class="upload-size-hint">文件大小：{{ formatSize(form.fileSize) }}</div>
-        <!-- 视频上传目录选择器（显示在按钮下方） -->
-        <div v-if="showVideoDirDropdown" class="upload-dir-panel">
-          <div class="upload-dir-header">选择保存目录</div>
-          <div class="upload-dir-list">
-            <template v-for="dir in scanDirectories" :key="dir.id">
-              <div class="upload-dir-item" @click="pickVideoFile(dir.path)" v-if="dir.category === '视频'">{{ dir.path }}</div>
-            </template>
-          </div>
-          <div class="upload-dir-custom">
-            <input
-              v-model="customVideoDir"
-              type="text"
-              placeholder="或输入自定义目录路径"
-              @keyup.enter="pickVideoFile(customVideoDir)"
-            />
-            <button @click="pickVideoFile(customVideoDir)" :disabled="!customVideoDir.trim()">使用此目录</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- 封面路径：手动输入 + 上传按钮 -->
-      <div class="form-item">
-        <label>封面路径</label>
-        <div class="path-row">
-          <input v-model="form.coverPath" type="text" placeholder="封面图片路径（选填，如 /Volumes/disk1/cover.jpg）" />
-          <button class="fill-btn" @click="fillCoverPath" title="根据番号自动填充">填充</button>
-          <button class="upload-btn" @click="showCoverUploadDir" :disabled="uploading">
-            <span v-if="uploading && uploadTarget === 'cover'">上传中 {{ uploadProgress }}%</span>
-            <span v-else>上传封面</span>
-          </button>
-        </div>
-        <!-- 上传进度条 -->
-        <div v-if="uploading && uploadTarget === 'cover'" class="upload-progress">
-          <div class="upload-progress-bar">
-            <div class="upload-progress-fill" :style="{ width: uploadProgress + '%' }"></div>
-          </div>
-          <div class="upload-progress-text">{{ uploadingFileName }}</div>
-        </div>
-        <!-- 封面上传目录选择器 -->
-        <div v-if="showCoverDirDropdown" class="upload-dir-panel">
-          <div class="upload-dir-header">选择保存目录</div>
-          <div class="upload-dir-list">
-            <template v-for="dir in scanDirectories" :key="dir.id">
-              <div class="upload-dir-item" @click="pickCoverFile(dir.path)" v-if="dir.category === '封面'">
-                {{ dir.path.replace(/[\\/]video$/i, '/cover').replace(/[\\/]video[\\/]/i, '/cover/') }}
-              </div>
-            </template>
-          </div>
-          <div class="upload-dir-custom">
-            <input
-              v-model="customCoverDir"
-              type="text"
-              placeholder="或输入自定义目录路径"
-              @keyup.enter="pickCoverFile(customCoverDir)"
-            />
-            <button @click="pickCoverFile(customCoverDir)" :disabled="!customCoverDir.trim()">使用此目录</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- 演员 -->
-      <div class="form-item">
-        <label>演员</label>
-        <div class="actor-selector">
-          <div class="selected-actors">
-            <span v-for="actor in selectedActors" :key="actor.id" class="actor-tag">
-              {{ actor.name }}
-              <button class="remove-btn" @click="removeActor(actor.id)">×</button>
-            </span>
-          </div>
-          <div class="input-with-suggestions">
-            <input
-              v-model="actorSearch"
-              type="text"
-              placeholder="搜索演员并添加"
-              @input="searchActors"
-            />
-            <div v-if="matchedActors.length > 0" class="suggestions">
-              <div
-                v-for="actor in matchedActors"
-                :key="actor.id"
-                class="suggestion-item"
-                @mousedown="addActor(actor)"
+          <div v-if="showVideoDirDropdown" class="panel dir-panel">
+            <p class="dir-panel__head">选择保存目录</p>
+            <div class="dir-panel__list">
+              <button
+                v-for="dir in videoDirs"
+                :key="dir.id"
+                type="button"
+                class="dir-panel__item"
+                @click="pickVideoFile(dir.path)"
               >
-                {{ actor.name }}
-              </div>
+                {{ dir.path }}
+              </button>
+              <p v-if="videoDirs.length === 0" class="hint">没有配置视频保存目录</p>
+            </div>
+            <div class="row">
+              <input
+                id="av-custom-video-dir"
+                v-model="customVideoDir"
+                class="input"
+                type="text"
+                placeholder="或输入自定义目录路径"
+                @keyup.enter="pickVideoFile(customVideoDir)"
+              />
+              <button type="button" class="btn btn--sm" :disabled="!customVideoDir.trim()" @click="pickVideoFile(customVideoDir)">
+                使用此目录
+              </button>
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- 隐藏的文件选择器 -->
-      <input
-        ref="videoFileInputRef"
-        type="file"
-        accept="video/*"
-        style="display:none"
-        @change="onVideoFileSelected"
-      />
-      <input
-        ref="coverFileInputRef"
-        type="file"
-        accept="image/*"
-        style="display:none"
-        @change="onCoverFileSelected"
-      />
+        <!-- 封面路径：手动输入 + 自动填充 + 上传 -->
+        <div class="field">
+          <label for="av-cover-path">封面路径</label>
+          <div class="row">
+            <input
+              id="av-cover-path"
+              v-model="form.coverPath"
+              class="input"
+              type="text"
+              placeholder="封面图片路径（选填，如 /Volumes/disk1/cover.jpg）"
+            />
+            <button type="button" class="btn btn--sm" title="根据番号自动填充" @click="fillCoverPath">填充</button>
+            <button type="button" class="btn btn--sm" :disabled="uploading" @click="showCoverUploadDir">
+              <span v-if="uploading && uploadTarget === 'cover'">上传中 {{ uploadProgress }}%</span>
+              <span v-else>上传封面</span>
+            </button>
+          </div>
+
+          <div v-if="uploading && uploadTarget === 'cover'" class="progress">
+            <div class="progress__bar">
+              <div class="progress__fill" :style="{ width: uploadProgress + '%' }"></div>
+            </div>
+            <div class="progress__text">{{ uploadingFileName }}</div>
+          </div>
+
+          <div v-if="showCoverDirDropdown" class="panel dir-panel">
+            <p class="dir-panel__head">选择保存目录</p>
+            <div class="dir-panel__list">
+              <button
+                v-for="dir in coverDirs"
+                :key="dir.id"
+                type="button"
+                class="dir-panel__item"
+                @click="pickCoverFile(dir.path)"
+              >
+                {{ toCoverDir(dir.path) }}
+              </button>
+              <p v-if="coverDirs.length === 0" class="hint">没有配置封面保存目录</p>
+            </div>
+            <div class="row">
+              <input
+                id="av-custom-cover-dir"
+                v-model="customCoverDir"
+                class="input"
+                type="text"
+                placeholder="或输入自定义目录路径"
+                @keyup.enter="pickCoverFile(customCoverDir)"
+              />
+              <button type="button" class="btn btn--sm" :disabled="!customCoverDir.trim()" @click="pickCoverFile(customCoverDir)">
+                使用此目录
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 演员：全量列表已在打开时取回，这里只做本地筛选 -->
+        <div class="field">
+          <label for="av-actor-search">演员</label>
+          <div class="panel actor-box">
+            <div v-if="selectedActors.length" class="tag-row">
+              <span v-for="actor in selectedActors" :key="actor.id" class="tag tag--accent">
+                {{ actor.name }}
+                <button type="button" class="tag__x" :aria-label="'移除 ' + actor.name" @click="removeActor(actor.id)">
+                  &times;
+                </button>
+              </span>
+            </div>
+            <div class="actor-search">
+              <input
+                id="av-actor-search"
+                v-model="actorSearch"
+                class="input"
+                type="text"
+                placeholder="搜索演员并添加"
+                autocomplete="off"
+                @input="onActorSearchInput"
+              />
+              <ul v-if="actorCandidates.length" class="suggest">
+                <li v-for="actor in actorCandidates" :key="actor.id" class="suggest__item">
+                  <button type="button" @mousedown.prevent="addActor(actor)">{{ actor.name }}</button>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- 隐藏的文件选择器：只为按钮触发，不进 Tab 顺序 -->
+        <input ref="videoFileInputRef" type="file" accept="video/*" class="file-picker" @change="onVideoFileSelected" />
+        <input ref="coverFileInputRef" type="file" accept="image/*" class="file-picker" @change="onCoverFileSelected" />
+      </div>
     </template>
+
     <template #extra-actions>
-      <button v-if="editingVideo" class="delete-btn" @click="handleDelete">删除</button>
-      <button v-if="!editingVideo" class="continue-btn" @click="handleSaveContinue">连续添加</button>
+      <button v-if="editingVideo" type="button" class="btn btn--danger btn--sm foot-left" @click="handleDelete">
+        删除
+      </button>
+      <button v-else type="button" class="btn btn--sm foot-left" @click="handleSaveContinue">连续添加</button>
     </template>
   </Dialog>
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { videoApi, actorApi, scanDirectoryApi, uploadApi } from '@/scripts/api'
+import { useUiStore, errText } from '@/scripts/store/ui'
 import { formatSize } from '@/scripts/utils/format'
+import { debounce } from '@/scripts/utils/debounce'
 import Dialog from './Dialog.vue'
+import ComboBox from './ComboBox.vue'
 
 const props = defineProps({
   visible: Boolean,
   editingVideo: Object
 })
 
+const ui = useUiStore()
+
 const emit = defineEmits(['save', 'save-continue', 'cancel', 'delete'])
+
+// 后端 Paging.MaxPageSize，单次能取回的上限
+const ACTOR_FETCH_SIZE = 500
+const SUGGEST_LIMIT = 20
 
 const actorList = ref([])
 const selectedActors = ref([])
 const actorSearch = ref('')
-const matchedActors = ref([])
+// 本地这一页筛不出来时才用它兜底（演员总数超过 ACTOR_FETCH_SIZE）
+const remoteActors = ref([])
 const codeLoading = ref(false)
 const meta = ref({ categories: [], countries: [], series: [] })
 const scanDirectories = ref([])
 
-const showCatDropdown = ref(false)
-const showCountryDropdown = ref(false)
-const showSeriesDropdown = ref(false)
+const customCountry = ref(false)
+const customCategory = ref(false)
 const showVideoDirDropdown = ref(false)
 const showCoverDirDropdown = ref(false)
 const customVideoDir = ref('')
@@ -251,28 +297,6 @@ const videoFileInputRef = ref(null)
 const coverFileInputRef = ref(null)
 const pendingUploadDir = ref('')
 
-const seriesInput = ref('')
-
-const seriesList = computed(() => meta.value.series || [])
-
-const filteredCategories = computed(() => {
-  const list = meta.value.categories || []
-  if (!form.value.category) return list
-  return list.filter(c => c.toLowerCase().includes(form.value.category.toLowerCase()))
-})
-
-const filteredCountries = computed(() => {
-  const list = meta.value.countries || []
-  if (!form.value.country) return list
-  return list.filter(c => c.toLowerCase().includes(form.value.country.toLowerCase()))
-})
-
-const filteredSeries = computed(() => {
-  const list = seriesList.value || []
-  if (!seriesInput.value) return list.slice(0, 50)
-  return list.filter(s => s.name.toLowerCase().includes(seriesInput.value.toLowerCase())).slice(0, 50)
-})
-
 const form = ref({
   name: '',
   code: '',
@@ -284,44 +308,64 @@ const form = ref({
   fileSize: null
 })
 
-// 一键填充视频路径：保存目录/番号.mp4
+const countryOptions = computed(() =>
+  (meta.value.countries || []).map((c) => ({ id: c, name: c }))
+)
+
+const categoryOptions = computed(() =>
+  (meta.value.categories || []).map((c) => ({ id: c, name: c }))
+)
+
+// meta 已经是 [{ id, name }]，直接给 ComboBox
+const seriesOptions = computed(() => meta.value.series || [])
+
+const videoDirs = computed(() => scanDirectories.value.filter((d) => d.category === '视频'))
+const coverDirs = computed(() => scanDirectories.value.filter((d) => d.category === '封面'))
+
+/* ---------------------------------------------------------------
+   路径推导：{目录}/{番号}.{扩展名}，封面目录由视频目录推导
+   --------------------------------------------------------------- */
+
+const trimEnd = (dir) => (dir || '').replace(/[\\/]+$/, '')
+
+// /x/video 与 /x/video/y 里的 video 段换成 cover
+const toCoverDir = (dir) => (dir || '').replace(/[\\/]video(?=$|[\\/])/i, '/cover')
+
+const mediaPath = (dir, code, ext) => `${trimEnd(dir)}/${code}.${ext}`
+
 const fillVideoPath = () => {
   if (!form.value.code) {
-    alert('请先填写番号')
+    ui.warn('请先填写番号')
     return
   }
-  const videoDirs = scanDirectories.value.filter(d => d.category === '视频')
-  if (videoDirs.length === 0) {
-    alert('没有配置视频保存目录')
+  if (videoDirs.value.length === 0) {
+    ui.warn('没有配置视频保存目录')
     return
   }
-  const dir = videoDirs[0].path.replace(/\/+$/, '')
-  form.value.filePath = `${dir}/${form.value.code}.mp4`
+  form.value.filePath = mediaPath(videoDirs.value[0].path, form.value.code, 'mp4')
 }
 
-// 一键填充封面路径：保存目录/番号.jpg
 const fillCoverPath = () => {
   if (!form.value.code) {
-    alert('请先填写番号')
+    ui.warn('请先填写番号')
     return
   }
-  const coverDirs = scanDirectories.value.filter(d => d.category === '封面')
-  if (coverDirs.length > 0) {
-    const dir = coverDirs[0].path.replace(/\/+$/, '')
-    form.value.coverPath = `${dir}/${form.value.code}.jpg`
+  if (coverDirs.value.length > 0) {
+    form.value.coverPath = mediaPath(coverDirs.value[0].path, form.value.code, 'jpg')
+    return
+  }
+  // 没有封面目录，从视频目录推导
+  if (videoDirs.value.length > 0) {
+    form.value.coverPath = mediaPath(toCoverDir(videoDirs.value[0].path), form.value.code, 'jpg')
   } else {
-    // 没有封面目录，尝试从视频目录推导
-    const videoDirs = scanDirectories.value.filter(d => d.category === '视频')
-    if (videoDirs.length > 0) {
-      const dir = videoDirs[0].path.replace(/[\\/]video$/i, '/cover').replace(/[\\/]video[\\/]/i, '/cover/').replace(/\/+$/, '')
-      form.value.coverPath = `${dir}/${form.value.code}.jpg`
-    } else {
-      alert('没有配置封面保存目录')
-    }
+    ui.warn('没有配置封面保存目录')
   }
 }
 
-// ===== 上传相关 =====
+/* ---------------------------------------------------------------
+   上传
+   --------------------------------------------------------------- */
+
 const loadScanDirectories = async () => {
   try {
     const res = await scanDirectoryApi.getList()
@@ -333,21 +377,18 @@ const loadScanDirectories = async () => {
   }
 }
 
-// 显示视频上传目录选择器
 const showVideoUploadDir = () => {
   showVideoDirDropdown.value = !showVideoDirDropdown.value
   showCoverDirDropdown.value = false
   customVideoDir.value = ''
 }
 
-// 显示封面上传目录选择器
 const showCoverUploadDir = () => {
   showCoverDirDropdown.value = !showCoverDirDropdown.value
   showVideoDirDropdown.value = false
   customCoverDir.value = ''
 }
 
-// 选择视频目录后触发文件选择器
 const pickVideoFile = (dir) => {
   if (!dir) return
   pendingUploadDir.value = dir
@@ -355,17 +396,13 @@ const pickVideoFile = (dir) => {
   videoFileInputRef.value?.click()
 }
 
-// 选择封面目录后触发文件选择器
 const pickCoverFile = (dir) => {
   if (!dir) return
-  // 把路径中的 video 替换为 cover
-  const coverDir = dir.replace(/[\\/]video$/i, '/cover').replace(/[\\/]video[\\/]/i, '/cover/')
-  pendingUploadDir.value = coverDir
+  pendingUploadDir.value = toCoverDir(dir)
   showCoverDirDropdown.value = false
   coverFileInputRef.value?.click()
 }
 
-// 视频文件选择后上传
 const onVideoFileSelected = async (e) => {
   const file = e.target.files?.[0]
   if (!file) return
@@ -373,7 +410,6 @@ const onVideoFileSelected = async (e) => {
   e.target.value = '' // 清空，支持重复选择同一文件
 }
 
-// 封面文件选择后上传
 const onCoverFileSelected = async (e) => {
   const file = e.target.files?.[0]
   if (!file) return
@@ -381,7 +417,6 @@ const onCoverFileSelected = async (e) => {
   e.target.value = ''
 }
 
-// 执行上传
 const doUpload = async (type, directory, file) => {
   uploading.value = true
   uploadTarget.value = type
@@ -416,11 +451,11 @@ const doUpload = async (type, directory, file) => {
         }
       }
     } else {
-      alert('上传失败: ' + (res.message || '未知错误'))
+      ui.error('上传失败：' + errText(res, '未知错误'))
     }
   } catch (err) {
     console.error('上传失败:', err)
-    alert('上传失败: ' + (err.response?.status || '') + ' ' + (err.message || err))
+    ui.error('上传失败：' + errText(err))
   } finally {
     uploading.value = false
     uploadTarget.value = ''
@@ -430,66 +465,62 @@ const doUpload = async (type, directory, file) => {
   }
 }
 
-// ===== 其他方法 =====
+/* ---------------------------------------------------------------
+   演员选择
+   --------------------------------------------------------------- */
 
-const selectCategory = (val) => {
-  form.value.category = val
-  showCatDropdown.value = false
-}
+const actorRows = (data) => (Array.isArray(data) ? data : data?.list || [])
 
-const selectCountry = (val) => {
-  form.value.country = val
-  showCountryDropdown.value = false
-}
+const candidate = (actor, keyword, picked) =>
+  !picked.has(actor.id) && (actor.name || '').toLowerCase().includes(keyword)
 
-const selectSeries = (s) => {
-  form.value.seriesId = s.id
-  seriesInput.value = s.name
-  showSeriesDropdown.value = false
-}
+const actorCandidates = computed(() => {
+  const kw = actorSearch.value.trim().toLowerCase()
+  if (!kw) return []
+  const picked = new Set(selectedActors.value.map((a) => a.id))
+  const local = actorList.value.filter((a) => candidate(a, kw, picked))
+  // 演员总数没超过单次取回上限时根本不会发请求，本地这份就是全集
+  if (local.length || actorList.value.length < ACTOR_FETCH_SIZE) return local.slice(0, SUGGEST_LIMIT)
+  return remoteActors.value.filter((a) => candidate(a, kw, picked)).slice(0, SUGGEST_LIMIT)
+})
 
-const hideDropdown = (type) => {
-  setTimeout(() => {
-    if (type === 'cat') showCatDropdown.value = false
-    if (type === 'country') showCountryDropdown.value = false
-    if (type === 'series') {
-      showSeriesDropdown.value = false
-      const matched = seriesList.value.find(s => s.name === seriesInput.value)
-      if (matched) {
-        form.value.seriesId = matched.id
-      } else {
-        form.value.seriesId = ''
-      }
-    }
-  }, 200)
-}
-
-const searchActors = async () => {
-  if (!actorSearch.value.trim()) {
-    matchedActors.value = []
+// 本地筛不出来（列表被 500 条截断）才退回服务端，并且停顿后再查，不再每敲一个字打一次接口
+const searchRemoteActors = debounce(async (kw) => {
+  if (!kw || actorList.value.length < ACTOR_FETCH_SIZE) {
+    remoteActors.value = []
     return
   }
   try {
-    const res = await actorApi.getList({ keyword: actorSearch.value.trim(), pageSize: 50 })
-    if (res.success) {
-      matchedActors.value = (res.data?.items || res.data || []).filter(a => !selectedActors.value.some(s => s.id === a.id))
-    }
+    const res = await actorApi.getList({ keyword: kw, pageSize: 50 })
+    if (actorSearch.value.trim() !== kw) return // 关键词已经变了
+    const picked = new Set(selectedActors.value.map((a) => a.id))
+    remoteActors.value = actorRows(res.data).filter((a) => candidate(a, kw.toLowerCase(), picked))
   } catch (error) {
     console.error('搜索演员失败:', error)
+    remoteActors.value = []
   }
+}, 400)
+
+const onActorSearchInput = () => {
+  searchRemoteActors(actorSearch.value.trim())
 }
 
 const addActor = (actor) => {
-  if (!selectedActors.value.some(a => a.id === actor.id)) {
+  if (!selectedActors.value.some((a) => a.id === actor.id)) {
     selectedActors.value.push(actor)
   }
   actorSearch.value = ''
-  matchedActors.value = []
+  searchRemoteActors.cancel()
+  remoteActors.value = []
 }
 
 const removeActor = (actorId) => {
-  selectedActors.value = selectedActors.value.filter(a => a.id !== actorId)
+  selectedActors.value = selectedActors.value.filter((a) => a.id !== actorId)
 }
+
+/* ---------------------------------------------------------------
+   数据加载与提交
+   --------------------------------------------------------------- */
 
 const generateCode = async () => {
   codeLoading.value = true
@@ -521,9 +552,9 @@ const loadMeta = async () => {
 
 const loadActorList = async () => {
   try {
-    const res = await actorApi.getList()
+    const res = await actorApi.getList({ page: 1, pageSize: ACTOR_FETCH_SIZE })
     if (res.success) {
-      actorList.value = res.data || []
+      actorList.value = actorRows(res.data)
     }
   } catch (error) {
     console.error('加载演员列表失败:', error)
@@ -531,51 +562,55 @@ const loadActorList = async () => {
 }
 
 watch(() => props.visible, async (val) => {
-  if (val) {
-    await Promise.all([loadMeta(), loadActorList(), loadScanDirectories()])
-    // 关闭所有目录选择器
-    showVideoDirDropdown.value = false
-    showCoverDirDropdown.value = false
-    if (props.editingVideo) {
-      try {
-        const detail = await videoApi.getDetail(props.editingVideo.id)
-        if (detail.success && detail.data) {
-          form.value = {
-            name: detail.data.video.name || '',
-            code: detail.data.video.code || '',
-            category: detail.data.video.category || '',
-            country: detail.data.video.country || '',
-            seriesId: detail.data.video.seriesId || '',
-            filePath: detail.data.video.filePath || '',
-            coverPath: detail.data.video.coverPath || ''
-          }
-          if (detail.data.video.seriesId && detail.data.video.seriesName) {
-            seriesInput.value = detail.data.video.seriesName
-          } else {
-            seriesInput.value = ''
-          }
-          selectedActors.value = detail.data.actors || []
-        }
-      } catch (e) {
-        console.error('加载影片详情失败', e)
-      }
-    } else {
-      resetForm()
+  if (!val) return
+  customCountry.value = false
+  customCategory.value = false
+  showVideoDirDropdown.value = false
+  showCoverDirDropdown.value = false
+  resetActors()
+
+  await Promise.all([loadMeta(), loadActorList(), loadScanDirectories()])
+  if (!props.editingVideo) {
+    resetForm()
+    return
+  }
+  try {
+    const detail = await videoApi.getDetail(props.editingVideo.id)
+    if (!detail.success || !detail.data) return
+    const { video } = detail.data
+    form.value = {
+      name: video.name || '',
+      code: video.code || '',
+      category: video.category || '',
+      country: video.country || '',
+      seriesId: video.seriesId || '',
+      filePath: video.filePath || '',
+      coverPath: video.coverPath || ''
     }
+    selectedActors.value = detail.data.actors || []
+    // 编辑值不在已有选项里时，直接落到手填输入框，免得看起来像没选
+    customCountry.value = !!video.country && !meta.value.countries.includes(video.country)
+    customCategory.value = !!video.category && !meta.value.categories.includes(video.category)
+  } catch (e) {
+    console.error('加载影片详情失败', e)
   }
 })
 
 const resetForm = () => {
   form.value = { name: '', code: '', category: '', country: '', seriesId: '', filePath: '', coverPath: '', fileSize: null }
-  seriesInput.value = ''
-  selectedActors.value = []
+  resetActors()
+}
+
+const resetActors = () => {
   actorSearch.value = ''
-  matchedActors.value = []
+  remoteActors.value = []
+  searchRemoteActors.cancel()
+  selectedActors.value = []
 }
 
 const handleSave = () => {
   if (!form.value.name.trim()) {
-    alert('请输入影片名称')
+    ui.warn('请输入影片名称')
     return
   }
   emit('save', {
@@ -588,13 +623,13 @@ const handleSave = () => {
     filePath: form.value.filePath,
     coverPath: form.value.coverPath,
     fileSize: form.value.fileSize,
-    actorIds: selectedActors.value.map(a => a.id)
+    actorIds: selectedActors.value.map((a) => a.id)
   })
 }
 
 const handleSaveContinue = () => {
   if (!form.value.name.trim()) {
-    alert('请输入影片名称')
+    ui.warn('请输入影片名称')
     return
   }
   emit('save-continue', {
@@ -606,16 +641,14 @@ const handleSaveContinue = () => {
     filePath: form.value.filePath,
     coverPath: form.value.coverPath,
     fileSize: form.value.fileSize,
-    actorIds: selectedActors.value.map(a => a.id)
+    actorIds: selectedActors.value.map((a) => a.id)
   })
   // 清空番号、视频路径、封面路径、演员
   form.value.code = ''
   form.value.filePath = ''
   form.value.coverPath = ''
   form.value.fileSize = null
-  selectedActors.value = []
-  actorSearch.value = ''
-  matchedActors.value = []
+  resetActors()
 }
 
 const handleCancel = () => {
@@ -628,147 +661,189 @@ const handleDelete = () => {
 </script>
 
 <style scoped>
-.form-item { margin-bottom: 16px; }
-.form-item label { display: block; margin-bottom: 6px; font-size: 14px; color: #666; }
-.form-item input, .form-item select { width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; box-sizing: border-box; }
-.code-row { display: flex; gap: 8px; }
-.code-row input { flex: 1; }
-.autocode-btn { white-space: nowrap; padding: 8px 14px; border: 1px solid #4a9eff; background: #4a9eff; color: #fff; border-radius: 4px; cursor: pointer; font-size: 13px; }
-.autocode-btn:hover { background: #3a8eef; }
-.autocode-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-.combobox-wrap { position: relative; }
-.combobox-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid #ddd; border-radius: 4px; margin-top: 4px; max-height: 200px; overflow-y: auto; z-index: 10; }
-.combobox-option { padding: 8px 12px; cursor: pointer; }
-.combobox-option:hover { background: #f5f5f5; }
-.combobox-empty { padding: 8px 12px; color: #999; font-size: 13px; }
-.actor-selector { border: 1px solid #ddd; border-radius: 4px; padding: 8px; }
-.selected-actors { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
-.actor-tag { background: #e3f2fd; color: #1976d2; padding: 4px 8px; border-radius: 4px; font-size: 13px; display: flex; align-items: center; gap: 4px; }
-.remove-btn { background: none; border: none; color: #1976d2; cursor: pointer; font-size: 16px; line-height: 1; }
-.input-with-suggestions { position: relative; }
-.input-with-suggestions input { width: 100%; padding: 6px 10px; border: 1px solid #eee; border-radius: 3px; }
-.suggestions { position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid #ddd; border-radius: 4px; margin-top: 2px; max-height: 150px; overflow-y: auto; z-index: 10; }
-.suggestion-item { padding: 6px 10px; cursor: pointer; font-size: 13px; }
-.suggestion-item:hover { background: #f5f5f5; }
-.delete-btn { padding: 8px 16px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; }
-.delete-btn:hover { background: #c0392b; }
-.continue-btn { padding: 8px 16px; background: #27ae60; color: white; border: none; border-radius: 4px; cursor: pointer; }
-.continue-btn:hover { background: #229954; }
-
-/* 路径行 + 上传按钮 */
-.path-row { display: flex; gap: 8px; align-items: center; }
-.path-row input { flex: 1; }
-.upload-btn {
-  white-space: nowrap;
-  padding: 8px 14px;
-  border: 1px solid #4a9eff;
-  background: #4a9eff;
-  color: #fff;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 13px;
-}
-
-.fill-btn {
-  white-space: nowrap;
-  padding: 8px 14px;
-  border: 1px solid #27ae60;
-  background: #27ae60;
-  color: #fff;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 13px;
-}
-
-.fill-btn:hover {
-  background: #229954;
-}
-
-.upload-btn:hover { background: #2980b9; }
-.upload-btn:disabled { background: #b0bec5; cursor: not-allowed; }
-
-/* 上传目录选择面板 */
-.upload-dir-panel {
-  margin-top: 8px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  background: #fafafa;
-  overflow: hidden;
-}
-.upload-dir-header {
-  padding: 8px 12px;
-  font-size: 13px;
-  color: #666;
-  background: #f0f0f0;
-  border-bottom: 1px solid #ddd;
-  font-weight: 500;
-}
-.upload-dir-list {
-  max-height: 160px;
-  overflow-y: auto;
-}
-.upload-dir-item {
-  padding: 8px 12px;
-  font-size: 13px;
-  cursor: pointer;
-  color: #333;
-  word-break: break-all;
-}
-.upload-dir-item:hover { background: #e3f2fd; color: #1976d2; }
-.upload-dir-custom {
+.form {
   display: flex;
-  gap: 6px;
-  padding: 8px 12px;
-  border-top: 1px solid #ddd;
+  flex-direction: column;
+  gap: var(--s4);
 }
-.upload-dir-custom input {
-  flex: 1;
-  padding: 6px 10px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 13px;
-  box-sizing: border-box;
-}
-.upload-dir-custom button {
-  padding: 6px 12px;
-  background: #27ae60;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 13px;
-  white-space: nowrap;
-}
-.upload-dir-custom button:hover { background: #219653; }
-.upload-dir-custom button:disabled { background: #b0bec5; cursor: not-allowed; }
 
-/* 上传进度条 */
-.upload-progress {
-  margin-top: 8px;
+/* 文件选择器只由按钮 .click() 触发，不占位也不进 Tab 顺序 */
+.file-picker {
+  display: none;
 }
-.upload-progress-bar {
+
+.field > .field__label {
+  font-size: var(--f-sm);
+  color: var(--text-dim);
+}
+
+.req {
+  color: var(--danger);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+}
+
+.row > .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.row--two {
+  align-items: flex-start;
+}
+
+.row--two > .field {
+  flex: 1;
+  min-width: 0;
+}
+
+.switch {
+  align-self: flex-start;
+  font-size: var(--f-xs);
+  color: var(--accent);
+}
+
+.switch:hover {
+  text-decoration: underline;
+}
+
+.hint {
+  font-size: var(--f-xs);
+  color: var(--text-faint);
+}
+
+.foot-left {
+  margin-right: auto;
+}
+
+/* 上传进度 */
+.progress {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.progress__bar {
   height: 6px;
-  background: #e0e0e0;
-  border-radius: 3px;
+  border-radius: var(--rp);
+  background: var(--bg-elev-2);
   overflow: hidden;
 }
-.upload-progress-fill {
+
+.progress__fill {
   height: 100%;
-  background: linear-gradient(90deg, #3498db, #2ecc71);
-  border-radius: 3px;
-  transition: width 0.2s ease;
+  border-radius: var(--rp);
+  background: var(--accent);
+  transition: width var(--dur) var(--ease);
 }
-.upload-progress-text {
-  font-size: 12px;
-  color: #888;
-  margin-top: 4px;
+
+.progress__text {
+  font-size: var(--f-xs);
+  color: var(--text-dim);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.upload-size-hint {
-  font-size: 12px;
-  color: #52c41a;
-  margin-top: 2px;
+
+/* 目录选择面板 */
+.dir-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  padding: var(--s3);
+}
+
+.dir-panel__head {
+  font-size: var(--f-sm);
+  color: var(--text-dim);
+}
+
+.dir-panel__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.dir-panel__item {
+  text-align: left;
+  padding: 5px 8px;
+  border-radius: var(--r1);
+  font-size: var(--f-sm);
+  color: var(--text-dim);
+  word-break: break-all;
+}
+
+.dir-panel__item:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+/* 演员 */
+.actor-box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  padding: var(--s3);
+}
+
+.tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+}
+
+.tag__x {
+  display: grid;
+  place-items: center;
+  font-size: var(--f-md);
+  line-height: 1;
+  color: inherit;
+  opacity: .7;
+}
+
+.tag__x:hover {
+  opacity: 1;
+  color: var(--danger);
+}
+
+.actor-search {
+  position: relative;
+}
+
+.suggest {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  list-style: none;
+  padding: 4px;
+  max-height: 220px;
+  overflow-y: auto;
+  background: var(--bg-elev);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r1);
+  box-shadow: var(--shadow-2);
+}
+
+.suggest__item button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 6px 9px;
+  border-radius: var(--r1);
+  font-size: var(--f-md);
+  color: var(--text-dim);
+}
+
+.suggest__item button:hover {
+  background: var(--bg-hover);
+  color: var(--text);
 }
 </style>

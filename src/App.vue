@@ -1,39 +1,17 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
-import { settingApi } from '@/scripts/api'
+import { onMounted } from 'vue'
 import AppHeader from '@/views/components/AppHeader.vue'
 import AppFooter from '@/views/components/AppFooter.vue'
 import LikeCalendar from '@/views/components/LikeCalendar.vue'
+import AppOverlays from '@/views/components/AppOverlays.vue'
+import { useAppStore } from '@/scripts/store/app'
 
-const siteName = ref('影视网站')
+const app = useAppStore()
 
-onMounted(async () => {
-  await loadSiteName()
-  window.addEventListener('settingsUpdated', handleSettingsUpdate)
+onMounted(() => {
+  // 站点名/分页大小等只在这里拉一次，Header/Footer 直接读 store
+  app.init()
 })
-
-onUnmounted(() => {
-  window.removeEventListener('settingsUpdated', handleSettingsUpdate)
-})
-
-const loadSiteName = async () => {
-  try {
-    const res = await settingApi.getByName('siteName')
-    if (res.success && res.data) {
-      siteName.value = res.data
-      document.title = res.data
-    }
-  } catch (error) {
-    console.error('加载网站名称失败:', error)
-  }
-}
-
-const handleSettingsUpdate = (event) => {
-  if (event.detail && event.detail.siteName) {
-    siteName.value = event.detail.siteName
-    document.title = event.detail.siteName
-  }
-}
 </script>
 
 <template>
@@ -48,10 +26,11 @@ const handleSettingsUpdate = (event) => {
       <AppFooter />
     </footer>
   </div>
-  <!-- 悬浮日历 -->
+  <!-- 悬浮日历：窄屏收成右下角小圆钮，避免盖住内容 -->
   <div class="floating-calendar">
     <LikeCalendar />
   </div>
+  <AppOverlays />
 </template>
 
 <style scoped>
@@ -61,27 +40,24 @@ const handleSettingsUpdate = (event) => {
   min-height: 100vh;
 }
 
-#header {
-  flex-shrink: 0;
-}
-
 #main-container {
   flex: 1;
-  padding: 20px;
-  max-width: 1200px;
   width: 100%;
+  max-width: var(--container);
   margin: 0 auto;
-}
-
-#footer {
-  flex-shrink: 0;
-  margin-top: auto;
 }
 
 .floating-calendar {
   position: fixed;
-  right: 20px;
-  bottom: 20px;
-  z-index: 100;
+  right: var(--s5);
+  bottom: var(--s5);
+  z-index: var(--z-fab);
+}
+
+@media (max-width: 900px) {
+  .floating-calendar {
+    right: var(--s3);
+    bottom: var(--s3);
+  }
 }
 </style>

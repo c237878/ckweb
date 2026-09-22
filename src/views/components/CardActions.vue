@@ -4,62 +4,15 @@
   </div>
 </template>
 
-<script setup>
-</script>
-
 <style scoped>
+/* 只负责排布；按钮外观统一走 main.css 里的 .btn 系列，
+   原先这里用 :deep() 覆写了一套浅色按钮样式，会把主题盖掉。 */
 .card-actions {
   display: flex;
   justify-content: flex-end;
   align-items: center;
   gap: 6px;
-  padding: 10px 16px;
-  border-top: 1px solid #f0f0f0;
-}
-
-/* 统一按钮样式 */
-.card-actions :deep(.btn) {
-  padding: 5px 14px;
-  border: 1px solid #ddd;
-  background: #fff;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 13px;
-  color: #333;
-  transition: all 0.2s;
-}
-
-.card-actions :deep(.btn:hover) {
-  background: #f5f5f5;
-}
-
-.card-actions :deep(.btn-primary) {
-  background: #3498db;
-  color: #fff;
-  border-color: #3498db;
-}
-
-.card-actions :deep(.btn-primary:hover) {
-  background: #2980b9;
-}
-
-.card-actions :deep(.btn-success) {
-  background: #28a745;
-  color: #fff;
-  border-color: #28a745;
-}
-
-.card-actions :deep(.btn-success:hover) {
-  background: #218838;
-}
-
-.card-actions :deep(.btn-danger) {
-  background: #e74c3c;
-  color: #fff;
-  border-color: #e74c3c;
-}
-
-.card-actions :deep(.btn-danger:hover) {
-  background: #c0392b;
+  padding: var(--s2) var(--s3);
+  border-top: 1px solid var(--border);
 }
 </style>

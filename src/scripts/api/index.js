@@ -57,7 +57,9 @@ export const comicApi = {
   restoreBatch: (data) => api.post('/comic/restore/batch', data),
   // 图片访问
   getImageUrl: (chapterId, fileName) => `/api/comic/image/${chapterId}/${encodeURIComponent(fileName)}`,
-  getCoverUrl: (coverPath) => `/api/comic/image/cover/${encodeURI(coverPath)}`,
+  // 逐段编码：encodeURI 不转义 # % \，封面路径里出现 # 会被当成分数标识符而静默截断请求
+  getCoverUrl: (coverPath) => `/api/comic/image/cover/${String(coverPath ?? '')
+    .split('/').map(encodeURIComponent).join('/')}`,
   // 点赞
   like: (id) => api.post(`/comic/${id}/like`)
 }
@@ -81,6 +83,8 @@ export const videoApi = {
   getCoverUrl: (id) => `/api/video/cover/${id}`,
   checkSubtitle: (code) => api.get(`/video/${code}/subtitle/check`),
   getMeta: () => api.get('/video/meta'),
+  /** 首页分类板块：一次请求取代按分类各发一次 list */
+  getHomeSections: () => api.get('/video/home-sections'),
   getAutoCode: () => api.get('/video/autocode'),
   like: (id) => api.post(`/video/${id}/like`),
   resetFileSize: (id) => api.post(`/video/${id}/reset-file-size`),
@@ -100,17 +104,23 @@ export const actorApi = {
   getDetail: (id) => api.get(`/actor/${id}`),
   getVideos: (id, params) => api.get(`/actor/${id}/videos`, { params }),
   getCountries: () => api.get('/actor/countries'),
+  /** 演员海报墙的文件名列表 */
+  getPosters: (id) => api.get(`/actor/${id}/posters`),
   add: (data) => api.post('/actor', data),
   update: (id, data) => api.put(`/actor/${id}`, data),
   delete: (id) => api.delete(`/actor/${id}`)
+}
+
+// 精彩瞬间
+export const highlightApi = {
+  getPosters: () => api.get('/highlights/posters')
 }
 
 // 系统设置相关API
 export const settingApi = {
   getAll: () => api.get('/systemsetting'),
   getByName: (name) => api.get(`/systemsetting/${name}`),
-  save: (data) => api.post('/systemsetting', data),
-  delete: (id) => api.delete(`/systemsetting/${id}`)
+  save: (data) => api.post('/systemsetting', data)
 }
 
 // 系列相关API

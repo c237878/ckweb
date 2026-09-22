@@ -1,34 +1,40 @@
-﻿<template>
-  <div class="comic-list">
-    <div class="list-header">
-      <h1>漫画管理</h1>
-      <div class="header-actions">
-        <button class="add-btn" @click="handleAdd">添加漫画</button>
-      </div>
+<template>
+  <div class="page comic-list">
+    <div class="page-header">
+      <h1 class="page-title">漫画管理</h1>
+      <button class="btn btn--primary" @click="handleAdd">添加漫画</button>
     </div>
 
     <div class="filters">
-      <select v-model.number="statusFilter" @change="handleSearch" class="status-select">
+      <select v-model.number="statusFilter" class="select" @change="applyFilter">
         <option :value="-1">全部状态</option>
         <option :value="0">连载中</option>
         <option :value="1">完结</option>
       </select>
-      <input
-        v-model="keyword"
-        placeholder="搜索漫画名称或作者..."
-        type="text"
-        @keyup.enter="handleSearch"
-      />
-      <button class="search-btn" @click="handleSearch">搜索</button>
-      <button class="reset-btn" @click="handleReset">重置</button>
-      <select v-model="sortBy" @change="handleSearch" class="status-select">
+      <select v-model="sortBy" class="select" @change="applyFilter">
         <option value="">默认排序</option>
         <option value="name">按名称</option>
         <option value="likes">按点赞</option>
       </select>
+      <input
+        v-model="keyword"
+        class="input grow"
+        type="search"
+        placeholder="搜索漫画名称或作者..."
+        aria-label="搜索漫画名称或作者"
+        @keyup.enter="applyFilter"
+        @input="debouncedSearch"
+      />
+      <button class="btn btn--sm btn--ghost" @click="handleReset">重置</button>
     </div>
 
-    <div class="comic-grid" v-if="comicList.length > 0">
+    <div v-if="loading" class="grid" aria-busy="true" aria-label="加载中">
+      <div v-for="n in Math.min(pageSize, 24)" :key="n" class="skeleton card-skeleton"></div>
+    </div>
+
+    <div v-else-if="error" class="notice notice--error">{{ error }}</div>
+
+    <div v-else-if="comicList.length" class="grid">
       <ComicCard
         v-for="comic in comicList"
         :key="comic.id"
@@ -36,33 +42,21 @@
         @click="goToDetail"
         @edit="handleEdit"
         @delete="handleDelete"
-      >
-        <template #actions>
-          <button class="btn btn-sm btn-primary" @click="handleEdit(comic)">编辑</button>
-          <button class="btn btn-sm btn-danger" @click="handleDelete(comic)">删除</button>
-        </template>
-      </ComicCard>
+      />
     </div>
 
-    <div class="empty-hint" v-if="comicList.length === 0 && !loading">
-      暂无漫画，点击上方「添加漫画」开始
+    <div v-else class="empty">
+      <p>{{ hasFilter ? '没有符合条件的漫画' : '暂无漫画，点击上方「添加漫画」开始' }}</p>
+      <button v-if="hasFilter" class="btn btn--sm" @click="handleReset">清除筛选</button>
     </div>
 
-    <div class="loading-hint" v-if="loading">加载中...</div>
-
-    <div class="pagination" v-if="total > 0">
-      <button :disabled="page === 1" @click="changePage(page - 1)">上一页</button>
-      <span>第 {{ page }} 页 / 共 {{ Math.ceil(total / pageSize) }} 页（共 {{ total }} 条）</span>
-      <input class="goto-input" v-model.number="gotoVal" type="number" min="1"
-        :max="Math.ceil(total / pageSize)" placeholder="跳转" @keyup.enter="handleGotoPage" />
-      <button @click="handleGotoPage">跳转</button>
-      <button :disabled="page * pageSize >= total" @click="changePage(page + 1)">下一页</button>
-    </div>
+    <Pagination v-model:page="page" :page-size="pageSize" :total="total" @change="loadComics" />
 
     <!-- 添加/编辑对话框 -->
     <ComicFormDialog
       :visible="showDialog"
       :editing-comic="editingComic"
+      :saving="saving"
       @update:visible="showDialog = $event"
       @save="handleSave"
       @cancel="handleCancel"
@@ -71,32 +65,47 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { comicApi } from '@/scripts/api'
+import { useAppStore } from '@/scripts/store/app'
+import { useUiStore, errText } from '@/scripts/store/ui'
+import { debounce } from '@/scripts/utils/debounce'
 import { loadFilterState, saveFilterState } from '@/scripts/utils/filterPersist'
 import ComicCard from '@/views/components/ComicCard.vue'
 import ComicFormDialog from '@/views/components/ComicFormDialog.vue'
+import Pagination from '@/views/components/Pagination.vue'
 
 const router = useRouter()
+const app = useAppStore()
+const ui = useUiStore()
 const STORAGE_KEY = 'comic-list'
+
 const comicList = ref([])
 const page = ref(1)
-const pageSize = ref(24)
 const total = ref(0)
 const keyword = ref('')
 const statusFilter = ref(-1)
 const sortBy = ref('')
-const loading = ref(false)
+const loading = ref(true)
+const error = ref('')
 const showDialog = ref(false)
 const editingComic = ref(null)
-const gotoVal = ref()
+const saving = ref(false)
 
-// 筛选持久化（keyword 不缓存）
-watch([statusFilter, sortBy], () => saveFilterState(STORAGE_KEY, { statusFilter: statusFilter.value, sortBy: sortBy.value, page: page.value }))
+// 每页条数跟随站点设置，不再各页各写一个数
+const pageSize = computed(() => app.pageSize)
+
+const hasFilter = computed(() => !!keyword.value || statusFilter.value >= 0 || !!sortBy.value)
+
+// 筛选状态持久化（keyword 不缓存）
+watch([statusFilter, sortBy, page], () => {
+  saveFilterState(STORAGE_KEY, { statusFilter: statusFilter.value, sortBy: sortBy.value, page: page.value })
+})
 
 const loadComics = async () => {
   loading.value = true
+  error.value = ''
   try {
     const params = { pageIndex: page.value, pageSize: pageSize.value }
     if (keyword.value) params.keyword = keyword.value
@@ -106,42 +115,32 @@ const loadComics = async () => {
     if (res.success) {
       comicList.value = res.data?.list || []
       total.value = res.data?.total || 0
+    } else {
+      error.value = res.message || '漫画加载失败'
     }
-  } catch (error) {
-    console.error('加载漫画失败:', error)
+  } catch (err) {
+    console.error('加载漫画失败:', err)
+    error.value = '漫画加载失败，请确认后端服务可用'
   } finally {
     loading.value = false
   }
 }
 
-const handleSearch = () => {
+const applyFilter = () => {
   page.value = 1
-  saveFilterState(STORAGE_KEY, { statusFilter: statusFilter.value, sortBy: sortBy.value, page: page.value })
   loadComics()
 }
+
+// 停顿 400ms 再查，避免每敲一个字打一次接口
+const debouncedSearch = debounce(applyFilter, 400)
 
 // 重置筛选
 const handleReset = () => {
+  debouncedSearch.cancel()
   keyword.value = ''
   statusFilter.value = -1
   sortBy.value = ''
-  page.value = 1
-  saveFilterState(STORAGE_KEY, { statusFilter: -1, sortBy: '', page: 1 })
-  loadComics()
-}
-
-const handleGotoPage = () => {
-  const totalPages = Math.ceil(total.value / pageSize.value)
-  const p = gotoVal.value
-  if (!p || p < 1 || p > totalPages) return
-  changePage(p)
-  gotoVal.value = undefined
-}
-
-const changePage = (p) => {
-  page.value = p
-  saveFilterState(STORAGE_KEY, { statusFilter: statusFilter.value, sortBy: sortBy.value, page: page.value })
-  loadComics()
+  applyFilter()
 }
 
 const goToDetail = (comic) => {
@@ -163,41 +162,50 @@ const handleEdit = (comic) => {
 }
 
 const handleSave = async (form) => {
+  if (saving.value) return
+  saving.value = true
   try {
     if (editingComic.value?.id) {
       await comicApi.update(editingComic.value.id, form)
     } else {
       await comicApi.add(form)
     }
-  } catch (error) {
-    alert('保存失败：' + (error.message || error))
+  } catch (err) {
+    ui.error('保存失败：' + errText(err))
     return
+  } finally {
+    saving.value = false
   }
   showDialog.value = false
   editingComic.value = null
   await loadComics()
+  ui.success('已保存')
 }
 
 const handleDelete = async (comic) => {
-  if (!confirm(`确定要删除漫画「${comic.name}」吗？`)) return
+  if (!await ui.confirm({
+    title: '确认删除',
+    message: `确定要删除漫画「${comic.name}」吗？删除后不可恢复。`,
+    danger: true
+  })) return
   try {
     await comicApi.delete(comic.id)
     await loadComics()
-  } catch (error) {
-    alert('删除失败：' + (error.message || error))
+    ui.success('已删除')
+  } catch (err) {
+    ui.error('删除失败：' + errText(err))
   }
 }
 
-
-
-onMounted(() => {
+onMounted(async () => {
   const saved = loadFilterState(STORAGE_KEY)
   if (saved) {
     statusFilter.value = saved.statusFilter ?? -1
     sortBy.value = saved.sortBy ?? ''
     page.value = saved.page ?? 1
   }
-  loadComics()
+  await app.init()
+  await loadComics()
 })
 </script>
 
@@ -205,161 +213,12 @@ onMounted(() => {
 .comic-list {
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  max-width: 1400px;
-  margin: 0 auto;
+  gap: var(--s4);
 }
 
-.list-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.list-header h1 {
-  font-size: 28px;
-  color: #333;
-  margin: 0;
-}
-
-.header-actions {
-  display: flex;
-  gap: 12px;
-}
-
-.add-btn {
-  padding: 10px 20px;
-  background: #3498db;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: background 0.2s;
-}
-
-.add-btn:hover { background: #2980b9; }
-
-.filters {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.status-select {
-  padding: 8px 12px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 14px;
-  cursor: pointer;
-}
-
-.filters input[type="text"] {
-  padding: 8px 12px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  font-size: 14px;
-  height: 38px;
-  min-width: 200px;
-}
-
-.search-btn {
-  padding: 8px 16px;
-  height: 38px;
-  background: #3498db;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: background 0.2s;
-}
-
-.search-btn:hover { background: #2980b9; }
-
-.comic-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-}
-.reset-btn {
-  padding: 8px 16px;
-  background: #e74c3c;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
-  white-space: nowrap;
-}
-
-.reset-btn:hover {
-  background: #c0392b;
-}
-
-.empty-hint {
-  text-align: center;
-  color: #999;
-  font-size: 16px;
-}
-
-.loading-hint {
-  text-align: center;
-  color: #888;
-}
-
-/* 分页器 */
-.pagination {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 15px;
-}
-
-.pagination button {
-  padding: 8px 16px;
-  border: 1px solid #ddd;
-  background: #fff;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: background 0.2s;
-}
-
-.pagination button:hover:not(:disabled) {
-  background: #f5f5f5;
-}
-
-.pagination button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.goto-input {
-  width: 60px;
-  padding: 10px 8px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  font-size: 13px;
-  text-align: center;
-}
-
-.goto-input:focus {
-  outline: none;
-  border-color: #3498db;
-}
-
-.pagination span {
-  font-size: 14px;
-  color: #666;
-}
-
-
-@media (max-width: 1024px) {
-  .comic-grid { grid-template-columns: repeat(3, 1fr); }
-}
-
-@media (max-width: 768px) {
-  .comic-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+/* 封面 3:2 再加约三行文字与操作栏的高度 */
+.card-skeleton {
+  aspect-ratio: 1 / 1.15;
+  border-radius: var(--r2);
 }
 </style>

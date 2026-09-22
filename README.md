@@ -1,174 +1,143 @@
-# 影视网站项目
+# AI影城（ckweb + ckapi）
 
-## 项目结构
+自托管的本地媒体库站点。两个仓库：
 
-本项目包含两个子项目：
+- **ckweb** — 前端，Vue 3.5 + Vite 7 + Pinia + vue-router，无 UI 组件库（样式全部自绘）
+- **ckapi** — 后端，.NET 8 + SQLite（`Microsoft.Data.Sqlite` 裸 SQL，无 ORM）+ Swagger
 
-- **ckweb**: 前端项目（Vue.js）
-- **ckapi**: 后端项目（.NET Core）
-
-## 技术栈
-
-### 前端 (ckweb)
-- Vue.js 3.5+
-- Vue Router 4.6+
-- Pinia 3.0+
-- Axios
-- Vite 7.1+
-
-### 后端 (ckapi)
-- .NET Core 8.0
-- SQLite 数据库
-- Swagger API 文档
-
-## 数据库表结构
-
-### 1. Video (影片表)
-- id: 主键
-- code: 番号
-- name: 名称
-- country: 所属国家
-- hosturl: 主机地址
-- videosize: 视频大小（字节）
-- quality: 视频质量标记（如：4K, 1080P, 720P等）
-- seriesid: 所属系列ID
-- sortorder: 排序序号
-- cover: 封面图片（Base64）
-- description: 简介
-- ctime: 创建时间
-- utime: 修改时间
-
-### 2. VideoSeries (影视系列表)
-- id: 主键
-- name: 名称
-- alias: 别名
-- link: 链接
-- country: 所属国家
-- description: 描述
-- ctime: 创建时间
-- utime: 修改时间
-
-### 3. Actor (演员表)
-- id: 主键
-- name: 姓名
-- alias: 别名
-- country: 所属国家
-- avatar: 头像（Base64）
-- description: 简介
-- ctime: 创建时间
-- utime: 修改时间
-
-### 4. VideoActor (视频-演员关联表)
-- id: 主键
-- videoid: 视频ID
-- actorid: 演员ID
-- ctime: 创建时间
-- utime: 修改时间
-
-### 5. Highlight (精彩集锦表)
-- id: 主键
-- image: 图片（Base64）
-- actorid: 对应演员ID
-- videoid: 对应影片ID
-- title: 标题
-- description: 描述
-- ctime: 创建时间
-- utime: 修改时间
-
-### 6. LikeRecord (点赞记录表)
-- id: 主键
-- videoid: 视频ID
-- liketime: 点赞时间
-- usertoken: 用户标识
-- ctime: 创建时间
-- utime: 修改时间
-
-### 7. SystemSetting (系统设置表)
-- id: 主键
-- name: 设置名称
-- content: 设置内容
-- ctime: 创建时间
-- utime: 修改时间
-
-### 8. FriendLink (友情链接表)
-- id: 主键
-- name: 网站名称
-- link: 网站链接
-- logo: Logo（Base64或URL）
-- description: 描述
-- sortorder: 排序序号
-- ctime: 创建时间
-- utime: 修改时间
-
-## 快速开始
-
-### 后端启动
+## 跑起来
 
 ```bash
-cd ckapi
-dotnet restore
-dotnet run
+# 后端（默认 5033，可用 ServerPort 配置项改端口）
+cd ckapi && dotnet run
+
+# 前端（默认 3001，/api 代理到后端）
+cd ckweb && npm install && npm run dev
 ```
 
-后端将运行在 http://localhost:5033
-Swagger 文档地址: http://localhost:5033/swagger
+- Swagger（仅开发环境）: http://localhost:5033/swagger
+- 数据库文件与备份目录在 `ckapi/appsettings.json` 的 `ConnectionStrings` 里
+- 联调别的后端实例：`VITE_PROXY_TARGET=http://localhost:5099 npm run dev`
+- `npm run lint` 依赖 `eslint.config.js`（已提供扁平配置，规则以 warn 为主，不阻断构建）
 
-### 前端启动
+## 配置项（ckapi/appsettings.json）
 
-```bash
-cd ckweb
-npm install
-npm run dev
+| 键 | 含义 |
+|---|---|
+| `ConnectionStrings:DefaultConnection` | SQLite 路径 |
+| `ConnectionStrings:BackupPath` | 备份目录；不存在则跳过备份 |
+| `ServerPort` | Kestrel 监听端口，默认 5033 |
+| `Media:Roots` | 允许对外提供文件的目录白名单，默认 `["/Volumes"]` |
+
+## 数据库
+
+启动时由 `ckapi/Services/DataService.cs` 负责：建表 → 按 `PRAGMA user_version` 逐级迁移 → 建索引 → `ANALYZE`。
+**`CreateBaseTables` 是"当前完整结构"的唯一权威声明**，`Migrations` 是历史库的追赶路径，两者必须保持等价（改结构时同时改两处）。全新库会直接标记为最新版本、跳过迁移。
+
+索引：`videos(ctime)`、`videos(category,ctime)`、`videos(code)`、`videos(country)`、`videos(seriesid,sort_order)`、`video_actors(actor_id)`、`video_likes(video_id,target_type)`、`video_likes(liked_at)`、`comics(ctime)`、`comic_chapters(comic_id,sort_order)`、`video_series(name)`。
+
+### 表
+
+**videos** — 影片
+`id` `name` `category`(单一分类文本) `code`(番号) `country` `seriesid`→video_series `file_path` `file_size` `cover_path`(**磁盘绝对路径，不是 Base64**) `media_attr_flags` `sort_order` `ctime`
+> 入库时间就是 `ctime`。接口里的 `addedAt` 字段也取自 `ctime`，但前端目前没有任何地方渲染它。
+
+**media_attr_flags（片源标记）** — `0` 未标记 · `1` 劣质 · `2` 无字幕 · `3` 完美。
+前端展示文案与配色统一在 `ckweb/src/scripts/constants.js` 的 `MEDIA_FLAGS`，不要在页面里各写一份。
+
+**actors** — `id` `name`(UNIQUE) `alias`(空格分隔的多个别名) `country` `bio` `ctime`
+> 演员照片是**文件墙**，不走数据库列：目录取 `system_settings.posterDir`，按 `<posterDir>/<演员ID>/*.jpg|png|webp` 枚举，经 `GET /api/actor/{id}/posters` 返回文件名。原先那个始终为空的 `avatar_path` 列已在 schema v2 删除，别再去库里找演员头像字段。
+
+**video_actors** — `(video_id, actor_id)` 复合主键，多对多
+**video_series** — `id` `name` `alias` `link` `country` `ctime` `utime`
+**video_likes** — `id` 自增 · `video_id` · `liked_at` · `target_type`(`video`/`comic`)。追加式记录，无去重、无用户标识
+**comics** — `id` `name` `author` `description` `url` `cover_path` `directory` `status`(0 连载中 / 1 完结) `ctime` `utime`
+**comic_chapters** — `id` `comic_id` `title` `directory` `sort_order` `image_count` `ctime`
+**scan_directories** — `id` `path` `category`(`视频`/`封面`/`字幕`) `ctime` `utime`
+**system_settings** — 名称/值 KV：`siteName` `pageSize` `posterDir` `homePageCategories` `homePageCategoryCount`
+**friend_links** — `id` `name` `link` `logo` `description` `sortorder` `ctime` `utime`
+
+> schema v2 删除了取证确认零引用的 `videos.added_at`、`videos.utime`、`actors.avatar_path`、
+> `comic_chapters.utime`、`scan_directories.recursive`、`scan_directories.auto_create_series`
+> 以及遗留表 `video_types`、`scan_tasks`（删表前转存为 `备份目录/dropped_<表>_<时间戳>.sql`）。
+> 保留 `friend_links.logo`（数据全空但读写与设置页输入都在）与 `video_likes.target_type`（区分影片/漫画点赞）。
+
+## 备份
+
+`SQLiteHelper.BackupDatabase()` 用 SQLite 原生在线备份接口，每天一份（`<库名>_yyyy-MM-dd.db`），同名文件已存在则跳过。启动迁移前先做一次快照。
+注意：**不是**每次写操作都备份 —— 早期实现如此，批量写入会退化成 N 次全库拷贝。
+
+## API 一览
+
+### /api/Video
+| 方法 | 路由 | 说明 |
+|---|---|---|
+| GET | `/api/Video/list` | 分页列表，支持 `category` `country` `keyword` `seriesId` `hasFile` `mediaAttrFlags` `prioritizeUnrated` `sortBy` |
+| GET | `/api/Video/{id}` | 详情（含 actors、likeCount） |
+| POST | `/api/Video/add` | 新增 |
+| PUT | `/api/Video/{id}` | 更新（番号变更会连带重命名磁盘文件） |
+| DELETE | `/api/Video/{id}` | 删除。`?deleteFiles=true` 才连磁盘文件一起删；**默认 false**，删文件必须显式选择 |
+| DELETE | `/api/Video/batch` | 批量删除 |
+| POST | `/api/Video/{id}/like` | 点赞 |
+| GET | `/api/Video/meta` | 分类/国家/系列 + 首页配置 |
+| GET | `/api/Video/home-sections` | **首页各分类板块一次返回**（替代按分类多次请求） |
+| GET | `/api/Video/autocode` | 生成下一个 `AUTOCODE-###` |
+| GET | `/api/Video/daily-recommend` | 今日推荐，按天内存缓存，`?refresh=true` 重取 |
+| GET | `/api/Video/recently-liked` | 最近点赞 |
+| GET | `/api/Video/top-liked` | 高赞影片 |
+| GET | `/api/Video/likes/stats` | 点赞日历 + 近 12 个月统计 |
+
+### /api/video（流媒体与文件）
+`GET /stream/{id}`（支持 Range）· `GET /cover/{id}`（带 ETag + 一周强缓存）· `GET /{code}/subtitle/check` · `GET /{code}/subtitle` · `GET /{id}/recommend` · `POST /{id}/reset-file-size` · `PUT /{id}/file-info` · `PUT /{id}/media-flags` · `DELETE /{id}/file` · `POST /rename-to-code`
+
+### /api/Actor
+`GET /` · `GET /{id}` · `POST /` · `PUT /{id}` · `DELETE /{id}` · `GET /countries` · `GET /{id}/videos` · `GET /{id}/posters` · `GET /{id}/poster/{fileName}`
+> `GET /{id}/videos` 支持 `page` `pageSize` `mediaAttrFlags` `hasFile`，筛选在服务端完成后再分页。
+
+### /api/Series
+`GET /` · `GET /{id}` · `POST /` · `PUT /{id}` · `DELETE /{id}` · `GET /countries` · `GET /{id}/videos` · `POST /{id}/sort`
+> `GET /{id}/videos` 参数同上；`POST /{id}/sort` 提交的是整个系列的 id 序列，所以详情页进入排序模式时会先清掉片源筛选。
+
+### /api/Comic
+`GET /list` · `GET /{id}` · `POST /add` · `PUT /{id}` · `DELETE /{id}` · `POST /{comicId}/chapters` · `PUT /chapter/{id}` · `DELETE /chapter/{id}` · `GET /chapter/{chapterId}/images` · `GET /image/{chapterId}/{fileName}` · `GET /image/cover/{**path}` · `POST /decrypt/image` · `POST /decrypt/batch` · `POST /restore/image` · `POST /restore/batch` · `POST /{id}/like`
+
+### 其余
+`/api/Like` `GET /list` · `DELETE /{id}` · `POST /batch-delete` ；
+`/api/SystemSetting` `GET /` · `GET /{name}` · `POST /` · `DELETE /{id}` ；
+`/api/ScanDirectory` `GET /` · `GET /{id}` · `POST /` · `PUT /{id}` · `DELETE /{id}` · `POST /check` ；
+`/api/FriendLink` `GET /` · `POST /` · `PUT /{id}` · `DELETE /{id}` ；
+`/api/Highlights` `GET /posters` · `GET /poster/{fileName}` ；
+`/api/Upload` `POST /video` · `POST /cover`
+
+### 响应约定
+统一 `{ success, data, message }`。分页有两种历史形态，前端按端点分别读取，勿混用：
+`/Video/list` 返回 `data.list` + `data.total`；`/Actor`、`/Series`、`/Comic/list`、`/Like/list` 返回 `data` + 顶层 `total`。
+业务失败（重名、记录不存在）目前返回 **HTTP 200 + `success:false`**，前端依赖读 `success` 分支提示 —— 改成 4xx 会让这些提示静默失效，需前后端一起改。
+
+## 前端结构
+
+```
+src/
+  assets/main.css        设计令牌 + 全局工具类（唯一色彩来源）
+  scripts/
+    api/index.js         axios 实例与各模块 API
+    store/app.js         pinia：站点名/分页大小/主题
+    constants.js         MEDIA_FLAGS / SORT_OPTIONS
+    utils/               format / debounce / filterPersist / ckplayer(按需加载)
+  plugins/router.js      懒加载路由 + 404 + scrollBehavior
+  views/pages/           12 个页面
+  views/components/      VideoCard ComicCard Pagination ComboBox Dialog …
 ```
 
-前端将运行在 http://localhost:3001
+**主题**：`:root` 是暗色（影院金强调），`html[data-theme='light']` 覆盖为亮色；切换按钮在页头，选择记在 `localStorage.ck_theme`，`index.html` 内联脚本在首帧前落地避免闪白。
+写样式时**不要新增硬编码色值**，一律用 `--bg-elev` `--text-dim` `--accent` 这类令牌；`main.css` 里已有的 `.btn/.tag/.card/.field/.dialog/.empty/.skeleton` 优先复用。
 
-## 前端模块
+播放器 ckplayer 只在影片详情页按需注入（`scripts/utils/ckplayer.js`），不再全局加载。
+注意播放器容器 `div#ckplayer` 会让浏览器把同名元素挂到 `window.ckplayer` 上，判断库是否就绪必须用 `typeof === 'function'`。
 
-1. **首页**: 今日推荐、最新上映、最受喜爱
-2. **影片类型**: 按系列、国家筛选影片
-3. **演员列表**: 演员信息展示
-4. **影视系列**: 系列分类展示
-5. **精彩集锦**: 精彩截图集锦
-6. **友情链接**: 页脚友情链接
+## 安全边界
 
-## API 接口
-
-### 视频相关
-- GET /api/video - 获取视频列表（支持分页、筛选）
-- GET /api/video/{id} - 获取视频详情
-- GET /api/video/recommend - 获取今日推荐
-- GET /api/video/latest - 获取最新上映
-- GET /api/video/most-liked - 获取最多点赞
-- POST /api/video - 添加视频
-- PUT /api/video/{id} - 更新视频
-- DELETE /api/video/{id} - 删除视频
-
-### 演员相关
-- GET /api/actor - 获取演员列表
-- GET /api/actor/{id} - 获取演员详情
-- GET /api/actor/{id}/videos - 获取演员的影片
-- POST /api/actor - 添加演员
-- PUT /api/actor/{id} - 更新演员
-- DELETE /api/actor/{id} - 删除演员
-
-### 系列相关
-- GET /api/series - 获取系列列表
-- GET /api/series/{id} - 获取系列详情
-- GET /api/series/{id}/videos - 获取系列下的影片
-- POST /api/series - 添加系列
-- PUT /api/series/{id} - 更新系列
-- DELETE /api/series/{id} - 删除系列
-
-### 点赞相关
-- POST /api/like/{videoId} - 点赞视频
-- DELETE /api/like/{videoId} - 取消点赞
-- GET /api/like/count/{videoId} - 获取点赞数
-- GET /api/like/check/{videoId} - 检查是否已点赞
-
-## 开发说明
-
-- 数据库文件: ckweb.db（首次运行自动创建）
-- 后端端口: 5033
-- 前端端口: 3001
-- API 代理: 前端通过 /api 代理到后端
+- 无鉴权、CORS 全开、监听 `0.0.0.0` —— 仅适合可信局域网，别直接暴露公网。
+- 上传目录与图片代理都受 `Media:Roots` 白名单约束；文件名经 `SafePath.AsFileName` 校验（拒绝 `..`、路径分隔符、隐藏文件）。
+- 分页参数有上限（`pageSize` ≤ 500，top-N ≤ 100），页码下限 1。
+- 异常详情只进日志，响应里回统一文案。

@@ -1,48 +1,52 @@
 <template>
-  <div class="comic-card" @click="$emit('click', comic)">
-    <div class="card-cover">
+  <article class="comic-card card card--link" @click="$emit('click', comic)">
+    <div class="cover">
       <img
-        v-if="comic.coverPath"
+        v-if="comic.coverPath && !coverFailed"
         :src="coverUrl"
-        @error="imgError = true"
-        alt="封面"
+        :alt="`${comic.name || '漫画'} 封面`"
+        loading="lazy"
+        decoding="async"
+        @error="coverFailed = true"
       />
-      <div v-else class="cover-placeholder">??</div>
-      <!-- 外链按钮 -->
+      <!-- 封面缺失/挂掉时留首字占位，卡片高度不塌 -->
+      <span v-else class="cover-fallback">{{ comic.name?.charAt(0) || '?' }}</span>
+
       <a
         v-if="comic.url"
         class="external-link"
         :href="comic.url"
         target="_blank"
         rel="noopener noreferrer"
-        @click.stop
         title="打开外部链接"
-      >↗</a>
+        aria-label="打开外部链接"
+        @click.stop
+      ><span aria-hidden="true">↗</span></a>
     </div>
 
     <div class="card-info">
-      <div class="comic-name">
-        {{ comic.name }}
-        <span v-if="comic.status === 1" class="badge-completed">完结</span>
-      </div>
+      <h2 class="comic-name card-title" :title="comic.name">
+        <span class="comic-name-text">{{ comic.name }}</span>
+        <span v-if="comic.status === 1" class="tag tag--danger">完结</span>
+      </h2>
       <div class="comic-author" v-if="comic.author">{{ comic.author }}</div>
       <div class="comic-meta">
-        <span class="chapter-count">{{ comic.chapterCount }} 章</span>
-        <span v-if="comic.likeCount > 0" class="like-count">♥ {{ comic.likeCount }}</span>
+        <span class="tag">{{ comic.chapterCount }} 章</span>
+        <span v-if="comic.likeCount > 0" class="tag tag--like">♥ {{ comic.likeCount }}</span>
       </div>
     </div>
 
     <CardActions @click.stop>
       <slot name="actions">
-        <button class="btn btn-primary" @click="$emit('edit', comic)">编辑</button>
-        <button class="btn btn-danger" @click="$emit('delete', comic)">删除</button>
+        <button class="btn btn--sm btn--primary" @click.stop="$emit('edit', comic)">编辑</button>
+        <button class="btn btn--sm btn--danger" @click.stop="$emit('delete', comic)">删除</button>
       </slot>
     </CardActions>
-  </div>
+  </article>
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { comicApi } from '@/scripts/api'
 import CardActions from '@/views/components/CardActions.vue'
 
@@ -55,115 +59,46 @@ const props = defineProps({
 
 defineEmits(['click', 'edit', 'delete'])
 
-const imgError = ref(false)
+const coverFailed = ref(false)
 
-const coverUrl = computed(() => {
-  return comicApi.getCoverUrl(props.comic.coverPath)
-})
+const coverUrl = computed(() => comicApi.getCoverUrl(props.comic.coverPath))
+
+// 列表复用卡片时（换漫画对象但组件被复用），旧的加载失败状态不能留着
+watch(() => props.comic.coverPath, () => { coverFailed.value = false })
 </script>
 
 <style scoped>
+/* 外观全部走 .card / .cover / .tag，这里只补卡片特有的排布 */
 .comic-card {
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-  overflow: hidden;
-  cursor: pointer;
-  transition: box-shadow 0.3s;
   display: flex;
   flex-direction: column;
-}
-
-.comic-card:hover {
-  box-shadow: 0 4px 16px rgba(0,0,0,0.18);
-}
-
-.card-cover {
-  width: 100%;
-  aspect-ratio: 6/4;
-  overflow: hidden;
-  background: #f0f0f0;
-  position: relative;
-}
-
-.card-cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.cover-placeholder {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 48px;
-  background: #e8e8e8;
-}
-
-.external-link {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 28px;
-  height: 28px;
-  background: rgba(0,0,0,0.5);
-  color: #fff;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  text-decoration: none;
-  opacity: 0;
-  transition: opacity 0.2s;
   cursor: pointer;
-  line-height: 1;
-}
-
-.comic-card:hover .external-link {
-  opacity: 1;
-}
-
-.external-link:hover {
-  background: rgba(0,0,0,0.75);
 }
 
 .card-info {
-  padding: 12px 16px;
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  flex: 1;
+  gap: var(--s1);
+  padding: var(--s3);
 }
 
 .comic-name {
-  font-size: 15px;
-  font-weight: bold;
-  color: #333;
+  display: flex;
+  align-items: center;
+  gap: var(--s1);
+}
+
+.comic-name-text {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.badge-completed {
-  display: inline-block;
-  padding: 1px 6px;
-  font-size: 11px;
-  font-weight: bold;
-  color: #fff;
-  background: #e74c3c;
-  border-radius: 3px;
-  flex-shrink: 0;
 }
 
 .comic-author {
-  font-size: 12px;
-  color: #888;
+  font-size: var(--f-sm);
+  color: var(--text-dim);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -171,19 +106,35 @@ const coverUrl = computed(() => {
 
 .comic-meta {
   display: flex;
-  gap: 6px;
+  align-items: center;
+  gap: var(--s1);
+  margin-top: auto;
 }
 
-.chapter-count {
-  font-size: 12px;
-  color: #666;
-  background: #f5f5f5;
-  border-radius: 3px;
+/* 外链角标：只在需要时才出现，键盘聚焦同样要能看到 */
+.external-link {
+  position: absolute;
+  top: var(--s2);
+  right: var(--s2);
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--r1);
+  background: rgba(8, 10, 14, .62);
+  color: #fff;
+  font-size: var(--f-lg);
+  line-height: 1;
+  opacity: 0;
+  transition: opacity var(--dur) var(--ease), background var(--dur) var(--ease);
 }
 
-.like-count {
-  font-size: 12px;
-  color: #e74c3c;
-  font-weight: bold;
+.comic-card:hover .external-link,
+.external-link:focus-visible {
+  opacity: 1;
+}
+
+.external-link:hover {
+  background: rgba(8, 10, 14, .82);
 }
 </style>

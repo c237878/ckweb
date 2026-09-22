@@ -20,9 +20,9 @@ export default defineConfig({
     host: '0.0.0.0',
     // 确保所有路由都返回 index.html (SPA 支持)
     proxy: {
-      // 代理 /api 请求到 ckapi 后端
+      // 代理 /api 请求到 ckapi 后端；联调其他端口的后端时用 VITE_PROXY_TARGET 覆盖
       '/api': {
-        target: 'http://localhost:5033',
+        target: process.env.VITE_PROXY_TARGET || 'http://localhost:5033',
         changeOrigin: true,
         // 大文件上传关键配置
         configure: (proxy) => {

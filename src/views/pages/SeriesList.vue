@@ -1,90 +1,95 @@
 <template>
-  <div class="series-list">
-    <div class="list-header">
-      <h1>影视系列</h1>
+  <div class="page series-list">
+    <div class="page-header">
+      <h1 class="page-title">影视系列</h1>
       <div class="header-actions">
         <label class="select-all">
           <input type="checkbox" :checked="isAllSelected" @change="toggleSelectAll" />
           全选
         </label>
-        <button v-if="selectedIds.length > 0" class="batch-delete-btn" @click="batchDelete">
+        <button v-if="selectedIds.length > 0" class="btn btn--sm btn--danger" @click="batchDelete">
           批量删除 ({{ selectedIds.length }})
         </button>
-        <button class="add-btn" @click="handleAdd">添加系列</button>
+        <button class="btn btn--primary" @click="handleAdd">添加系列</button>
       </div>
     </div>
 
     <div class="filters">
-      <select v-model="filters.country" @change="page = 1; loadSeries()">
+      <select v-model="filters.country" class="select" @change="applyFilter">
         <option value="">全部地区</option>
         <option v-for="c in countries" :key="c" :value="c">{{ c }}</option>
       </select>
       <input
         v-model="keyword"
-        placeholder="搜索系列..."
-        type="text"
-        @keyup.enter="handleSearch"
+        class="input grow"
+        type="search"
+        placeholder="搜索系列名称或别名..."
+        @keyup.enter="applyFilter"
+        @input="debouncedSearch"
       />
-      <button class="search-btn" @click="handleSearch">搜索</button>
-      <button class="reset-btn" @click="handleReset">重置</button>
-      <select v-model="filters.sortBy" @change="page = 1; loadSeries()" class="sort-select">
-        <option value="">默认排序</option>
-        <option value="name">按名称</option>
-        <option value="likeCount">按点赞</option>
-        <option value="videoCount">按作品数</option>
+      <select v-model="filters.sortBy" class="select" @change="applyFilter">
+        <option v-for="opt in SORT_OPTIONS.series" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
       </select>
+      <button class="btn btn--sm btn--ghost" @click="handleReset">重置</button>
     </div>
 
-    <div class="series-grid">
-      <div
-        class="series-card"
+    <div v-if="loading" class="grid grid--rows" aria-busy="true" aria-label="加载中">
+      <div v-for="n in Math.min(pageSize, 24)" :key="n" class="skeleton row-skeleton"></div>
+    </div>
+
+    <div v-else-if="error" class="notice notice--error">{{ error }}</div>
+
+    <div v-else-if="seriesList.length" class="grid grid--rows">
+      <article
         v-for="series in seriesList"
         :key="series.id"
+        class="card series-card"
         :class="{ selected: selectedIds.includes(series.id) }"
       >
         <div class="card-main">
-          <div class="card-checkbox-col">
-            <input
-              type="checkbox"
-              class="card-checkbox"
-              :checked="selectedIds.includes(series.id)"
-              @change="handleSelect(series)"
-              @click.stop
-            />
-          </div>
+          <input
+            type="checkbox"
+            class="card-checkbox"
+            :checked="selectedIds.includes(series.id)"
+            :aria-label="`选择 ${series.name}`"
+            @change="handleSelect(series)"
+            @click.stop
+          />
           <div class="card-body" @click="handleSelect(series)">
             <div class="info-row">
-              <span class="name">{{ series.name }}</span>
+              <router-link class="name" :to="`/series/${series.id}`" @click.stop>
+                <span class="name-text" :title="series.name">{{ series.name }}</span>
+              </router-link>
             </div>
-            <div class="info-row alias-row" v-if="series.alias">
-              <span class="alias">{{ series.alias }}</span>
+            <div class="info-row" v-if="series.alias">
+              <span class="alias" :title="series.alias">{{ series.alias }}</span>
             </div>
             <div class="info-row">
-              <span v-if="series.likeCount > 0" class="like-count">♥ {{ series.likeCount }}</span>
-              <span v-if="series.videoCount > 0" class="video-count">{{ series.videoCount }} 部</span>
-              <span v-if="series.country" class="country-tag">{{ series.country }}</span>
-              <span v-if="series.unloadedCount > 0" class="unloaded-badge" title="有 {{ series.unloadedCount }} 部未下载">⬇{{ series.unloadedCount }}</span>
+              <span v-if="series.likeCount > 0" class="tag tag--like">♥ {{ series.likeCount }}</span>
+              <span v-if="series.videoCount > 0" class="tag">{{ series.videoCount }} 部</span>
+              <span v-if="series.country" class="tag tag--accent">{{ series.country }}</span>
+              <span
+                v-if="series.unloadedCount > 0"
+                class="tag tag--danger"
+                :title="`有 ${series.unloadedCount} 部未下载`"
+              >未下载 {{ series.unloadedCount }}</span>
             </div>
           </div>
         </div>
         <CardActions>
-          <button v-if="series.link" class="btn" @click.stop="openLink(series.link)">链接</button>
-          <button class="btn btn-primary" @click.stop="handleEdit(series)">编辑</button>
-          <button class="btn btn-success" @click.stop="goToDetail(series.id)">详情</button>
+          <button v-if="series.link" class="btn btn--sm" @click.stop="openLink(series.link)">链接</button>
+          <button class="btn btn--sm btn--primary" @click.stop="handleEdit(series)">编辑</button>
+          <button class="btn btn--sm" @click.stop="goToDetail(series.id)">详情</button>
         </CardActions>
-      </div>
+      </article>
     </div>
 
-    <div class="empty-hint" v-if="seriesList.length === 0 && !loading">暂无系列</div>
-
-    <div class="pagination" v-if="total > 0">
-      <button :disabled="page === 1" @click="changePage(page - 1)">上一页</button>
-      <span>第 {{ page }} 页 / 共 {{ Math.ceil(total / pageSize) }} 页（共 {{ total }} 条）</span>
-      <input class="goto-input" v-model.number="gotoPage" type="number" min="1" :max="Math.ceil(total / pageSize)"
-        placeholder="跳转" @keyup.enter="handleGotoPage" />
-      <button @click="handleGotoPage">跳转</button>
-      <button :disabled="page * pageSize >= total" @click="changePage(page + 1)">下一页</button>
+    <div v-else class="empty">
+      <p>没有符合条件的系列</p>
+      <button v-if="hasActiveFilter" class="btn btn--sm" @click="handleReset">清除筛选</button>
     </div>
+
+    <Pagination v-model:page="page" :page-size="pageSize" :total="total" @change="loadSeries" />
 
     <AddSeriesDialog
       :visible="showDialog"
@@ -99,66 +104,75 @@
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { seriesApi, settingApi } from '@/scripts/api'
+import { seriesApi } from '@/scripts/api'
+import { useAppStore } from '@/scripts/store/app'
+import { useUiStore, errText } from '@/scripts/store/ui'
+import { SORT_OPTIONS } from '@/scripts/constants'
+import { debounce } from '@/scripts/utils/debounce'
 import CardActions from '@/views/components/CardActions.vue'
 import AddSeriesDialog from '@/views/components/AddSeriesDialog.vue'
+import Pagination from '@/views/components/Pagination.vue'
 import { loadFilterState, saveFilterState } from '@/scripts/utils/filterPersist'
 
 const STORAGE_KEY = 'series-list'
 
+const app = useAppStore()
+const ui = useUiStore()
 const router = useRouter()
+
 const seriesList = ref([])
-const page = ref(1)
-const pageSize = ref(24)
-const total = ref(0)
 const keyword = ref('')
-const loading = ref(false)
+const page = ref(1)
+const total = ref(0)
+const countries = ref([])
+const loading = ref(true)
+const error = ref('')
 const showDialog = ref(false)
 const editingSeries = ref(null)
-const countries = ref([])
-const filters = ref({ country: '', sortBy: '' })
 const selectedIds = ref([])
 
-// 持久化
-watch(filters, () => saveFilterState(STORAGE_KEY, { filters: filters.value, page: page.value }), { deep: true })
+const filters = ref({ country: '', sortBy: '' })
 
-const isAllSelected = computed(() => {
-  return seriesList.value.length > 0 && selectedIds.value.length === seriesList.value.length
+const pageSize = computed(() => app.pageSize)
+
+// 关键词单独不入库：下次进来仍是半截搜索很烦
+const hasActiveFilter = computed(
+  () => keyword.value !== '' || Object.values(filters.value).some((v) => v !== '' && v !== null)
+)
+
+const isAllSelected = computed(
+  () => seriesList.value.length > 0 && selectedIds.value.length === seriesList.value.length
+)
+
+watch(
+  [filters, page],
+  () => saveFilterState(STORAGE_KEY, { filters: filters.value, page: page.value }),
+  { deep: true }
+)
+
+onMounted(async () => {
+  const saved = loadFilterState(STORAGE_KEY)
+  if (saved?.filters) filters.value = { ...filters.value, ...saved.filters }
+  if (saved?.page) page.value = saved.page
+
+  await app.init()
+  // 旧版排序值是驼峰（likeCount），换成 constants 里的小写值，避免下拉框对不上
+  if (filters.value.sortBy) filters.value.sortBy = String(filters.value.sortBy).toLowerCase()
+  await Promise.all([loadCountries(), loadSeries()])
 })
 
-const toggleSelectAll = () => {
-  if (isAllSelected.value) {
-    selectedIds.value = []
-  } else {
-    selectedIds.value = seriesList.value.map(s => s.id)
-  }
-}
-
-const handleSelect = (series) => {
-  const idx = selectedIds.value.indexOf(series.id)
-  if (idx > -1) {
-    selectedIds.value.splice(idx, 1)
-  } else {
-    selectedIds.value.push(series.id)
-  }
-}
-
-const batchDelete = async () => {
-  if (!confirm(`确定要删除选中的 ${selectedIds.value.length} 个系列吗？`)) return
+const loadCountries = async () => {
   try {
-    for (const id of selectedIds.value) {
-      await seriesApi.delete(id)
-    }
-    selectedIds.value = []
-    await loadSeries()
-  } catch (error) {
-    console.error('批量删除失败:', error)
-    alert('批量删除失败：' + error.message)
+    const res = await seriesApi.getCountries()
+    if (res.success && res.data) countries.value = res.data
+  } catch (err) {
+    console.warn('加载地区列表失败:', err)
   }
 }
 
 const loadSeries = async () => {
   loading.value = true
+  error.value = ''
   try {
     const params = {
       page: page.value,
@@ -172,42 +186,41 @@ const loadSeries = async () => {
     if (res.success) {
       seriesList.value = res.data || []
       total.value = res.total || 0
+      // 列表内容换了，跨页保留的勾选会让"批量删除"作用在看不见的行上
+      selectedIds.value = []
+    } else {
+      error.value = res.message || '系列加载失败'
     }
-  } catch (error) {
-    console.error('加载系列失败:', error)
+  } catch (err) {
+    console.error('加载系列失败:', err)
+    error.value = '系列加载失败，请确认后端服务可用'
   } finally {
     loading.value = false
   }
 }
 
-const handleSearch = () => {
+const applyFilter = () => {
   page.value = 1
-  saveFilterState(STORAGE_KEY, { filters: filters.value, page: page.value })
   loadSeries()
 }
 
-// 重置筛选
+// 停顿 400ms 再查，避免每敲一个字打一次接口
+const debouncedSearch = debounce(applyFilter, 400)
+
+const toggleSelectAll = () => {
+  selectedIds.value = isAllSelected.value ? [] : seriesList.value.map((s) => s.id)
+}
+
+const handleSelect = (series) => {
+  const index = selectedIds.value.indexOf(series.id)
+  if (index > -1) selectedIds.value.splice(index, 1)
+  else selectedIds.value.push(series.id)
+}
+
 const handleReset = () => {
   keyword.value = ''
   filters.value = { country: '', sortBy: '' }
-  page.value = 1
-  saveFilterState(STORAGE_KEY, { filters: { country: '', sortBy: '' }, page: 1 })
-  loadSeries()
-}
-
-const gotoPage = ref()
-const handleGotoPage = () => {
-    const totalPages = Math.ceil(total.value / pageSize.value)
-    const p = gotoPage.value
-    if (!p || p < 1 || p > totalPages) return
-    changePage(p)
-    gotoPage.value = undefined
-}
-
-const changePage = (p) => {
-  page.value = p
-  saveFilterState(STORAGE_KEY, { filters: filters.value, page: page.value })
-  loadSeries()
+  applyFilter()
 }
 
 const goToDetail = (id) => {
@@ -228,6 +241,38 @@ const handleEdit = (series) => {
   showDialog.value = true
 }
 
+// 后端没有批量删除接口，只能逐条删：中途失败时前面那些已经真的删掉了，
+// 所以要把成功/失败数量汇总成一条提示说清楚，而不是第一条失败就中断还只报一个错
+const batchDelete = async () => {
+  const ids = [...selectedIds.value]
+  const go = await ui.confirm({
+    title: '确认删除',
+    message: `确定要删除选中的 ${ids.length} 个系列吗？`,
+    danger: true
+  })
+  if (!go) return
+
+  let done = 0
+  const errors = []
+  for (const id of ids) {
+    try {
+      await seriesApi.delete(id)
+      done += 1
+    } catch (err) {
+      console.error('批量删除失败:', err)
+      errors.push(errText(err))
+    }
+  }
+  selectedIds.value = []
+  await loadSeries()
+  if (errors.length) {
+    // 只报第一条原因：一屏同样的网络错误没有信息量
+    ui.error(`批量删除：已删除 ${done} 项，失败 ${errors.length} 项（${errors[0]}）`)
+  } else {
+    ui.success(`已删除 ${done} 项`)
+  }
+}
+
 const handleSave = async (formData) => {
   try {
     if (formData.id) {
@@ -235,24 +280,29 @@ const handleSave = async (formData) => {
     } else {
       await seriesApi.add(formData)
     }
-  } catch (error) {
-    alert('保存失败：' + (error.message || error))
+  } catch (err) {
+    console.error('保存系列失败:', err)
+    ui.error('保存失败：' + errText(err))
     return
   }
   showDialog.value = false
   editingSeries.value = null
-  await loadSeries()
+  await Promise.all([loadSeries(), loadCountries()])
+  ui.success('已保存')
 }
 
 const handleSeriesDelete = async (id) => {
-  if (!confirm('确定要删除该系列吗？')) return
+  const go = await ui.confirm({ title: '确认删除', message: '确定要删除该系列吗？', danger: true })
+  if (!go) return
   try {
     await seriesApi.delete(id)
     showDialog.value = false
     editingSeries.value = null
-    await loadSeries()
-  } catch (error) {
-    alert('删除失败：' + (error.message || error))
+    await Promise.all([loadSeries(), loadCountries()])
+    ui.success('已删除')
+  } catch (err) {
+    console.error('删除系列失败:', err)
+    ui.error('删除失败：' + errText(err))
   }
 }
 
@@ -260,218 +310,83 @@ const handleCancel = () => {
   showDialog.value = false
   editingSeries.value = null
 }
-
-onMounted(async () => {
-  // 恢复筛选状态
-  const saved = loadFilterState(STORAGE_KEY)
-  if (saved) {
-    if (saved.filters) filters.value = { ...filters.value, ...saved.filters }
-    if (saved.page) page.value = saved.page
-  }
-
-  try {
-    const res = await settingApi.getByName('pageSize')
-    if (res.success && res.data) {
-      pageSize.value = Number(res.data) || 24
-    }
-  } catch (e) {
-    console.warn('读取 pageSize 设置失败，使用默认值 24')
-  }
-  try {
-    const res = await seriesApi.getCountries()
-    if (res.success && res.data) {
-      countries.value = res.data
-    }
-  } catch (e) {
-    console.warn('加载地区列表失败', e)
-  }
-  await loadSeries()
-})
 </script>
 
 <style scoped>
 .series-list {
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  max-width: 1400px;
-  margin: 0 auto;
-}
-
-.list-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.list-header h1 {
-  font-size: 28px;
-  color: #333;
-  margin: 0;
+  gap: var(--s4);
 }
 
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
-}
-
-.add-btn {
-  padding: 10px 20px;
-  background: #3498db;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: background 0.2s;
-}
-
-.add-btn:hover {
-  background: #2980b9;
+  gap: var(--s2);
+  flex-wrap: wrap;
 }
 
 .select-all {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  color: #666;
-}
-
-.select-all input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
+  gap: var(--s2);
+  font-size: var(--f-sm);
+  color: var(--text-dim);
   cursor: pointer;
 }
 
-.batch-delete-btn {
-  padding: 8px 16px;
-  background: #e74c3c;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: background 0.2s;
-}
-
-.batch-delete-btn:hover {
-  background: #c0392b;
-}
-
-.filters {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-.sort-select {
-  padding: 8px 12px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  font-size: 14px;
-  height: 38px;
-  box-sizing: border-box;
-  background: #fff;
+.select-all input {
+  accent-color: var(--accent);
+  width: 16px;
+  height: 16px;
   cursor: pointer;
 }
 
-.filters select,
-.filters input[type="text"] {
-  padding: 8px 12px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  font-size: 14px;
-  height: 38px;
-  box-sizing: border-box;
-}
-
-.filters input[type="text"] {
-  min-width: 200px;
-}
-
-.search-btn {
-  padding: 8px 16px;
-  background: #3498db;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  height: 38px;
-  box-sizing: border-box;
-  transition: background 0.2s;
-}
-.search-btn:hover {
-  background: #2980b9;
-}
-.reset-btn {
-  padding: 8px 16px;
-  background: #e74c3c;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
-  white-space: nowrap;
-}
-
-.reset-btn:hover {
-  background: #c0392b;
-}
-
-.series-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
+/* 行卡片骨架：正文两行 + 操作条一行 */
+.row-skeleton {
+  height: calc(var(--s5) + var(--s4));
+  border-radius: var(--r2);
 }
 
 .series-card {
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  overflow: hidden;
   display: flex;
   flex-direction: column;
-  align-items: stretch;
-  transition: border 0.2s, background 0.2s;
 }
 
 .series-card.selected {
-  background: #e3f2fd;
-  border: 2px solid #2196f3;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft), var(--shadow-2);
+}
+
+.series-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-2);
 }
 
 .card-main {
   display: flex;
-  flex-direction: row;
   align-items: stretch;
+  gap: var(--s2);
   flex: 1;
-  cursor: pointer;
-}
-
-.card-checkbox-col {
-  display: flex;
-  align-items: center;
-  padding: 0 8px;
-  flex-shrink: 0;
+  min-width: 0;
+  padding-left: var(--s3);
 }
 
 .card-checkbox {
+  flex-shrink: 0;
+  align-self: center;
   width: 18px;
   height: 18px;
+  accent-color: var(--accent);
   cursor: pointer;
 }
 
 .card-body {
-  padding: 16px;
+  padding: var(--s3);
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--s2);
   min-width: 0;
   cursor: pointer;
 }
@@ -479,143 +394,39 @@ onMounted(async () => {
 .info-row {
   display: flex;
   align-items: center;
-  gap: 6px;
-  overflow: hidden;
+  gap: var(--s2);
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
-.info-row .name {
-  font-size: 16px;
-  font-weight: bold;
-  color: #333;
+.name {
+  display: block;
+  flex: 1 1 6em;
+  min-width: 6em;
+  font-size: var(--f-lg);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.name-text {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color var(--dur) var(--ease);
+}
+
+.name:hover .name-text {
+  color: var(--accent);
+}
+
+.alias {
   flex: 1;
   min-width: 0;
+  font-size: var(--f-sm);
+  color: var(--text-faint);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.right-tags {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-}
-
-.like-count {
-  font-size: 12px;
-  color: #e74c3c;
-  background: #fce4ec;
-  padding: 2px 6px;
-  border-radius: 3px;
-  white-space: nowrap;
-}
-
-.video-count {
-  font-size: 12px;
-  color: #666;
-  background: #f5f5f5;
-  padding: 2px 6px;
-  border-radius: 3px;
-  white-space: nowrap;
-}
-
-.unloaded-badge {
-  font-size: 12px;
-  color: #fff;
-  background: #e74c3c;
-  padding: 2px 8px;
-  border-radius: 3px;
-  white-space: nowrap;
-  font-weight: 600;
-  animation: pulse-badge 2s ease-in-out infinite;
-}
-
-@keyframes pulse-badge {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
-}
-
-.country-tag {
-  background: #f3e5f5;
-  color: #7b1fa2;
-  padding: 2px 6px;
-  border-radius: 3px;
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-.alias-row {
-  overflow: hidden;
-}
-
-.alias-row .alias {
-  font-size: 13px;
-  color: #999;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  display: block;
-}
-
-.empty-hint {
-  text-align: center;
-  color: #999;
-  padding: 40px;
-}
-
-.pagination {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 15px;
-}
-
-.pagination button {
-  padding: 8px 16px;
-  border: 1px solid #ddd;
-  background: #fff;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: background 0.2s;
-}
-
-.pagination button:hover:not(:disabled) {
-  background: #f5f5f5;
-}
-
-.pagination button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.goto-input {
-  width: 60px;
-  padding: 10px 8px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  font-size: 13px;
-  text-align: center;
-}
-
-.goto-input:focus {
-  outline: none;
-  border-color: #3498db;
-}
-
-.pagination span {
-  font-size: 14px;
-  color: #666;
-}
-
-@media (max-width: 768px) {
-  .series-grid {
-    grid-template-columns: repeat(1, 1fr);
-  }
-  .list-header {
-    flex-direction: column;
-    gap: 12px;
-    align-items: flex-start;
-  }
 }
 </style>

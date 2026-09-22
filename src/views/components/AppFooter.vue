@@ -2,48 +2,36 @@
   <footer class="app-footer">
     <div class="footer-content">
       <!-- 友情链接 -->
-      <div class="friend-links" v-if="friendLinks.length > 0">
+      <nav class="friend-links" aria-label="友情链接" v-if="friendLinks.length > 0">
         <span class="links-title">友情链接：</span>
         <a
           v-for="link in friendLinks"
           :key="link.id"
           :href="link.link"
           target="_blank"
+          rel="noopener noreferrer"
           :title="link.description || link.name"
           class="friend-link"
         >
-          <img v-if="link.logo" :src="link.logo" :alt="link.name" class="link-logo" />
+          <img v-if="link.logo" :src="link.logo" :alt="link.name" class="link-logo" loading="lazy" />
           <span v-else>{{ link.name }}</span>
         </a>
-      </div>
+      </nav>
       <div class="copyright">
-        <p>&copy; {{ currentYear }} {{ siteName }} All Rights Reserved</p>
+        <p>&copy; {{ currentYear }} {{ app.siteName }} All Rights Reserved</p>
       </div>
     </div>
   </footer>
 </template>
 
 <script setup>
-import { ref, onMounted, computed, onUnmounted } from 'vue'
-import { settingApi, friendLinkApi } from '@/scripts/api'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { friendLinkApi } from '@/scripts/api'
+import { useAppStore } from '@/scripts/store/app'
 
-const siteName = ref('影视网站')
+const app = useAppStore()
 const friendLinks = ref([])
 const currentYear = computed(() => new Date().getFullYear())
-
-const loadFooterData = async () => {
-  // 加载网站名称
-  try {
-    const res = await settingApi.getByName('siteName')
-    if (res.success && res.data) {
-      siteName.value = res.data
-    }
-  } catch (error) {
-    console.error('加载网站名称失败:', error)
-  }
-  // 加载好友链接
-  await loadFriendLinks()
-}
 
 const loadFriendLinks = async () => {
   try {
@@ -56,83 +44,80 @@ const loadFriendLinks = async () => {
   }
 }
 
-// 监听设置更新
-const handleSettingsUpdate = () => {
-  loadFooterData()
-}
+// 网站名走 store，这里只关心页脚自己的友情链接
+const handleLinksUpdate = () => loadFriendLinks()
 
-// 监听链接更新
-const handleFriendLinksUpdate = () => {
+onMounted(() => {
   loadFriendLinks()
-}
-
-onMounted(async () => {
-  await loadFooterData()
-  window.addEventListener('settingsUpdated', handleSettingsUpdate)
-  window.addEventListener('friendLinksUpdated', handleFriendLinksUpdate)
+  window.addEventListener('friendLinksUpdated', handleLinksUpdate)
 })
 
 onUnmounted(() => {
-  window.removeEventListener('settingsUpdated', handleSettingsUpdate)
-  window.removeEventListener('friendLinksUpdated', handleFriendLinksUpdate)
+  window.removeEventListener('friendLinksUpdated', handleLinksUpdate)
 })
 </script>
 
 <style scoped>
 .app-footer {
-  background: #2c3e50;
-  color: white;
-  padding: 30px 0;
-  margin-top: 50px;
+  padding: var(--s5) 0;
+  background: var(--bg-elev);
+  border-top: 1px solid var(--border);
 }
 
+/* 与正文的间隔由 .page 自身的下内缩提供，这里不再加 margin-top */
 .footer-content {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 20px;
+  max-width: var(--container);
+  margin: 0 auto;   /* 居中容器，非间距 */
+  padding: 0 var(--s5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
 }
 
 .friend-links {
-  text-align: center;
-  margin-bottom: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--s2);
 }
 
 .links-title {
-  color: #999;
-  font-size: 14px;
+  color: var(--text-faint);
+  font-size: var(--f-md);
 }
 
 .friend-link {
-  color: #fff;
-  text-decoration: none;
-  font-size: 14px;
-  padding: 4px 12px;
-  border: 1px solid rgba(255,255,255,0.3);
-  border-radius: 4px;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  transition: all 0.2s;
+  height: var(--ctl-h-sm);
+  padding-inline: var(--ctl-pad-x-sm);
+  line-height: 1;
+  border: 1px solid var(--border);
+  border-radius: var(--rp);
+  color: var(--text-dim);
+  font-size: var(--f-sm);
+  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease),
+    background var(--dur) var(--ease);
 }
 
 .friend-link:hover {
-  background: rgba(255,255,255,0.1);
-  border-color: rgba(255,255,255,0.5);
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .link-logo {
   max-width: 80px;
   max-height: 20px;
+  object-fit: contain;
 }
 
 .copyright {
   text-align: center;
-  color: #999;
-  font-size: 14px;
+  color: var(--text-faint);
+  font-size: var(--f-sm);
 }
 </style>

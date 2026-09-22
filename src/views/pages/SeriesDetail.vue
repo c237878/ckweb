@@ -1,98 +1,156 @@
 <template>
-  <div class="detail-page" v-if="series">
-    <div class="detail-header">
-      <div class="header-row">
-        <h1>{{ series.name }}</h1>
-        <span v-if="series.country" class="country-tag">{{ series.country }}</span>
-        <span v-if="series.likeCount > 0" class="like-tag">♥ {{ series.likeCount }}</span>
-        <button class="edit-btn" @click="openEditDialog">编辑</button>
-        <template v-if="videos.length > 1">
-          <button v-if="!sorting" class="sort-btn" @click="startSort">编辑排序</button>
-          <button v-else class="sort-btn save" @click="saveSort" :disabled="savingSort">
-            {{ savingSort ? '保存中...' : '完成排序' }}
-          </button>
-          <button v-if="sorting" class="sort-btn cancel" @click="cancelSort">取消</button>
-        </template>
-      </div>
-      <p v-if="series.alias" class="alias-row">别名：{{ series.alias }}</p>
-      <p v-if="series.link" class="link-row">
-        链接：<a :href="series.link" target="_blank">{{ decodeUrl(series.link) }}</a>
-      </p>
-    </div>
-    <div v-if="sorting" class="sort-hint">
-      📌 拖动影片卡片调整顺序，完成后点击「完成排序」保存
-    </div>
-    <div class="detail-videos">
-      <div class="videos-header">
-        <h2>系列影片 ({{ displayVideos.length }})</h2>
-        <select v-model="mediaAttrFilter" class="media-filter">
-          <option value="">全部片源</option>
-          <option value="0">未设置</option>
-          <option value="1">劣质</option>
-          <option value="2">无字幕</option>
-          <option value="3">完美</option>
-        </select>
-      </div>
-      <div
-        class="video-grid"
-        :class="{ 'sorting-mode': sorting }"
-      >
-        <div
-          v-for="(video, index) in displayVideos"
-          :key="video.id"
-          class="video-card-wrapper"
-          :class="{
-            dragging: dragIndex === index,
-            'drag-over': dragOverIndex === index
-          }"
-          :draggable="sorting"
-          @dragstart="onDragStart($event, index)"
-          @dragover.prevent="onDragOver($event, index)"
-          @dragleave="onDragLeave(index)"
-          @drop="onDrop($event, index)"
-          @dragend="onDragEnd"
-        >
-          <div v-if="sorting" class="sort-badge">{{ index + 1 }}</div>
-          <VideoCard :video="video" mode="display" />
-        </div>
-        <div v-if="displayVideos.length === 0" class="empty-hint">暂无影片</div>
+  <div class="page series-detail">
+    <div v-if="loading" class="loading-block">
+      <div class="skeleton head-skeleton"></div>
+      <div class="grid" aria-busy="true" aria-label="加载中">
+        <div v-for="n in Math.min(pageSize, 12)" :key="n" class="skeleton card-skeleton"></div>
       </div>
     </div>
 
-    <AddSeriesDialog
-      :visible="showEditDialog"
-      :editingSeries="series"
-      @save="onEditSave"
-      @cancel="showEditDialog = false"
-      @delete="onDelete"
-    />
+    <div v-else-if="error" class="notice notice--error">
+      {{ error }}
+      <button class="btn btn--sm" @click="loadAll">重试</button>
+    </div>
+
+    <template v-else-if="series">
+      <section class="panel series-header">
+        <div class="page-header">
+          <h1 class="page-title">{{ series.name }}</h1>
+          <div class="header-actions">
+            <button class="btn btn--sm" @click="openEditDialog">编辑</button>
+            <template v-if="total > 1">
+              <button v-if="!sorting" class="btn btn--sm" :disabled="videosLoading" @click="startSort">编辑排序</button>
+              <template v-else>
+                <button class="btn btn--sm btn--primary" :disabled="savingSort || videosLoading" @click="saveSort">
+                  {{ savingSort ? '保存中...' : '完成排序' }}
+                </button>
+                <button class="btn btn--sm btn--ghost" :disabled="savingSort" @click="cancelSort">取消</button>
+              </template>
+            </template>
+          </div>
+        </div>
+
+        <div v-if="series.country || series.likeCount > 0" class="tag-row">
+          <span v-if="series.country" class="tag tag--accent">{{ series.country }}</span>
+          <span v-if="series.likeCount > 0" class="tag tag--like">♥ {{ series.likeCount }}</span>
+        </div>
+
+        <p v-if="series.alias" class="alias-row">别名：{{ series.alias }}</p>
+        <p v-if="series.link" class="link-row">
+          链接：<a :href="series.link" target="_blank" rel="noopener noreferrer">{{ decodeUrl(series.link) }}</a>
+        </p>
+      </section>
+
+      <p v-if="sorting" class="notice sort-hint">
+        拖动影片卡片调整顺序，序号即系列内位置，完成后点「完成排序」保存。
+      </p>
+
+      <section>
+        <div class="videos-head">
+          <h2 class="section-title">系列影片 ({{ total }})</h2>
+          <div class="media-filter">
+            <label class="sr-only" for="series-media-filter">按片源筛选影片</label>
+            <select id="series-media-filter" v-model="mediaAttrFilter" class="select" :disabled="videosLoading">
+              <option value="">全部片源</option>
+              <option v-for="opt in mediaFlagOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+            </select>
+          </div>
+        </div>
+
+        <div v-if="videosLoading" class="grid" aria-busy="true" aria-label="加载中">
+          <div v-for="n in Math.min(pageSize, 24)" :key="n" class="skeleton card-skeleton"></div>
+        </div>
+
+        <div v-else-if="videosError" class="notice notice--error">{{ videosError }}</div>
+
+        <div v-else-if="videos.length" class="grid" :class="{ 'grid-sorting': sorting }">
+          <div
+            v-for="(video, index) in videos"
+            :key="video.id"
+            class="video-slot"
+            :class="{ dragging: dragIndex === index, 'drag-over': dragOverIndex === index }"
+            :draggable="sorting"
+            @dragstart="onDragStart($event, index)"
+            @dragover.prevent="onDragOver($event, index)"
+            @dragleave="onDragLeave(index)"
+            @drop="onDrop($event, index)"
+            @dragend="onDragEnd"
+          >
+            <div v-if="sorting" class="sort-badge">{{ index + 1 }}</div>
+            <VideoCard :video="video" mode="display" />
+          </div>
+        </div>
+
+        <div v-else class="empty">
+          <p>{{ mediaAttrFilter ? '没有该片源的影片' : '该系列暂无影片' }}</p>
+          <button v-if="mediaAttrFilter" class="btn btn--sm" @click="mediaAttrFilter = ''">清除筛选</button>
+        </div>
+
+        <Pagination
+          v-if="!sorting"
+          v-model:page="page"
+          :page-size="pageSize"
+          :total="total"
+          @change="loadVideos"
+        />
+      </section>
+
+      <AddSeriesDialog
+        :visible="showEditDialog"
+        :editing-series="series"
+        @save="onEditSave"
+        @cancel="showEditDialog = false"
+        @delete="onDelete"
+      />
+    </template>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { seriesApi } from '@/scripts/api'
+import { useAppStore } from '@/scripts/store/app'
+import { useUiStore, errText } from '@/scripts/store/ui'
+import { MEDIA_FLAGS } from '@/scripts/constants'
 import VideoCard from '@/views/components/VideoCard.vue'
 import AddSeriesDialog from '@/views/components/AddSeriesDialog.vue'
+import Pagination from '@/views/components/Pagination.vue'
 
 const route = useRoute()
+const router = useRouter()
+const app = useAppStore()
+const ui = useUiStore()
+
 const series = ref(null)
 const videos = ref([])
+const page = ref(1)
+const total = ref(0)
+
+const loading = ref(true)
+const error = ref('')
+const videosLoading = ref(false)
+const videosError = ref('')
+
 const mediaAttrFilter = ref('')
-const displayVideos = computed(() => {
-  if (!mediaAttrFilter.value) return videos.value
-  const f = parseInt(mediaAttrFilter.value)
-  return videos.value.filter(v => (v.mediaAttrFlags || 0) === f)
-})
 const showEditDialog = ref(false)
 
 // 排序相关
 const sorting = ref(false)
-const savedVideos = ref([])  // 排序前的备份
 const dragIndex = ref(null)
 const dragOverIndex = ref(null)
 const savingSort = ref(false)
+
+const pageSize = computed(() => app.pageSize)
+
+// 片源筛选下沉到后端；'0'（未标记）是一个真实筛选值而不是"不排除"
+const mediaFlagOptions = computed(() =>
+  Object.entries(MEDIA_FLAGS).map(([value, flag]) => ({
+    value,
+    label: value === '0' ? '未设置' : flag.short || flag.long
+  }))
+)
+
 
 const openEditDialog = () => {
   showEditDialog.value = true
@@ -103,19 +161,25 @@ const onEditSave = async (formData) => {
     await seriesApi.update(series.value.id, formData)
     showEditDialog.value = false
     await loadSeries()
-  } catch (error) {
-    alert('保存失败：' + (error.message || error))
+    ui.success('已保存')
+  } catch (err) {
+    console.error('保存系列失败:', err)
+    ui.error('保存失败：' + errText(err))
   }
 }
 
 const onDelete = async (id) => {
-  if (!confirm('确定要删除该系列吗？')) return
+  const go = await ui.confirm({ title: '确认删除', message: '确定要删除该系列吗？', danger: true })
+  if (!go) return
   try {
     await seriesApi.delete(id)
     showEditDialog.value = false
-    window.location.href = '/series'
-  } catch (error) {
-    alert('删除失败：' + (error.message || error))
+    ui.success('已删除')
+    // 原先用 window.location.href 整页刷新，现在走路由跳转
+    router.push('/series')
+  } catch (err) {
+    console.error('删除系列失败:', err)
+    ui.error('删除失败：' + errText(err))
   }
 }
 
@@ -124,57 +188,124 @@ const loadSeries = async () => {
     const res = await seriesApi.getDetail(route.params.id)
     if (res.success) {
       series.value = res.data
+      return ''
     }
-  } catch (error) {
-    console.error('加载系列详情失败:', error)
+    return res.message || '系列信息加载失败'
+  } catch (err) {
+    console.error('加载系列详情失败:', err)
+    return '系列信息加载失败，请确认后端服务可用'
   }
 }
 
 const loadVideos = async () => {
+  videosLoading.value = true
+  videosError.value = ''
   try {
-    const res = await seriesApi.getVideos(route.params.id, { page: 1, pageSize: 1000 })
+    const params = { page: page.value, pageSize: pageSize.value }
+    if (mediaAttrFilter.value !== '') params.mediaAttrFlags = parseInt(mediaAttrFilter.value)
+    const res = await seriesApi.getVideos(route.params.id, params)
     if (res.success) {
       videos.value = res.data || []
+      total.value = res.total || 0
+    } else {
+      videosError.value = res.message || '系列影片加载失败'
     }
-  } catch (error) {
-    console.error('加载系列影片失败:', error)
+  } catch (err) {
+    console.error('加载系列影片失败:', err)
+    videosError.value = '系列影片加载失败，请确认后端服务可用'
+  } finally {
+    videosLoading.value = false
   }
 }
 
+const SORT_PAGE_SIZE = 500 // 后端 ClampSize 的上限
+const SORT_MAX_PAGES = 20  // 兜底，避免服务端分页异常时死循环
+
+// 保存排序要提交整个系列的 id 序列（后端按下标写 sort_order，
+// 少提交的那批会留在旧序号上），所以排序模式必须一次取完全部影片
+const loadAllVideos = async () => {
+  const merged = []
+  let current = 1
+  let serverTotal
+  do {
+    const res = await seriesApi.getVideos(route.params.id, { page: current, pageSize: SORT_PAGE_SIZE })
+    if (!res.success) throw new Error(res.message || '系列影片加载失败')
+    merged.push(...(res.data || []))
+    serverTotal = res.total || merged.length
+    current += 1
+  } while (merged.length < serverTotal && current <= SORT_MAX_PAGES)
+
+  // 只拿到一部分就去保存会把没拿到的那些排到旧序号上，宁可拒绝
+  if (merged.length < serverTotal) throw new Error('影片数量过大，无法一次载入排序')
+  return merged
+}
+
 const loadAll = async () => {
-  await loadSeries()
+  loading.value = true
+  error.value = ''
+  const message = await loadSeries()
+  loading.value = false
+  if (message) {
+    error.value = message
+    return
+  }
   await loadVideos()
 }
 
 // === 排序相关 ===
-const startSort = () => {
-  savedVideos.value = JSON.parse(JSON.stringify(videos.value))
+let pageBeforeSort = 1
+
+const startSort = async () => {
+  if (sorting.value || videosLoading.value) return
+  pageBeforeSort = page.value
   sorting.value = true
+  // 排序是对整个系列重编号，带着筛选进来会只提交一部分，先清掉
+  mediaAttrFilter.value = ''
+  videosLoading.value = true
+  videosError.value = ''
+  try {
+    videos.value = await loadAllVideos()
+    total.value = videos.value.length
+  } catch (err) {
+    console.error('进入排序模式失败:', err)
+    sorting.value = false
+    videosError.value = err.message || '进入排序模式失败'
+    page.value = pageBeforeSort
+    await loadVideos()
+  } finally {
+    videosLoading.value = false
+  }
 }
 
-const cancelSort = () => {
-  videos.value = savedVideos.value
+const cancelSort = async () => {
   sorting.value = false
   dragIndex.value = null
   dragOverIndex.value = null
+  // 未提交的改动直接回服务端读数，比本地备份更可靠
+  page.value = pageBeforeSort
+  await loadVideos()
 }
 
 const saveSort = async () => {
   if (savingSort.value) return
   savingSort.value = true
   try {
-    const videoIds = videos.value.map(v => v.id)
+    const videoIds = videos.value.map((v) => v.id)
     const res = await seriesApi.updateSort(route.params.id, { videoIds })
     if (res.success) {
       sorting.value = false
-      savedVideos.value = []
+      dragIndex.value = null
+      dragOverIndex.value = null
       // 重新加载以获取服务端最新排序
+      page.value = 1
       await loadVideos()
+      ui.success('排序已保存')
     } else {
-      alert('保存排序失败: ' + (res.message || '未知错误'))
+      ui.error('保存排序失败：' + errText(res, '未知错误'))
     }
-  } catch (error) {
-    alert('保存排序失败: ' + (error.message || error))
+  } catch (err) {
+    console.error('保存排序失败:', err)
+    ui.error('保存排序失败：' + errText(err))
   } finally {
     savingSort.value = false
   }
@@ -202,34 +333,21 @@ const onDragLeave = (index) => {
 
 const onDrop = (e, index) => {
   e.preventDefault()
-  if (dragIndex.value === null || dragIndex.value === index) {
+  const from = dragIndex.value
+  if (from === null || from === index) {
     onDragEnd()
     return
   }
-  // 移动数组元素
-  const moved = videos.value.splice(dragIndex.value, 1)[0]
+  // 排序模式下不带筛选，视图下标即数组下标
+  const [moved] = videos.value.splice(from, 1)
   videos.value.splice(index, 0, moved)
-  dragIndex.value = null
-  dragOverIndex.value = null
+  onDragEnd()
 }
 
 const onDragEnd = () => {
   dragIndex.value = null
   dragOverIndex.value = null
 }
-
-onMounted(() => {
-  loadAll()
-})
-
-watch(
-  () => route.params.id,
-  (newId) => {
-    if (newId) {
-      loadAll()
-    }
-  }
-)
 
 const decodeUrl = (url) => {
   try {
@@ -238,184 +356,157 @@ const decodeUrl = (url) => {
     return url
   }
 }
+
+onMounted(async () => {
+  await app.init()
+  await loadAll()
+})
+
+watch(
+  () => route.params.id,
+  (newId) => {
+    if (!newId) return
+    series.value = null
+    page.value = 1
+    mediaAttrFilter.value = ''
+    sorting.value = false
+    loadAll()
+  }
+)
+
+// 筛选是服务端行为，改动后回到第一页重新取
+watch(mediaAttrFilter, () => {
+  // 切系列时 loadAll 自己会取影片；排序模式整系列重载也不该被筛选打断
+  if (loading.value || sorting.value) return
+  page.value = 1
+  loadVideos()
+})
 </script>
 
 <style scoped>
-.detail-page {
+.series-detail {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: var(--s5);
 }
 
-.detail-header {
+.loading-block {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--s5);
 }
 
-.header-row {
+.head-skeleton {
+  height: calc(var(--s7) * 3);
+  border-radius: var(--r2);
+}
+
+/* 封面 3:2 再加约三行文字的高度 */
+.card-skeleton {
+  aspect-ratio: 1 / 1.08;
+  border-radius: var(--r2);
+}
+
+.series-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+}
+
+.header-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--s2);
   flex-wrap: wrap;
 }
 
-.header-row h1 {
-  font-size: 32px;
-  margin: 0;
-}
-
-.edit-btn,
-.sort-btn {
-  background: none;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  padding: 4px 12px;
-  font-size: 13px;
-  color: #666;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.edit-btn:hover {
-  border-color: #3498db;
-  color: #3498db;
-}
-
-.sort-btn:hover {
-  border-color: #e67e22;
-  color: #e67e22;
-}
-
-.sort-btn.save {
-  border-color: #27ae60;
-  color: #27ae60;
-  font-weight: 600;
-}
-
-.sort-btn.save:hover {
-  background: #27ae60;
-  color: #fff;
-}
-
-.sort-btn.save:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.sort-btn.cancel {
-  border-color: #e74c3c;
-  color: #e74c3c;
-}
-
-.sort-btn.cancel:hover {
-  background: #e74c3c;
-  color: #fff;
-}
-
-.country-tag {
-  background: #f3e5f5;
-  color: #7b1fa2;
-  padding: 4px 10px;
-  border-radius: 4px;
-  font-size: 13px;
-}
-
-.like-tag {
-  background: #fce4ec;
-  color: #e74c3c;
-  padding: 4px 10px;
-  border-radius: 4px;
-  font-size: 13px;
+.tag-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  flex-wrap: wrap;
 }
 
 .alias-row {
-  color: #666;
-  font-size: 15px;
+  color: var(--text-dim);
+  font-size: var(--f-md);
+}
+
+.link-row {
+  color: var(--text-dim);
+  font-size: var(--f-md);
 }
 
 .link-row a {
-  color: #3498db;
-  font-size: 15px;
+  color: var(--accent);
   word-break: break-all;
 }
 
-.sort-hint {
-  background: #fff3cd;
-  border: 1px solid #ffc107;
-  color: #856404;
-  padding: 10px 16px;
-  border-radius: 6px;
-  font-size: 14px;
+.link-row a:hover {
+  color: var(--accent-strong);
 }
 
-.videos-header {
+.sort-hint {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.videos-head {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 20px;
+  justify-content: space-between;
+  gap: var(--s3);
+  flex-wrap: wrap;
 }
 
-.videos-header h2 {
-  margin: 0;
+.media-filter .select {
+  min-width: 132px;
 }
 
-.media-filter {
-  padding: 4px 8px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 13px;
-}
-
-.video-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 20px;
-}
-
-.video-grid.sorting-mode .video-card-wrapper {
-  cursor: grab;
+.video-slot {
   position: relative;
-  border-radius: 8px;
-  transition: transform 0.15s, box-shadow 0.15s;
+  min-width: 0;
 }
 
-.video-grid.sorting-mode .video-card-wrapper:hover {
+.grid-sorting .video-slot {
+  cursor: grab;
+  border-radius: var(--r2);
+  transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+
+.grid-sorting .video-slot:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-2);
 }
 
-.video-grid.sorting-mode .video-card-wrapper.dragging {
-  opacity: 0.4;
+.grid-sorting .video-slot.dragging {
+  opacity: .4;
   cursor: grabbing;
 }
 
-.video-grid.sorting-mode .video-card-wrapper.drag-over {
-  border: 2px dashed #e67e22;
-  background: rgba(230, 126, 34, 0.08);
+.grid-sorting .video-slot.drag-over {
+  outline: 2px dashed var(--accent);
+  outline-offset: 2px;
+  background: var(--accent-soft);
+  border-radius: var(--r2);
 }
 
 .sort-badge {
   position: absolute;
-  top: -8px;
-  left: -8px;
-  width: 28px;
-  height: 28px;
-  background: #e67e22;
-  color: #fff;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13px;
+  top: calc(-1 * var(--s2));
+  left: calc(-1 * var(--s2));
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--rp);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: var(--f-sm);
   font-weight: 700;
-  z-index: 10;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-}
-
-.empty-hint {
-  color: #999;
-  font-size: 14px;
-  padding: 20px;
+  font-variant-numeric: tabular-nums;
+  box-shadow: var(--shadow-1);
 }
 </style>

@@ -7,6 +7,7 @@
                     <div class="player-wrapper" :style="wrapperStyle">
                         <div v-if="video.id" id="ckplayer" ref="playerContainer"></div>
                         <div v-else class="no-video">暂无视频</div>
+                        <div v-if="playerError" class="player-error">{{ playerError }}</div>
                         <!-- 音量提示 -->
                         <div v-if="volumeTipVisible" class="volume-tip">
                             <span>音量: {{ Math.round(currentVolume * 100) }}%</span>
@@ -22,20 +23,20 @@
                         <span>{{ video.code ? video.code + ' ' + video.name : video.name }}</span>
                     </div>
                     <div class="info-row2">
-                        <span v-if="video.country" class="country-tag">{{ video.country }}</span>
-                        <span v-if="video.category" class="type-tag">{{ video.category }}</span>
-                        <span v-if="likeCount > 0" class="like-count">♥ {{ likeCount }}</span>
-                        <span class="file-size">{{ video.fileSize?formatSize(video.fileSize):'无文件' }}</span>
+                        <span v-if="video.country" class="tag tag--accent">{{ video.country }}</span>
+                        <span v-if="video.category" class="tag tag--success">{{ video.category }}</span>
+                        <span v-if="likeCount > 0" class="tag tag--like">♥ {{ likeCount }}</span>
+                        <span class="tag tag--muted">{{ video.fileSize?formatSize(video.fileSize):'无文件' }}</span>
                     </div>
                     <div class="info-row-media">
                         <span class="media-label">片源：</span>
                         <template v-if="video.mediaAttrFlags > 0">
-                            <span class="media-tag" :class="'media-' + video.mediaAttrFlags">{{ mediaFlagsText[video.mediaAttrFlags] }}</span>
+                            <span class="tag" :class="mediaFlagClass(video.mediaAttrFlags)">{{ mediaFlagText(video.mediaAttrFlags, true) }}</span>
                         </template>
                         <template v-else>
-                            <span class="media-option media-1" @click="setMediaFlags(1)">劣质片源</span>
-                            <span class="media-option media-2" @click="setMediaFlags(2)">无字幕</span>
-                            <span class="media-option media-3" @click="setMediaFlags(3)">完美片源</span>
+                            <button type="button" class="tag media-option media-1" @click="setMediaFlags(1)">劣质片源</button>
+                            <button type="button" class="tag media-option media-2" @click="setMediaFlags(2)">无字幕</button>
+                            <button type="button" class="tag media-option media-3" @click="setMediaFlags(3)">完美片源</button>
                         </template>
                     </div>
                     <div class="info-row3" v-if="video.seriesName">
@@ -84,7 +85,7 @@
                         </button>
                     </div>
                     <div class="recommend-section" v-if="recommendList.length > 0">
-                        <div class="recommend-title">推荐视频</div>
+                        <h2 class="section-title">推荐视频</h2>
                         <div class="recommend-grid">
                             <VideoCard
                                 v-for="item in recommendList"
@@ -99,10 +100,10 @@
             </div>
         </div>
 
-        <!-- 编辑弹窗 -->
+        <!-- 编辑弹窗：其中"删除"按钮触发的确认走全局反馈层（store/ui + AppOverlays） -->
         <AddVideoDialog
             :visible="showEditDialog"
-            :editingVideo="editingVideo"
+            :editing-video="editingVideo"
             @save="onEditSave"
             @cancel="showEditDialog = false; editingVideo = null"
             @delete="onDeleteVideo"
@@ -114,12 +115,16 @@
 import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { videoApi } from '@/scripts/api'
+import { useUiStore, errText } from '@/scripts/store/ui'
 import AddVideoDialog from '@/views/components/AddVideoDialog.vue'
 import VideoCard from '@/views/components/VideoCard.vue'
 import { formatSize } from '@/scripts/utils/format'
+import { mediaFlagText, mediaFlagClass } from '@/scripts/constants'
+import { loadCkplayer } from '@/scripts/utils/ckplayer'
 
 const route = useRoute()
 const router = useRouter()
+const ui = useUiStore()
 const video = ref(null)
 const actors = ref([])
 const recommendList = ref([])
@@ -219,19 +224,19 @@ const speedTipVisible = ref(false)
 const currentSpeed = ref(1)
 let speedTipTimer = null
 
-const mediaFlagsText = { 1: '劣质片源', 2: '无字幕', 3: '完美片源' }
-
 const setMediaFlags = async (flags) => {
     if (!video.value?.id) return
     try {
         const res = await videoApi.updateMediaFlags(video.value.id, flags)
         if (res.success) {
             video.value.mediaAttrFlags = flags
+            ui.success('已设置片源')
         } else {
-            alert(res.message || '设置失败')
+            ui.error('设置失败：' + errText(res, '未知错误'))
         }
     } catch (error) {
-        alert('设置失败: ' + (error.message || error))
+        console.error('设置片源失败:', error)
+        ui.error('设置失败：' + errText(error))
     }
 }
 let volumeTipTimer = null
@@ -239,7 +244,20 @@ let volumeTipTimer = null
 const videoNaturalWidth = ref(0)
 const videoNaturalHeight = ref(0)
 const playerContainer = ref(null)
+const playerError = ref('')
 let ckplayerInstance = null
+
+// 播放器相关的延时任务统一登记，离开页面时一次清干净
+const playerTimers = []
+const later = (fn, delay) => {
+    const id = setTimeout(fn, delay)
+    playerTimers.push(id)
+    return id
+}
+const clearPlayerTimers = () => {
+    playerTimers.forEach(clearTimeout)
+    playerTimers.length = 0
+}
 
 const wrapperStyle = computed(() => {
     if (!videoNaturalWidth.value || !videoNaturalHeight.value) {
@@ -256,6 +274,8 @@ const subtitleInfo = ref(null)
 
 const initCkplayer = async () => {
     if (!video.value?.id) return
+
+    playerError.value = ''
 
     // 销毁旧实例
     if (ckplayerInstance) {
@@ -289,9 +309,7 @@ const initCkplayer = async () => {
     const savedPlayTime = video.value.fileSize ? getPlayTime(video.value.id) : 0
 
     // 文件不存在时视频地址为空，由 ckplayer 自动显示封面
-    const videoUrl = video.value.fileSize
-        ? `/api/video/stream/${video.value.id}`
-        : ''
+    const videoUrl = video.value.fileSize ? videoApi.getStreamUrl(video.value.id) : ''
 
     const videoObject = {
         container: '#ckplayer',
@@ -314,39 +332,35 @@ const initCkplayer = async () => {
         }]
     }
 
-    // ckplayer 通过 UMD 挂载到 window.ckplayer
-    if (typeof window.ckplayer === 'undefined') {
-        console.error('ckplayer 未加载')
+    // 播放器只在进详情页时才用得到，改为按需注入（原先挂在 index.html 里阻塞所有页面）
+    let Ckplayer
+    try {
+        Ckplayer = await loadCkplayer()
+    } catch (err) {
+        console.error('播放器加载失败:', err)
+        playerError.value = '播放器加载失败，请刷新页面重试'
         return
     }
 
-    ckplayerInstance = new window.ckplayer(videoObject)
-    
-    // 恢复保存的音量
+    ckplayerInstance = new Ckplayer(videoObject)
+
+    // 下面几个延时都要在离开页面时清掉，否则卸载后仍会往陈旧 id 上写播放进度
     if (currentVolume.value !== 1) {
-        setTimeout(() => {
-            setVolume(currentVolume.value)
-        }, 500)
+        later(() => setVolume(currentVolume.value), 500)
     }
-    
+
     // 监听播放时间并保存播放进度
-    let saveTimer = null
-    setTimeout(() => {
-        if (ckplayerInstance) {
-            ckplayerInstance.time((currentTime) => {
-                // 每10秒保存一次播放进度
-                if (!saveTimer) {
-                    saveTimer = setTimeout(() => {
-                        savePlayTime(video.value.id, currentTime)
-                        saveTimer = null
-                    }, 10000)
-                }
-            })
-        }
+    later(() => {
+        if (!ckplayerInstance) return
+        ckplayerInstance.time((currentTime) => {
+            later(() => {
+                if (video.value?.id) savePlayTime(video.value.id, currentTime)
+            }, 10000)
+        })
     }, 1000)
-    
+
     // 获取视频元数据
-    setTimeout(() => {
+    later(() => {
         const videoEl = document.querySelector('#ckplayer video')
         if (videoEl) {
             if (videoEl.videoWidth && videoEl.videoHeight) {
@@ -404,6 +418,8 @@ onMounted(async () => {
 onUnmounted(() => {
     document.removeEventListener('keydown', handleKeyDown)
     clearTimeout(volumeTipTimer)
+    clearTimeout(speedTipTimer)
+    clearPlayerTimers()
     if (ckplayerInstance) {
         try {
             ckplayerInstance.remove()
@@ -511,13 +527,13 @@ const resetFileSize = async () => {
             if (res.data?.fileSize !== undefined) video.value.fileSize = res.data.fileSize
             if (res.data?.coverPath !== undefined) video.value.cover_path = res.data.coverPath
             video.value.mediaAttrFlags = 0
-            console.log('重置结果:', res.message)
+            ui.success('已重置')
         } else {
-            alert('重置失败: ' + (res.message || '未知错误'))
+            ui.error('重置失败：' + errText(res, '未知错误'))
         }
     } catch (error) {
         console.error('重置失败:', error)
-        alert('重置失败: ' + error.message)
+        ui.error('重置失败：' + errText(error))
     }
     resetting.value = false
 }
@@ -525,21 +541,25 @@ const resetFileSize = async () => {
 // 删除视频文件
 const handleDeleteFile = async () => {
     if (!video.value?.id) return
-    if (!confirm('确定要删除视频文件吗？封面不会受影响。')) return
+    const go = await ui.confirm({
+        title: '删除视频文件',
+        message: '确定要删除视频文件吗？封面不会受影响。',
+        danger: true
+    })
+    if (!go) return
     deletingFile.value = true
     try {
         const res = await videoApi.deleteVideoFile(video.value.id)
         if (res.success) {
             video.value.file_path = null
             video.value.fileSize = 0
-            console.log('删除结果:', res.message)
-            alert('已删除文件：' + res.message)
+            ui.success('已删除文件')
         } else {
-            alert('删除失败：' + (res.message || '未知错误'))
+            ui.error('删除失败：' + errText(res, '未知错误'))
         }
     } catch (error) {
         console.error('删除失败:', error)
-        alert('删除失败：' + error.message)
+        ui.error('删除失败：' + errText(error))
     }
     deletingFile.value = false
 }
@@ -568,18 +588,37 @@ const onEditSave = async (formData) => {
         showEditDialog.value = false
         editingVideo.value = null
         await loadVideo()
+        ui.success('已保存')
     } catch (error) {
         console.error('保存失败:', error)
+        ui.error('保存失败：' + errText(error))
     }
 }
 
+// 删除：必须让调用方显式选择是否连文件一起删。
+// 服务端 deleteFiles 默认已是 false，但这里仍然显式传值，避免依赖默认。
+const askDeleteChoice = (label) =>
+    ui.ask({
+        title: '确认删除',
+        message: `删除后不可恢复。${label}磁盘上的视频文件要一起删掉吗？`,
+        actions: [
+            { value: 'deleteRecordOnly', label: '仅删记录' },
+            { value: 'deleteAll', label: '删除记录和文件', danger: true }
+        ]
+    })
+
 const onDeleteVideo = async (videoId) => {
+    const name = editingVideo.value?.name
+    const choice = await askDeleteChoice(name ? `「${name}」` : '')
+    if (choice === 'cancel') return
     try {
         clearPlayTime(videoId)  // 清除播放记录
-        await videoApi.delete(videoId)
+        await videoApi.delete(videoId, { deleteFiles: choice === 'deleteAll' })
         router.push('/')
+        ui.success('已删除')
     } catch (error) {
         console.error('删除失败:', error)
+        ui.error('删除失败：' + errText(error))
     }
 }
 
@@ -616,16 +655,18 @@ const handleLike = async () => {
 
 <style scoped>
 .video-detail {
+    width: 100%;
+    max-width: var(--container);
+    margin: 0 auto;
+    padding: var(--s4) var(--s5) var(--s7);
     display: flex;
     flex-direction: column;
-    gap: 16px;
-    max-width: 1400px;
-    margin: 0 auto;
+    gap: var(--s4);
 }
 
 .layout {
     display: flex;
-    gap: 16px;
+    gap: var(--s4);
     align-items: flex-start;
 }
 
@@ -634,42 +675,64 @@ const handleLike = async () => {
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: var(--s3);
 }
 
 .player-section {
     width: 100%;
     background: #000;
-    border-radius: 8px;
+    border-radius: var(--r2);
     overflow: visible;
 }
 
 .player-wrapper {
     width: 100%;
-    max-height: 500px;
+    max-height: 520px;
     position: relative;
     background: #000;
+    border-radius: var(--r2);
+    overflow: hidden;
 }
 
-.player-wrapper video {
-    width: 100%;
-    height: 100%;
-    display: block;
-    object-fit: contain;
-}
-
+.player-wrapper video,
 .player-wrapper #ckplayer {
     width: 100%;
     height: 100%;
+    display: block;
+}
+
+/* ckplayer 自己的控制条是 z-index:260 的绝对定位层，会越过页面的 --z-dialog(200)
+   盖到确认弹窗上。给它一个自己的层叠上下文，把那 260 关在容器里。 */
+.player-wrapper #ckplayer {
+    position: relative;
+    z-index: 0;
+}
+
+.player-wrapper video {
+    object-fit: contain;
 }
 
 .no-video {
-    aspect-ratio: 16/9;
+    aspect-ratio: 16 / 9;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #999;
-    font-size: 18px;
+    color: var(--text-faint);
+    font-size: var(--f-lg);
+}
+
+.player-error {
+    position: absolute;
+    left: 50%;
+    bottom: 18%;
+    transform: translateX(-50%);
+    padding: 6px 14px;
+    border-radius: var(--r1);
+    background: var(--danger-soft);
+    border: 1px solid var(--danger);
+    color: var(--danger);
+    font-size: var(--f-sm);
+    white-space: nowrap;
 }
 
 .volume-tip {
@@ -677,269 +740,198 @@ const handleLike = async () => {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    background: rgba(0, 0, 0, 0.75);
+    padding: 10px 22px;
+    border-radius: var(--r2);
+    background: rgba(0, 0, 0, .75);
     color: #fff;
-    padding: 12px 24px;
-    border-radius: 8px;
-    font-size: 16px;
+    font-size: var(--f-lg);
     pointer-events: none;
-    z-index: 100;
+    z-index: 20;
 }
+
+/* ==================== 信息区 ==================== */
 
 .info-section {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--s2);
 }
 
 .info-row1 {
-    font-size: 18px;
-    font-weight: bold;
-    color: #333;
-    display: flex;
-    align-items: center;
-    gap: 6px;
+    font-size: var(--f-xl);
+    font-weight: 650;
+    line-height: 1.35;
 }
 
 .info-row2 {
-    font-size: 14px;
-    color: #666;
-    display: flex;
-    gap: 12px;
-    align-items: center;
-}
-
-.type-tag {
-    background: #e8f4ff;
-    color: #3498db;
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-size: 13px;
-}
-
-.country-tag {
-    background: #fef3e8;
-    color: #e67e22;
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-size: 13px;
-}
-
-.info-row-media {
     display: flex;
     align-items: center;
-    gap: 6px;
-    font-size: 13px;
-    margin-top: 4px;
+    gap: var(--s2);
+    flex-wrap: wrap;
+    font-size: var(--f-md);
+    color: var(--text-dim);
 }
 
-.media-label {
-    color: #666;
-}
-
-.media-tag {
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-size: 12px;
-    font-weight: 600;
-}
-
-.media-tag.media-1 { background: #fee; color: #c0392b; }
-.media-tag.media-2 { background: #fff3cd; color: #856404; }
-.media-tag.media-3 { background: #d4edda; color: #155724; }
-
-.media-option {
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-size: 12px;
-    cursor: pointer;
-    border: 1px solid #ddd;
-    transition: all 0.2s;
-}
-
-.media-option.media-1 { color: #c0392b; border-color: #c0392b; }
-.media-option.media-1:hover { background: #c0392b; color: #fff; }
-.media-option.media-2 { color: #856404; border-color: #856404; }
-.media-option.media-2:hover { background: #856404; color: #fff; }
-.media-option.media-3 { color: #155724; border-color: #155724; }
-.media-option.media-3:hover { background: #155724; color: #fff; }
-
-.country-tag {
-    background: #fff3e0;
-    color: #e67e22;
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-size: 13px;
-}
-
-.info-row-note {
-    font-size: 13px;
-    color: #999;
-    line-height: 1.6;
-}
-
-.info-row3 {
-    font-size: 14px;
-    color: #666;
-}
-
+.info-row3,
 .info-row4 {
     display: flex;
+    align-items: baseline;
     flex-wrap: wrap;
     gap: 6px;
-    font-size: 14px;
-    color: #666;
+    font-size: var(--f-md);
+    color: var(--text-dim);
 }
 
 .actor-link {
-    color: #3498db;
+    color: var(--info);
     cursor: pointer;
-    text-decoration: none;
 }
 
 .actor-link:hover {
     text-decoration: underline;
 }
 
-.actor-link:not(:last-child)::after {
-    color: #666;
+/* 片源标记 */
+.info-row-media {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    font-size: var(--f-sm);
 }
+
+.media-label {
+    color: var(--text-faint);
+}
+
+/* 芯片外形走全局 .tag，这里只补"可点选择"这一层交互态 */
+.media-option {
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: color var(--dur) var(--ease), background var(--dur) var(--ease),
+      border-color var(--dur) var(--ease);
+}
+
+.media-option.media-1:hover { border-color: var(--danger); color: var(--danger); background: var(--danger-soft); }
+.media-option.media-2:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.media-option.media-3:hover { border-color: var(--success); color: var(--success); background: var(--success-soft); }
+
+/* ==================== 右侧面板 ==================== */
 
 .right-panel {
     width: 300px;
     flex-shrink: 0;
+    position: relative;
     display: flex;
     flex-direction: column;
-    gap: 20px;
-    position: relative;
-    transition: width 0.3s, padding 0.3s, opacity 0.3s;
+    gap: var(--s5);
+    transition: width var(--dur) var(--ease), opacity var(--dur) var(--ease);
     overflow: hidden;
 }
 
 .right-panel.collapsed {
     width: 0;
-    padding: 0;
     opacity: 0;
     gap: 0;
 }
 
 .panel-toggle {
     position: absolute;
-    left: -20px;
+    left: -22px;
     top: 50%;
     transform: translateY(-50%);
-    width: 20px;
-    height: 60px;
-    background: #eee;
-    border-radius: 4px 0 0 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    width: 22px;
+    height: 62px;
+    display: grid;
+    place-items: center;
+    border-radius: var(--r1) 0 0 var(--r1);
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-right: none;
+    color: var(--text-dim);
+    font-size: var(--f-xs);
     cursor: pointer;
-    font-size: 12px;
-    color: #666;
     z-index: 10;
-    transition: background 0.2s;
 }
 
 .panel-toggle:hover {
-    background: #ddd;
+    background: var(--bg-elev-2);
+    color: var(--text);
 }
 
 .action-section {
     display: flex;
-    gap: 8px;
+    gap: var(--s2);
     flex-wrap: wrap;
 }
 
 .action-btn {
     width: calc(25% - 6px);
-    height: 36px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    background: #fff;
+    height: 34px;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--border);
+    border-radius: var(--r1);
+    background: var(--bg-elev);
+    color: var(--text-dim);
+    font-size: var(--f-sm);
     cursor: pointer;
-    font-size: 13px;
-    color: #333;
-    transition: all 0.2s;
+    transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease),
+      background var(--dur) var(--ease);
 }
 
-.action-btn:hover {
-    border-color: #3498db;
-    color: #3498db;
-    background: #f0f8ff;
+.action-btn:hover:not(:disabled) {
+    color: var(--accent);
+    border-color: var(--accent);
+    background: var(--accent-soft);
+}
+
+.action-btn:disabled {
+    opacity: .5;
+    cursor: not-allowed;
 }
 
 .action-btn.like-btn {
-    border-color: #e74c3c;
-    color: #e74c3c;
+    color: var(--like);
+    border-color: var(--like);
 }
 
-.action-btn.like-btn:hover {
-    background: #fdf2f2;
+.action-btn.like-btn:hover:not(:disabled) {
+    background: var(--like-soft);
+    border-color: var(--like);
+    color: var(--like);
 }
 
-.recommend-title {
-    font-size: 15px;
-    font-weight: bold;
-    color: #333;
-    margin-bottom: 12px;
+.recommend-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s3);
 }
 
 .recommend-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 10px;
-}
-
-/* tag 样式 */
-.country-tag, .type-tag, .series-tag, .like-count, .file-size {
-  width: auto;
-  height: 20px;
-  line-height: 20px;
-  padding: 0 6px;
-  border-radius: 3px;
-  font-size: 12px;
-  white-space: nowrap;
-}
-/* 国家 tag - 紫色 */
-.country-tag {
-  background: #f3e5f5;
-  color: #7b1fa2;
-}
-/* 分类 tag - 绿色 */
-.type-tag {
-  background: #e8f5e9;
-  color: #2e7d32;
-}
-/* 系列 tag - 橙色 */
-.series-tag {
-  background: #fff3e0;
-  color: #e65100;
-}
-/* 获赞数 */
-.like-count {
-  color: #e74c3c;
-  background: #fce4ec;
-}
-/* 文件大小 */
-.file-size {
-  color: #555;
-  background: #f0f0f0;
+    gap: var(--s2);
 }
 
 @media (max-width: 900px) {
+    .video-detail {
+        padding: var(--s3) var(--s3) var(--s6);
+    }
+
     .layout {
         flex-direction: column;
     }
-    .right-panel {
-        width: 100% !important;
-    }
+
+    .right-panel,
     .right-panel.collapsed {
-        width: 0 !important;
+        width: 100%;
+        opacity: 1;
+    }
+
+    .panel-toggle {
+        display: none;
     }
 }
 </style>

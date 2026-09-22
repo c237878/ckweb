@@ -1,317 +1,313 @@
 <template>
-  <div class="video-card" :title="video.code + ' ' + video.name" :class="[`mode-${mode}`, { selectable: selectable, selected }]" @click="handleClick">
-    <div v-if="selectable" class="select-checkbox">
-      <input type="checkbox" :checked="selected" @change.stop="handleSelect" />
+  <article
+    class="video-card card"
+    :class="[`mode-${mode}`, { selected, selectable }]"
+    @click="handleClick"
+  >
+    <div v-if="selectable" class="select-checkbox" @click.stop>
+      <input
+        type="checkbox"
+        :checked="selected"
+        :aria-label="`选择 ${video.name}`"
+        @change="handleSelect"
+      />
     </div>
-    <!-- 第一行：封面图片 -->
-    <div class="video-cover">
-      <img v-if="video.coverPath" :src="`/api/video/cover/${video.id}`" :alt="video.name" @error="$event.target.style.display='none'" />
-      <div v-if="!video.coverPath" class="no-cover">{{ video.name?.charAt(0) || '?' }}</div>
-      <!-- file_size=0 时显示灰色蒙版 -->
-      <div v-if="!video.fileSize || video.fileSize === 0" class="cover-mask">
+
+    <!-- 封面：容器固定宽高比，图片迟到也不塌陷；加载失败留首字占位而不是隐藏 -->
+    <div class="cover video-cover" :class="{ 'cover--fit': isPortrait }">
+      <img
+        v-if="shown.coverPath && !coverFailed"
+        :src="coverUrl"
+        :alt="shown.name || '影片封面'"
+        loading="lazy"
+        decoding="async"
+        @load="onCoverLoad"
+        @error="coverFailed = true"
+      />
+      <span v-else class="cover-fallback">{{ shown.name?.charAt(0) || '?' }}</span>
+      <div v-if="!shown.fileSize" class="cover-mask">
+        <span class="mask-badge">无文件</span>
       </div>
     </div>
+
     <div class="video-body">
-      <!-- 第二行：番号(code, 蓝色tag) + 名称(name, 加粗) -->
       <div class="info-row">
-        <div class="name">
-          <span v-if="video.code">{{ video.code }}</span>
-          <span>{{ video.name }}</span>
-        </div>
+        <router-link class="name card-title" :to="`/video/${shown.id}`" @click.stop>
+          <span v-if="shown.code" class="name-code">{{ shown.code }}</span>
+          <span class="name-text" :title="`${shown.code ? shown.code + ' ' : ''}${shown.name}`">{{ shown.name }}</span>
+        </router-link>
       </div>
-      <!-- 第三行：国家(tag, 紫色) + 分类(tag, 绿色) + 获赞数(红心) -->
-      <div class="info-row" v-if="mode!='brief'">
-        <span v-if="video.country" class="country-tag">{{ video.country }}</span>
-        <span v-if="video.category && mode=='full'" class="type-tag">{{ video.category }}</span>
-        <span v-if="video.likeCount > 0" class="like-count">♥ {{ video.likeCount }}</span>
-        <span class="file-size" @click.stop="copyCode" title="点击复制番号">{{ video.fileSize ? formatSize(video.fileSize) : '无文件' }}</span>
-        <span v-if="video.mediaAttrFlags > 0" class="media-flag-tag" :class="'media-' + video.mediaAttrFlags">{{ mediaFlagsText[video.mediaAttrFlags] }}</span>
-      </div>
-      <!-- 第四行：所属系列名称（可点击，橙色tag） -->
-      <div class="info-row" v-if="video.seriesName && mode!='brief'">
-        <span class="series-tag clickable" @click.stop="goToSeries(video.seriesId)">{{ video.seriesName }}</span>
-      </div>
-      <!-- 第五行：演员名称（可点击，蓝色tag） -->
-      <div class="info-row actors" v-if="video.actorNames">
+
+      <div class="info-row" v-if="mode !== 'brief'">
+        <span v-if="shown.country" class="tag tag--accent">{{ shown.country }}</span>
+        <span v-if="shown.category && mode === 'full'" class="tag tag--success">{{ shown.category }}</span>
+        <span v-if="shown.likeCount > 0" class="tag tag--like">♥ {{ shown.likeCount }}</span>
+        <button
+          v-if="mode === 'full'"
+          type="button"
+          class="tag file-size"
+          :title="copied ? '已复制番号' : '点击复制番号'"
+          @click.stop="copyCode"
+        >
+{{ copied ? '已复制' : (shown.fileSize ? formatSize(shown.fileSize) : '无文件') }}
+</button>
+        <span v-else class="tag file-size">{{ shown.fileSize ? formatSize(shown.fileSize) : '无文件' }}</span>
         <span
-          v-for="item in parseActors(video.actorNames)"
-          :key="item.id"
-          class="actor-tag clickable"
-          @click.stop="goToActor(item.id)"
-        >{{ item.name }}</span>
+          v-if="shown.mediaAttrFlags > 0"
+          class="tag"
+          :class="mediaFlagClass(shown.mediaAttrFlags)"
+        >{{ mediaFlagText(shown.mediaAttrFlags) }}</span>
+      </div>
+
+      <div class="info-row" v-if="shown.seriesName && mode !== 'brief'">
+        <button
+          type="button"
+          class="tag tag--info clickable"
+          @click.stop="goToSeries(shown.seriesId)"
+        >
+{{ shown.seriesName }}
+</button>
+      </div>
+
+      <div class="info-row actors" v-if="actorList.length">
+        <button
+          v-for="actor in actorList"
+          :key="actor.id || actor.name"
+          type="button"
+          class="tag clickable actor-tag"
+          @click.stop="goToActor(actor.id)"
+        >
+{{ actor.name }}
+</button>
       </div>
     </div>
-    <!-- 第六行：操作按钮 -->
+
     <CardActions v-if="mode === 'full' && showActions" @click.stop>
-      <button class="btn" @click.stop="handleReset" :disabled="resetting">{{ resetting ? '重置中...' : '重置' }}</button>
-      <button class="btn btn-primary" @click.stop="handleEdit">编辑</button>
-      <button class="btn btn-success" @click.stop="goToDetail">详情</button>
+      <button class="btn btn--sm" @click.stop="handleReset" :disabled="resetting">
+        {{ resetting ? '重置中...' : '重置' }}
+      </button>
+      <button class="btn btn--sm btn--primary" @click.stop="handleEdit">编辑</button>
+      <button class="btn btn--sm" @click.stop="goToDetail">详情</button>
     </CardActions>
-  </div>
+  </article>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import CardActions from './CardActions.vue'
 import { formatSize } from '@/scripts/utils/format'
+import { mediaFlagText, mediaFlagClass } from '@/scripts/constants'
 import { videoApi } from '@/scripts/api'
+import { useUiStore, errText } from '@/scripts/store/ui'
 
 const props = defineProps({
-  video: {
-    type: Object,
-    required: true
-  },
-  mode: {
-    type: String,
-    default: 'full', // 'full' | 'display' | 'brief'
-  },
-  showActions: {
-    type: Boolean,
-    default: true
-  },
-  selectable: {
-    type: Boolean,
-    default: false
-  },
-  selected: {
-    type: Boolean,
-    default: false
-  }
+  video: { type: Object, required: true },
+  /** full = 列表页（带操作与全部标签）；display = 首页板块；brief = 紧凑行 */
+  mode: { type: String, default: 'full' },
+  showActions: { type: Boolean, default: true },
+  selectable: { type: Boolean, default: false },
+  selected: { type: Boolean, default: false }
 })
 
 const router = useRouter()
+const ui = useUiStore()
 const emit = defineEmits(['edit', 'select'])
 
-const mediaFlagsText = { 1: '劣质', 2: '无字幕', 3: '完美' }
+const resetting = ref(false)
+const coverFailed = ref(false)
+const copied = ref(false)
+const isPortrait = ref(false)
 
-const copyCode = async (e) => {
-  e.stopPropagation()
+// 重置接口返回的字段覆盖在本地，不回写 props
+const patch = ref({})
+const shown = computed(() => ({ ...props.video, ...patch.value }))
+
+// 封面比例并不统一（800x538 为主，也有 16:9 和手机竖屏 1080x1920）。
+// 竖屏图塞进 3:2 盒子会被裁到只剩中间一条，所以改成留边完整显示。
+const onCoverLoad = (event) => {
+  const img = event.target
+  isPortrait.value = img.naturalHeight > img.naturalWidth
+}
+
+const coverUrl = computed(() => videoApi.getCoverUrl(props.video.id))
+
+// 后端把演员拼成 "id|name,id|name" 一个字符串下发，这里拆开
+const actorList = computed(() => {
+  if (!props.video.actorNames) return []
+  return props.video.actorNames.split(',').map((part) => {
+    const idx = part.indexOf('|')
+    return idx === -1 ? { id: '', name: part } : { id: part.slice(0, idx), name: part.slice(idx + 1) }
+  })
+})
+
+const copyCode = async () => {
   const code = props.video.code || ''
   if (!code) return
   try {
     await navigator.clipboard.writeText(code)
+    copied.value = true
+    setTimeout(() => { copied.value = false }, 1500)
   } catch {
-    // 兜底
+    // 非安全上下文（局域网 http 直连）下 clipboard 不可用，退回 execCommand
     const ta = document.createElement('textarea')
     ta.value = code
+    ta.style.position = 'fixed'
+    ta.style.opacity = '0'
     document.body.appendChild(ta)
     ta.select()
     document.execCommand('copy')
     document.body.removeChild(ta)
+    copied.value = true
+    setTimeout(() => { copied.value = false }, 1500)
   }
-  if (!props.video.fileSize) {
-    handleReset();
-  }
+
+  // 无文件时复制番号顺带触发一次路径重扫
+  if (!shown.value.fileSize) handleReset()
 }
 
 const handleClick = () => {
-  if (props.selectable) {
-    handleSelect()
-  } else {
-    goToDetail()
-  }
+  if (props.selectable) handleSelect()
+  else goToDetail()
 }
 
-const handleSelect = () => {
-  emit('select', props.video.id)
-}
+const handleSelect = () => emit('select', props.video.id)
+const goToDetail = () => router.push(`/video/${props.video.id}`)
+const goToSeries = (seriesId) => { if (seriesId) router.push(`/series/${seriesId}`) }
+const goToActor = (actorId) => { if (actorId) router.push(`/actor/${actorId}`) }
+const handleEdit = () => emit('edit', props.video)
 
-const goToDetail = () => {
-  router.push(`/video/${props.video.id}`)
-}
-
-const goToSeries = (seriesId) => {
-  if (seriesId) {
-    router.push(`/series/${seriesId}`)
-  }
-}
-
-const parseActors = (str) => {
-  if (!str) return []
-  return str.split(',').map(part => {
-    const idx = part.indexOf('|')
-    if (idx === -1) return { id: '', name: part }
-    return { id: part.slice(0, idx), name: part.slice(idx + 1) }
-  })
-}
-
-const goToActor = (actorId) => {
-  if (actorId) router.push(`/actor/${actorId}`)
-}
-
-const resetting = ref(false)
 const handleReset = async () => {
   if (!props.video?.id || resetting.value) return
   resetting.value = true
   try {
     const res = await videoApi.resetFileSize(props.video.id)
     if (res.success) {
-      if (res.data?.fileSize !== undefined) props.video.fileSize = res.data.fileSize
-      if (res.data?.filePath !== undefined) props.video.filePath = res.data.filePath
-      if (res.data?.coverPath !== undefined) props.video.coverPath = res.data.coverPath
+      // 只覆盖本卡片显示的值，不去改父组件传进来的对象（改 prop 会让列表数据与卡片悄悄分叉）
+      patch.value = { ...patch.value, ...(res.data ?? {}) }
+      if (res.data?.coverPath !== undefined) coverFailed.value = false
+      ui.success('已重置')
     } else {
-      alert('重置失败: ' + (res.message || '未知错误'))
+      ui.error('重置失败：' + errText(res, '未知错误'))
     }
   } catch (error) {
-    alert('重置失败: ' + (error.message || error))
+    console.error('重置失败:', error)
+    ui.error('重置失败：' + errText(error))
   } finally {
     resetting.value = false
-  }
-}
-
-const handleEdit = () => {
-  emit('edit', props.video)
-}
-
-// URL解码函数
-const decodeUrl = (url) => {
-  try {
-    return decodeURIComponent(url)
-  } catch {
-    return url
   }
 }
 </script>
 
 <style scoped>
 .video-card {
-  cursor: pointer;
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  transition: box-shadow 0.3s;
-  background: #fff;
   display: flex;
   flex-direction: column;
   position: relative;
-}
-
-.video-card:hover {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
-}
-
-.video-card.selected {
-  box-shadow: 0 0 0 3px #3498db;
-}
-
-.video-card.selectable {
   cursor: pointer;
 }
 
+.video-card.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft), var(--shadow-2);
+}
+
+.video-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-2);
+}
+
 .video-cover {
-  position: relative;
-  width: 100%;
-  padding-top: 66.56%; /* 3:2 比例 */
-  background: #f0f0f0;
-  overflow: hidden;
+  flex-shrink: 0;
+  background: var(--bg-elev-2);
+}
+
+/* 竖屏封面：完整显示，两侧留底色而不是硬裁 */
+.cover--fit img {
+  object-fit: contain;
+  padding: 4px;
 }
 
 .select-checkbox {
   position: absolute;
-  top: 8px;
-  left: 8px;
-  z-index: 10;
-  cursor: pointer;
+  top: var(--s2);
+  left: var(--s2);
+  z-index: 2;
 }
 
 .select-checkbox input[type="checkbox"] {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   cursor: pointer;
+  accent-color: var(--accent);
 }
 
-.video-cover img {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.no-cover {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #999;
-  font-size: 14px;
-}
-
-/* 灰色蒙版 - file_size=0 */
 .cover-mask {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(128, 128, 128, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(8, 10, 14, .52);
   pointer-events: none;
 }
 
-.mask-text {
+.mask-badge {
+  padding: 2px 9px;
+  border-radius: var(--rp);
+  background: rgba(8, 10, 14, .72);
   color: #fff;
-  font-size: 14px;
-  font-weight: bold;
-  padding: 6px 12px;
-  background: rgba(0, 0, 0, 0.5);
-  border-radius: 4px;
+  font-size: var(--f-xs);
+  letter-spacing: .5px;
 }
 
 .video-body {
-  padding: 12px 16px;
-  flex: 1;
+  padding: var(--s3);
   display: flex;
   flex-direction: column;
   gap: 6px;
   min-width: 0;
+  flex: 1;
 }
 
-/* 统一信息行样式 - 每一行都是 flex + gap */
 .info-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
+  min-height: 21px;
   overflow: hidden;
-  height: 21px;
 }
 
 .info-row.actors {
   flex-wrap: wrap;
 }
+
 .mode-brief .info-row.actors {
   flex-wrap: nowrap;
 }
 
-/* 第二行：名称样式 */
- .info-row .name {
-  width: 100%;
-  font-size: 14px;
-  font-weight: bold;
-  color: #333;
+.name {
   display: flex;
-  align-items: center;
-  gap: 4px;
+  align-items: baseline;
+  gap: 5px;
+  width: 100%;
 }
 
-.info-row .name span {
-  width: auto;
-  height: 20px;
-  line-height: 20px;
-  white-space: nowrap;
+.name:hover .name-text {
+  color: var(--accent);
 }
 
-.info-row .name span:last-child {
+.name-code {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.name-text {
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color var(--dur) var(--ease);
 }
 
 .clickable {
@@ -319,69 +315,23 @@ const decodeUrl = (url) => {
 }
 
 .clickable:hover {
-  background: #ffe0b2;
+  filter: brightness(1.18);
 }
 
 .actor-tag {
-  background: #e3f2fd;
-  color: #1565c0;
-  padding: 2px 6px;
-  border-radius: 3px;
-  font-size: 12px;
-  white-space: nowrap;
+  color: var(--text-dim);
+  background: var(--bg-elev-2);
 }
 
-.more-tag {
-  font-size: 12px;
-  color: #999;
-}
-
-/* tag 样式 */
-.country-tag, .type-tag, .series-tag, .like-count, .file-size {
-  width: auto;
-  height: 20px;
-  line-height: 20px;
-  padding: 0 6px;
-  border-radius: 3px;
-  font-size: 12px;
-  white-space: nowrap;
-}
-/* 国家 tag - 紫色 */
-.country-tag {
-  background: #f3e5f5;
-  color: #7b1fa2;
-}
-/* 分类 tag - 绿色 */
-.type-tag {
-  background: #e8f5e9;
-  color: #2e7d32;
-}
-/* 系列 tag - 橙色 */
-.series-tag {
-  background: #fff3e0;
-  color: #e65100;
-}
-/* 获赞数 */
-.like-count {
-  color: #e74c3c;
-  background: #fce4ec;
-}
-/* 文件大小 */
 .file-size {
-  color: #555;
-  background: #f0f0f0;
+  margin-left: auto;
+  color: var(--text-faint);
+  border: 1px solid transparent;
   cursor: pointer;
 }
 
-.media-flag-tag {
-  font-size: 11px;
-  padding: 1px 6px;
-  border-radius: 3px;
-  font-weight: 600;
-  white-space: nowrap;
+.file-size:hover {
+  color: var(--text);
+  border-color: var(--border);
 }
-
-.media-flag-tag.media-1 { background: #fee; color: #c0392b; }
-.media-flag-tag.media-2 { background: #fff3cd; color: #856404; }
-.media-flag-tag.media-3 { background: #d4edda; color: #155724; }
 </style>

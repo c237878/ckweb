@@ -13,6 +13,7 @@ const Highlights = () => import('@/views/pages/Highlights.vue')
 const ComicList = () => import('@/views/pages/ComicList.vue')
 const ComicDetail = () => import('@/views/pages/ComicDetail.vue')
 const LikeList = () => import('@/views/pages/LikeList.vue')
+const NotFound = () => import('@/views/pages/NotFound.vue')
 
 const routes = [
   {
@@ -74,12 +75,23 @@ const routes = [
     path: '/settings',
     name: 'Settings',
     component: Settings
+  },
+  {
+    // 之前没有兜底路由：删完演员后跳的 /actor（少个 s）会直接白屏
+    path: '/:pathMatch(.*)*',
+    name: 'NotFound',
+    component: NotFound
   }
 ]
 
 const router = createRouter({
   history: createWebHistory(),
-  routes
+  routes,
+  // 之前靠各页面手写 window.scrollTo 补，进详情页再返回列表会丢失滚动位置
+  scrollBehavior(to, from, savedPosition) {
+    if (savedPosition) return savedPosition
+    if (to.path !== from.path) return { top: 0 }
+  }
 })
 
 export default router

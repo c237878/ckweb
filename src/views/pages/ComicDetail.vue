@@ -1,355 +1,358 @@
-﻿<template>
-  <div class="comic-detail" v-if="comic">
+<template>
+  <div class="page comic-detail" v-if="comic">
     <!-- 头部 -->
-    <div class="detail-header">
-      <button class="back-btn" @click="$router.back()">← 返回</button>
-      <div class="comic-title">
-        <h1>{{ comic.name }}</h1>
+    <div class="page-header">
+      <h1 class="page-title comic-title" :title="comic.name">
+        <span class="comic-name">{{ comic.name }}</span>
         <span class="author" v-if="comic.author">作者：{{ comic.author }}</span>
-        <span v-if="comic.status === 1" class="badge-completed">完结</span>
-        <span v-if="likeCount" class="like-count">♥ {{ likeCount }}</span>
-      </div>
+        <span v-if="isCompleted" class="tag tag--danger">完结</span>
+        <span v-if="likeCount" class="tag tag--like">♥ {{ likeCount }}</span>
+      </h1>
       <div class="header-actions">
-        <button class="action-btn like-btn" @click="handleLike" :disabled="likeDisabled">
-          <span>点赞</span>
-        </button>
-        <button v-if="!isCompleted" class="btn" @click="refreshImages" :disabled="refreshing" title="重新加载章节图片，清除浏览器缓存">{{ refreshing ? '刷新中...' : '🔄 刷新' }}</button>
-        <button v-if="!isCompleted" class="btn btn-primary" @click="showEdit = true">编辑</button>
-        <button v-if="!isCompleted" class="btn btn-danger" @click="handleDelete">删除</button>
+        <button class="btn btn--sm" @click="$router.back()">返回</button>
+        <button class="btn btn--sm like-btn" :disabled="likeDisabled" @click="handleLike">点赞</button>
+        <button
+          v-if="!isCompleted"
+          class="btn btn--sm"
+          :disabled="refreshing"
+          title="重新扫描章节目录，并让本章节图片重新回源"
+          @click="refreshImages"
+        >
+{{ refreshing ? '刷新中...' : '刷新图片' }}
+</button>
+        <button v-if="!isCompleted" class="btn btn--sm btn--primary" @click="showEdit = true">编辑</button>
+        <button v-if="!isCompleted" class="btn btn--sm btn--danger" @click="handleDelete">删除</button>
       </div>
     </div>
 
     <!-- 基本信息 -->
-    <div class="comic-info" v-if="comic.description || comic.url || comic.directory">
+    <div class="panel comic-info" v-if="comic.description || comic.url || comic.directory">
       <div class="info-row" v-if="comic.description">
         <span class="label">简介</span>
         <span class="value">{{ comic.description }}</span>
       </div>
       <div class="info-row" v-if="comic.url">
         <span class="label">链接</span>
-        <a :href="comic.url" target="_blank" class="value link">{{ comic.url }}</a>
+        <a :href="comic.url" target="_blank" rel="noopener noreferrer" class="value link">{{ comic.url }}</a>
       </div>
       <div class="info-row" v-if="comic.directory">
         <span class="label">目录</span>
-        <span class="value">{{ comic.directory }}</span>
+        <span class="value path">{{ comic.directory }}</span>
       </div>
     </div>
 
     <!-- 章节标签 + 图片区 -->
     <div class="main-area">
-      <!-- 添加章节按钮（独立一行） -->
-      <div class="chapter-add-row" v-if="!isCompleted">
-        <button class="btn btn-primary btn-sm" @click="showAddChapter = true">+ 添加章节</button>
-      </div>
+      <button v-if="!isCompleted" class="btn btn--sm btn--primary" @click="openAddChapter">添加章节</button>
 
-      <!-- 章节标签栏 -->
-      <div class="chapter-tabs">
-        <div class="chapter-tabs-inner">
+      <!-- 章节标签栏：标签本体是个按钮，编辑/删除挂在旁边（按钮不能套按钮） -->
+      <nav class="chapter-tabs" aria-label="章节列表">
+        <div
+          v-for="ch in chapters"
+          :key="ch.id"
+          class="chapter-tab"
+          :class="{ active: currentChapter?.id === ch.id }"
+        >
           <button
-            v-for="ch in chapters"
-            :key="ch.id"
-            class="chapter-tab"
-            :class="{ active: currentChapter?.id === ch.id }"
-            @click="selectChapter(ch)"
+            class="tab-main"
             :title="ch.title"
+            :aria-current="currentChapter?.id === ch.id ? 'true' : undefined"
+            @click="selectChapter(ch)"
           >
             <span class="tab-title">{{ ch.title }}</span>
             <span class="tab-count">{{ ch.imageCount }} 图</span>
-            <div class="tab-actions" v-if="!isCompleted" @click.stop>
-              <button class="tab-action" title="编辑" @click.stop="openEditChapter(ch)">✎</button>
-              <button class="tab-action tab-action-danger" title="删除" @click.stop="deleteChapter(ch)">✕</button>
-            </div>
           </button>
+          <span class="tab-actions" v-if="!isCompleted">
+            <button
+              class="tab-action"
+              title="编辑章节"
+              :aria-label="`编辑章节 ${ch.title}`"
+              @click.stop="openEditChapter(ch)"
+            >&#9998;</button>
+            <button
+              class="tab-action tab-action-danger"
+              title="删除章节"
+              :aria-label="`删除章节 ${ch.title}`"
+              @click.stop="deleteChapter(ch)"
+            >&times;</button>
+          </span>
         </div>
-      </div>
+      </nav>
 
-      <!-- 无章节提示 -->
-      <div class="no-chapter-hint" v-if="chapters.length === 0">
-        暂无章节， 点击上方"+ 添加章节"按钮新增
+      <div class="empty" v-if="chapters.length === 0">
+        暂无章节，点击上方「添加章节」按钮新增
       </div>
-
-      <!-- 无选中章节提示 -->
-      <div class="no-chapter-hint" v-if="chapters.length > 0 && !currentChapter">
+      <div class="empty" v-else-if="!currentChapter">
         请选择一个章节
       </div>
 
       <!-- 图片区 -->
-      <div class="viewer-section" v-if="currentChapter">
+      <div class="viewer-section" v-else>
         <!-- 解密工具栏 -->
-        <div v-if="!isCompleted" class="decrypt-toolbar" :class="{ floating: floatMode }">
-          <div class="decrypt-group">
+        <div v-if="!isCompleted" class="panel decrypt-toolbar" :class="{ floating: floatMode }">
+          <label class="decrypt-group">
             <span class="group-label">切割行数</span>
-            <input
-              v-model.number="decryptConfig.rows"
-              type="number"
-              min="2"
-              class="decrypt-input"
-              @change="syncOrderLength"
-            />
-          </div>
+            <input v-model.number="decryptConfig.rows" class="input num" type="number" min="2" @change="syncOrderLength" />
+          </label>
 
-          <div class="decrypt-group">
+          <label class="decrypt-group">
             <span class="group-label">顶部留高</span>
-            <input
-              v-model.number="decryptConfig.topPadding"
-              type="number"
-              min="0"
-              class="decrypt-input"
-              placeholder="0"
-            />
-          </div>
+            <input v-model.number="decryptConfig.topPadding" class="input num" type="number" min="0" placeholder="0" />
+          </label>
 
-          <div class="decrypt-group">
+          <label class="decrypt-group">
             <span class="group-label">底部留高</span>
-            <input
-              v-model.number="decryptConfig.bottomPadding"
-              type="number"
-              min="0"
-              class="decrypt-input"
-              placeholder="0"
-            />
-          </div>
+            <input v-model.number="decryptConfig.bottomPadding" class="input num" type="number" min="0" placeholder="0" />
+          </label>
 
-          <div class="decrypt-group">
+          <label class="decrypt-group">
             <span class="group-label">排列顺序</span>
-            <input
-              v-model="orderText"
-              type="text"
-              class="decrypt-input order-text"
-              placeholder="如 2,1,0"
-              @blur="applyOrderText"
-            />
+            <input v-model="orderText" class="input order-text" type="text" placeholder="如 2,1,0" @blur="applyOrderText" />
             <small class="group-hint">{{ decryptConfig.rows }} 个 0~{{ decryptConfig.rows - 1 }} 的整数</small>
-          </div>
+          </label>
 
-          <label class="decrypt-group overwrite-check">
+          <label class="decrypt-group check">
             <input type="checkbox" v-model="decryptConfig.overwrite" />
             <span>覆盖已解密</span>
           </label>
 
-          <button
-            class="btn btn-warning"
-            @click="decryptAllImages"
-            :disabled="decrypting"
-          >
-            {{ decrypting ? '解密中…' : '批量解密' }}
-          </button>
-          <button
-            v-if="hasDecrypted"
-            class="btn"
-            @click="restoreAllImages"
-            :disabled="restoring"
-          >
-            {{ restoring ? '还原中…' : '批量还原' }}
-          </button>
-          <button class="btn btn-sm float-toggle" @click="floatMode = !floatMode" :title="floatMode ? '取消漂浮' : '漂浮模式'">
-            {{ floatMode ? '📌' : '📍' }}
-          </button>
+          <div class="decrypt-actions">
+            <button class="btn btn--sm btn--primary" :disabled="decrypting" @click="decryptAllImages">
+              {{ decrypting ? '解密中…' : '批量解密' }}
+            </button>
+            <button v-if="hasDecrypted" class="btn btn--sm" :disabled="restoring" @click="restoreAllImages">
+              {{ restoring ? '还原中…' : '批量还原' }}
+            </button>
+            <button
+              class="btn btn--sm"
+              :aria-pressed="floatMode"
+              :title="floatMode ? '取消漂浮' : '漂浮模式'"
+              @click="floatMode = !floatMode"
+            >
+{{ floatMode ? '固定' : '漂浮' }}
+</button>
+          </div>
         </div>
 
         <!-- 图片网格 -->
         <div class="image-toolbar">
           <div class="chapter-badge">
             <span class="chapter-name">{{ currentChapter.title }}</span>
-            <span class="chapter-img-count">{{ filteredImages.length }} 图</span>
+            <span class="tag">{{ filteredImages.length }} 图</span>
           </div>
           <div v-if="!isCompleted" class="image-toolbar-filter">
-            <label class="show-decrypted-check">
-              <input type="checkbox" v-model="showDecryptedOnly" />
+            <label class="check">
+              <input
+                type="checkbox"
+                :checked="imageFilter === 'decrypted'"
+                @change="imageFilter = $event.target.checked ? 'decrypted' : 'all'"
+              />
               <span>仅显示已解密</span>
             </label>
-            <label class="show-decrypted-check">
-              <input type="checkbox" v-model="showUndecryptedOnly" />
+            <label class="check">
+              <input
+                type="checkbox"
+                :checked="imageFilter === 'undecrypted'"
+                @change="imageFilter = $event.target.checked ? 'undecrypted' : 'all'"
+              />
               <span>仅显示未解密</span>
             </label>
           </div>
         </div>
 
-        <div class="image-grid">
+        <div class="image-grid" v-if="filteredImages.length">
           <div
             v-for="(img, idx) in filteredImages"
             :key="img.fileName"
             class="image-item"
-            :data-filename="img.fileName"
             @click="openViewer(idx)"
           >
-            <div class="cover-wrapper">
+            <div class="cover tile-cover" :class="{ 'is-decrypted': img.isDecrypted }">
               <img
+                v-if="!failedImages.has(img.fileName)"
                 :src="getImageUrl(img)"
-                :class="{ decrypted: img.isDecrypted }"
-                @error="e => e.target.style.display = 'none'"
+                :alt="pageLabel(idx)"
                 loading="lazy"
+                decoding="async"
+                @error="failedImages.add(img.fileName)"
               />
-              <div class="img-badge badge-decrypted" v-if="img.isDecrypted">✓</div>
-              <div class="img-badge badge-index">{{ idx + 1 }}</div>
+              <!-- 图片回源失败时留页码占位，比整格空白好认 -->
+              <span v-else class="cover-fallback">{{ idx + 1 }}</span>
+              <span v-if="img.isDecrypted" class="img-badge badge-decrypted" title="已解密">&#10003;</span>
+              <span class="img-badge badge-index">{{ idx + 1 }}</span>
             </div>
             <div class="image-actions" v-if="!isCompleted">
-              <button v-if="!img.isDecrypted" class="btn btn-xs" @click.stop="decryptSingle(img)">解密</button>
-              <button v-else class="btn btn-xs btn-warning" @click.stop="restoreSingle(img)">还原</button>
-              <button v-if="!comic.coverPath" class="btn btn-xs" @click.stop="setAsCover(img)" :disabled="settingCover">设为封面</button>
+              <button v-if="!img.isDecrypted" class="btn btn--sm btn--primary" @click.stop="decryptSingle(img)">解密</button>
+              <button v-else class="btn btn--sm" @click.stop="restoreSingle(img)">还原</button>
+              <button
+                v-if="!comic.coverPath"
+                class="btn btn--sm"
+                :disabled="settingCover"
+                @click.stop="setAsCover(img)"
+              >
+设为封面
+</button>
             </div>
           </div>
-
-          <div v-if="filteredImages.length === 0" class="empty-images">
-            <span>{{ '该章节暂无图片' }}</span>
-          </div>
         </div>
+
+        <div class="empty" v-else>该章节暂无图片</div>
       </div>
     </div>
 
-    <!-- 图片查看器弹窗 -->
-    <div class="viewer-modal" v-if="viewer.show" @click.self="closeViewer">
-      <button class="viewer-close" @click="closeViewer">×</button>
-      <button class="viewer-prev" @click="prevImage" :disabled="viewer.index <= 0">◀</button>
-      <div class="viewer-content">
-        <img
-          :src="viewer.currentSrc"
-          @error="handleViewerImgError"
-          alt="漫画图片"
-        />
-        <div class="viewer-info">
-          {{ viewer.index + 1 }} / {{ filteredImages.length }}
-          <span v-if="viewer.currentDecrypted"> ✓ 已解密</span>
-        </div>
-        <div class="viewer-controls">
-          <button class="viewer-play-btn" @click="togglePlay" :title="viewerPlaying ? '暂停' : '播放'">
+    <!-- 图片查看器 -->
+    <div
+      v-if="viewer.show"
+      ref="viewerPanel"
+      class="overlay viewer"
+      role="dialog"
+      aria-modal="true"
+      aria-label="漫画图片查看器"
+      tabindex="-1"
+      @click.self="closeViewer"
+    >
+      <button class="viewer__close" aria-label="关闭查看器" @click="closeViewer">&times;</button>
+      <button class="viewer__nav viewer__prev" :disabled="viewer.index <= 0" aria-label="上一张" @click="prevImage">&#9664;</button>
+
+      <figure class="viewer__stage">
+        <img v-if="viewerSrc && !viewerError" :src="viewerSrc" :alt="pageLabel(viewer.index)" @error="viewerError = true" />
+        <figcaption class="viewer__info">
+          <span v-if="viewerError" class="viewer__error">图片加载失败</span>
+          <template v-else>
+            <span class="viewer__count">{{ viewer.index + 1 }} / {{ filteredImages.length }}</span>
+            <span v-if="viewerImage?.isDecrypted" class="tag tag--success">已解密</span>
+          </template>
+          <span class="viewer__name">{{ viewerImage?.fileName }}</span>
+        </figcaption>
+
+        <div class="viewer__controls">
+          <button class="btn btn--sm" @click="togglePlay">
             {{ viewerPlaying ? '暂停' : '播放' }}
           </button>
           <div class="speed-control">
-            <span class="speed-label">间隔</span>
-            <input
-              v-model.number="playSpeed"
-              type="number"
-              min="100"
-              max="10000"
-              step="100"
-              class="speed-input"
-            />
-            <span class="speed-unit">ms</span>
+            <label for="play-speed">间隔</label>
+            <input id="play-speed" v-model.number="playSpeed" class="speed-input" type="number" min="100" max="10000" step="100" />
+            <span>ms</span>
             <div class="speed-presets">
               <button
                 v-for="s in [300, 500, 1000, 2000]"
                 :key="s"
                 class="speed-preset"
                 :class="{ active: playSpeed === s }"
+                :aria-pressed="playSpeed === s"
                 @click="playSpeed = s"
-              >{{ s }}</button>
+              >
+{{ s }}
+</button>
             </div>
           </div>
         </div>
-      </div>
-      <button class="viewer-next" @click="nextImage" :disabled="viewer.index >= filteredImages.length - 1">▶</button>
+      </figure>
+
+      <button
+        class="viewer__nav viewer__next"
+        :disabled="viewer.index >= filteredImages.length - 1"
+        aria-label="下一张"
+        @click="nextImage"
+      >
+&#9654;
+</button>
     </div>
 
-    <!-- 添加章节对话框 -->
-    <Dialog :visible="showAddChapter" title="添加章节" @cancel="showAddChapter = false" @confirm="handleAddChapter">
+    <!-- 章节对话框：新增与编辑共用一份表单（遮罩/Esc/焦点由 Dialog 统一管） -->
+    <Dialog
+      :visible="chapterDialog !== ''"
+      :title="isAddChapter ? '添加章节' : '编辑章节'"
+      size="sm"
+      @cancel="chapterDialog = ''"
+    >
       <template #content>
-        <div class="form-group">
-          <label>章节标题</label>
-          <input v-model="chapterForm.title" type="text" placeholder="默认为目录名" />
-        </div>
-        <div class="form-group">
-          <label>章节目录 <span class="required">*</span></label>
-          <input v-model="chapterForm.directory" type="text" placeholder="章节图片所在目录的完整路径" />
-          <small>填写漫画章节图片所在文件夹的完整路径</small>
+        <div class="chapter-form">
+          <div class="field">
+            <label for="chapter-title">章节标题</label>
+            <input
+              id="chapter-title"
+              v-model="chapterForm.title"
+              class="input"
+              type="text"
+              :placeholder="isAddChapter ? '默认为目录名' : '章节标题'"
+            />
+          </div>
+          <div class="field">
+            <label for="chapter-dir">章节目录 <span v-if="isAddChapter" class="required">*</span></label>
+            <input id="chapter-dir" v-model="chapterForm.directory" class="input" type="text" placeholder="章节图片所在目录的完整路径" />
+            <span class="form-hint">
+              {{ isAddChapter ? '填写漫画章节图片所在文件夹的完整路径' : '修改后若目录不同，将重新统计图片数量' }}
+            </span>
+          </div>
+          <div class="field" v-if="!isAddChapter">
+            <label for="chapter-sort">排序号</label>
+            <input id="chapter-sort" v-model.number="chapterForm.sortOrder" class="input" type="number" min="0" placeholder="数字越小越靠前" />
+          </div>
         </div>
       </template>
+
       <template #actions>
-        <button class="btn" @click="showAddChapter = false">取消</button>
-        <button class="btn btn-primary" @click="handleAddChapter">添加</button>
+        <button class="btn" @click="chapterDialog = ''">取消</button>
+        <button class="btn btn--primary" @click="submitChapter">{{ isAddChapter ? '添加' : '保存' }}</button>
       </template>
     </Dialog>
 
-    <!-- 编辑章节对话框 -->
-    <Dialog :visible="showEditChapter" title="编辑章节" @cancel="showEditChapter = false" @confirm="handleUpdateChapter">
-      <template #content>
-        <div class="form-group">
-          <label>章节标题</label>
-          <input v-model="editChapterForm.title" type="text" placeholder="章节标题" />
-        </div>
-        <div class="form-group">
-          <label>章节目录</label>
-          <input v-model="editChapterForm.directory" type="text" placeholder="章节图片所在目录的完整路径" />
-          <small>修改后若目录不同，将重新统计图片数量</small>
-        </div>
-        <div class="form-group">
-          <label>排序号</label>
-          <input v-model.number="editChapterForm.sortOrder" type="number" min="0" placeholder="数字越小越靠前" />
-        </div>
-      </template>
-      <template #actions>
-        <button class="btn" @click="showEditChapter = false">取消</button>
-        <button class="btn btn-primary" @click="handleUpdateChapter">保存</button>
-      </template>
-    </Dialog>
-
-    <!-- 编辑漫画对话框 -->
-    <Dialog :visible="showEdit" title="编辑漫画" @cancel="showEdit = false" @confirm="handleUpdate">
-      <template #content>
-        <div class="form-group">
-          <label>名称 <span class="required">*</span></label>
-          <input v-model="editForm.name" type="text" />
-        </div>
-        <div class="form-group">
-          <label>作者</label>
-          <input v-model="editForm.author" type="text" />
-        </div>
-        <div class="form-group">
-          <label>简介</label>
-          <textarea v-model="editForm.description" rows="3" style="resize:none"></textarea>
-        </div>
-        <div class="form-group">
-          <label>链接</label>
-          <input v-model="editForm.url" type="text" />
-        </div>
-        <div class="form-group">
-          <label>目录</label>
-          <input v-model="editForm.directory" type="text" />
-        </div>
-        <div class="form-group">
-          <label>状态</label>
-          <select v-model.number="editForm.status">
-            <option :value="0">连载中</option>
-            <option :value="1">完结</option>
-          </select>
-        </div>
-      </template>
-      <template #actions>
-        <button class="btn" @click="showEdit = false">取消</button>
-        <button class="btn btn-primary" @click="handleUpdate">保存</button>
-      </template>
-    </Dialog>
-
+    <!-- 编辑漫画对话框：与漫画列表页共用同一个表单 -->
+    <ComicFormDialog
+      :visible="showEdit"
+      :editing-comic="comic"
+      :saving="savingComic"
+      @update:visible="showEdit = $event"
+      @save="handleUpdate"
+      @cancel="showEdit = false"
+    />
   </div>
 
-  <div class="loading" v-else-if="loading">加载中…</div>
+  <div class="page" v-else-if="loading">
+    <div class="empty" aria-busy="true">
+      <span class="spinner" aria-hidden="true"></span>
+      <span>加载中…</span>
+    </div>
+  </div>
+
+  <div class="page" v-else>
+    <div class="notice notice--error">
+      {{ error || '漫画不存在或已被删除' }}
+      <router-link class="link" to="/comics">返回漫画列表</router-link>
+    </div>
+  </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { comicApi } from '@/scripts/api'
+import { useUiStore, errText } from '@/scripts/store/ui'
+import ComicFormDialog from '@/views/components/ComicFormDialog.vue'
 import Dialog from '@/views/components/Dialog.vue'
 
 const route = useRoute()
 const router = useRouter()
+const ui = useUiStore()
 
 const comic = ref(null)
 const chapters = ref([])
 const currentChapter = ref(null)
-const loading = ref(false)
+const loading = ref(true)
+const error = ref('')
 const showEdit = ref(false)
-const showAddChapter = ref(false)
-const showEditChapter = ref(false)
+const savingComic = ref(false)
+// 章节对话框：'' | 'add' | 'edit'
+const chapterDialog = ref('')
 const editingChapter = ref(null)
-const showDecryptedOnly = ref(false)
-const showUndecryptedOnly = ref(false)
-const displayImages = ref([])  // 实际显示的图片列表，切换筛选/章节时才重新筛选
 
-const editChapterForm = ref({ title: '', directory: '', sortOrder: 0 })
-const editForm = ref({ name: '', author: '', description: '', url: '', directory: '', status: 0 })
-const chapterForm = ref({ title: '', directory: '' })
+// 图片筛选：单选状态，两个复选框共用，避免"同时勾上"这种自相矛盾的态
+const imageFilter = ref('all')
+
+const chapterForm = ref({ title: '', directory: '', sortOrder: 0 })
 const images = ref([])
+const failedImages = ref(new Set())
 
 const decryptConfig = ref({ rows: 3, order: [2, 1, 0], overwrite: true, topPadding: 0, bottomPadding: 0 })
 const orderText = ref('2,1,0')        // 文本形式绑定
@@ -361,12 +364,48 @@ const floatMode = ref(false)
 const likeCount = ref(0)
 const likeDisabled = ref(false)
 
-const viewer = ref({ show: false, index: 0, currentSrc: '', currentDecrypted: false })
+const viewer = ref({ show: false, index: 0 })
+
+const hasDecrypted = computed(() => images.value.some(img => img.isDecrypted))
+const isCompleted = computed(() => comic.value?.status === 1)
+const isAddChapter = computed(() => chapterDialog.value === 'add')
+const filteredImages = computed(() => {
+  if (imageFilter.value === 'decrypted') return images.value.filter(img => img.isDecrypted)
+  if (imageFilter.value === 'undecrypted') return images.value.filter(img => !img.isDecrypted)
+  return images.value
+})
+
+// ---------- 图片 URL 与缓存 ----------
+// 后端对章节图片发了 ETag + 一周 max-age。原先每次渲染都往 URL 上拼 ?t=Date.now()，
+// 键每次都不同，等于把这套缓存整个作废（翻一次筛选条件就把整章重新下载一遍）。
+// 现在只在"服务端会换文件"时才换键：
+//   原图用固定键 —— 解密/还原都不会动原图
+//   解密图带章节版本号 —— 批量解密覆盖写入了新内容时才整章换一次键
+const chapterRev = ref({})
+const revOf = (id) => chapterRev.value[id] || 0
+const bumpChapterRev = (id) => {
+  if (id) chapterRev.value = { ...chapterRev.value, [id]: revOf(id) + 1 }
+}
+
+const getImageUrl = (img) => {
+  const chapterId = currentChapter.value?.id
+  if (!chapterId) return ''
+  const base = comicApi.getImageUrl(chapterId, img.fileName)
+  return img.isDecrypted ? `${base}?v=d${revOf(chapterId)}` : `${base}?v=o`
+}
+
+// 缩略图与查看器共用同一句 alt，读屏时两处说法一致
+const pageLabel = (idx) =>
+  `${comic.value?.name || '漫画'} ${currentChapter.value?.title || ''} 第 ${idx + 1} 页`
 
 // ---------- 自动播放 ----------
 const viewerPlaying = ref(false)
+const viewerError = ref(false)
 const playSpeed = ref(1000) // 毫秒，最小粒度 100ms
 let playTimer = null
+
+const viewerImage = computed(() => filteredImages.value[viewer.value.index] || null)
+const viewerSrc = computed(() => (viewerImage.value ? getImageUrl(viewerImage.value) : ''))
 
 const stopPlay = () => {
   if (playTimer) {
@@ -383,7 +422,6 @@ const schedulePlay = () => {
     if (!viewerPlaying.value) return
     if (viewer.value.index < filteredImages.value.length - 1) {
       viewer.value.index++
-      updateViewerImage()
       schedulePlay()
     } else {
       stopPlay()
@@ -393,33 +431,15 @@ const schedulePlay = () => {
 
 const startPlay = () => {
   if (viewerPlaying.value || filteredImages.value.length === 0) return
-  if (viewer.value.index >= filteredImages.value.length - 1) {
-    viewer.value.index = 0
-    updateViewerImage()
-  }
+  if (viewer.value.index >= filteredImages.value.length - 1) viewer.value.index = 0
   viewerPlaying.value = true
   schedulePlay()
 }
 
 const togglePlay = () => {
-  viewerPlaying.value ? stopPlay() : startPlay()
+  if (viewerPlaying.value) stopPlay()
+  else startPlay()
 }
-
-
-const applyFilter = () => {
-  if (showDecryptedOnly.value) {
-    displayImages.value = images.value.filter(img => img.isDecrypted)
-  } else if (showUndecryptedOnly.value) {
-    displayImages.value = images.value.filter(img => !img.isDecrypted)
-  } else {
-    displayImages.value = [...images.value]
-  }
-}
-
-const filteredImages = computed(() => displayImages.value)
-
-const hasDecrypted = computed(() => images.value.some(img => img.isDecrypted))
-const isCompleted = computed(() => comic.value?.status === 1)
 
 // ---------- 解密配置文本同步 ----------
 const applyOrderText = () => {
@@ -444,6 +464,7 @@ const syncOrderLength = () => {
 // ---------- 加载 ----------
 const loadComic = async () => {
   loading.value = true
+  error.value = ''
   try {
     const res = await comicApi.getDetail(route.params.id)
     if (res.success) {
@@ -453,9 +474,12 @@ const loadComic = async () => {
       if (chapters.value.length > 0 && !currentChapter.value) {
         selectChapter(chapters.value[0])
       }
+    } else {
+      error.value = res.message || '加载失败'
     }
-  } catch (error) {
-    alert('加载失败：' + (error.message || error))
+  } catch (err) {
+    console.error('加载漫画详情失败:', err)
+    error.value = err.message || '加载失败'
   } finally {
     loading.value = false
   }
@@ -463,18 +487,14 @@ const loadComic = async () => {
 
 const selectChapter = async (ch) => {
   currentChapter.value = ch
-  showDecryptedOnly.value = false
-  showUndecryptedOnly.value = false
-  viewer.value.show = false
+  imageFilter.value = 'all'
+  failedImages.value = new Set()
+  closeViewer()
   try {
     const res = await comicApi.getChapterImages(ch.id)
-    if (res.success) {
-      images.value = res.data.images || []
-      applyFilter()
-    }
+    images.value = res.success ? (res.data.images || []) : []
   } catch {
     images.value = []
-    applyFilter()
   }
 }
 
@@ -486,117 +506,89 @@ const refreshImages = async () => {
     const res = await comicApi.getChapterImages(currentChapter.value.id)
     if (res.success) {
       images.value = res.data.images || []
-      applyFilter()
-      // 强制刷新所有图片 src（带新时间戳）
-      nextTick(() => {
-        document.querySelectorAll('.image-item img').forEach(el => {
-          const src = el.src.split('?')[0]
-          el.src = src + '?t=' + Date.now()
-        })
-      })
+      failedImages.value = new Set()
+      // 用户主动要求重取，这才是唯一该换缓存键的场合
+      bumpChapterRev(currentChapter.value.id)
+    } else {
+      ui.error(errText(res, '刷新失败'))
     }
-  } catch (error) {
-    alert('刷新失败：' + (error.message || error))
+  } catch (err) {
+    ui.error('刷新失败：' + errText(err))
   } finally {
     refreshing.value = false
   }
 }
 
 // ---------- 章节操作 ----------
+const openAddChapter = () => {
+  editingChapter.value = null
+  chapterForm.value = { title: '', directory: '', sortOrder: 0 }
+  chapterDialog.value = 'add'
+}
+
 const openEditChapter = (ch) => {
   editingChapter.value = ch
-  editChapterForm.value = { title: ch.title || '', directory: ch.directory || '', sortOrder: ch.sortOrder || 0 }
-  showEditChapter.value = true
+  chapterForm.value = { title: ch.title || '', directory: ch.directory || '', sortOrder: ch.sortOrder || 0 }
+  chapterDialog.value = 'edit'
 }
 
-const handleUpdateChapter = async () => {
-  try {
-    const res = await comicApi.updateChapter(editingChapter.value.id, {
-      title: editChapterForm.value.title || undefined,
-      directory: editChapterForm.value.directory || undefined,
-      sortOrder: editChapterForm.value.sortOrder
-    })
-    if (res.success) {
-      showEditChapter.value = false
-      await loadComic()
-    } else {
-      alert(res.message || '更新失败')
-    }
-  } catch (error) {
-    alert('更新章节失败：' + (error.message || error))
-  }
-}
-
-const handleAddChapter = async () => {
-  if (!chapterForm.value.directory?.trim()) {
-    alert('章节目录不能为空')
+const submitChapter = async () => {
+  const isAdd = isAddChapter.value
+  if (isAdd && !chapterForm.value.directory?.trim()) {
+    ui.warn('章节目录不能为空')
     return
   }
   try {
-    const res = await comicApi.addChapter(route.params.id, {
-      title: chapterForm.value.title || undefined,
-      directory: chapterForm.value.directory
-    })
+    const res = isAdd
+      ? await comicApi.addChapter(route.params.id, {
+          title: chapterForm.value.title || undefined,
+          directory: chapterForm.value.directory
+        })
+      : await comicApi.updateChapter(editingChapter.value.id, {
+          title: chapterForm.value.title || undefined,
+          directory: chapterForm.value.directory || undefined,
+          sortOrder: chapterForm.value.sortOrder
+        })
     if (res.success) {
-      showAddChapter.value = false
-      chapterForm.value = { title: '', directory: '' }
+      chapterDialog.value = ''
+      if (isAdd) chapterForm.value = { title: '', directory: '', sortOrder: 0 }
       await loadComic()
+      ui.success(isAdd ? '章节已添加' : '章节已更新')
     } else {
-      alert(res.message || '添加失败')
+      ui.error(errText(res, isAdd ? '添加失败' : '更新失败'))
     }
-  } catch (error) {
-    alert('添加章节失败：' + (error.message || error))
+  } catch (err) {
+    ui.error((isAdd ? '添加章节失败：' : '更新章节失败：') + errText(err))
   }
 }
 
 const deleteChapter = async (ch) => {
-  if (!confirm(`确定要删除章节「${ch.title}」吗？`)) return
+  if (!await ui.confirm({
+    title: '确认删除',
+    message: `确定要删除章节「${ch.title}」吗？删除后不可恢复。`,
+    danger: true
+  })) return
   try {
     const res = await comicApi.deleteChapter(ch.id)
     if (res.success) {
+      closeViewer()
       await loadComic()
       if (currentChapter.value?.id === ch.id) {
         currentChapter.value = chapters.value[0] || null
         if (currentChapter.value) await selectChapter(currentChapter.value)
         else images.value = []
       }
+      ui.success('章节已删除')
     } else {
-      alert(res.message || '删除失败')
+      ui.error(errText(res, '删除失败'))
     }
-  } catch (error) {
-    alert('删除章节失败：' + (error.message || error))
+  } catch (err) {
+    ui.error('删除章节失败：' + errText(err))
   }
 }
 
-// ---------- 解密 ----------
-const getImageUrl = (img) => {
-  const base = comicApi.getImageUrl(currentChapter.value.id, img.fileName)
-  const sep = base.includes('?') ? '&' : '?'
-  if (img.isDecrypted) {
-    return base + sep + 'decrypted=1&t=' + Date.now()
-  }
-  return base + sep + 't=' + Date.now()
-}
-
-const refreshImage = (img) => {
-  img.isDecrypted = true
-  nextTick(() => {
-    const el = document.querySelector(`.image-item[data-filename="${img.fileName}"] img`)
-    if (el) el.src = getImageUrl(img)
-  })
-}
-
-const restoreImageDisplay = (img) => {
-  img.isDecrypted = false
-  nextTick(() => {
-    const el = document.querySelector(`.image-item[data-filename="${img.fileName}"] img`)
-    if (el) {
-      const base = comicApi.getImageUrl(currentChapter.value.id, img.fileName)
-      el.src = base + '?t=' + Date.now()
-    }
-  })
-}
-
+// ---------- 解密 / 还原 ----------
+// 只改 isDecrypted 状态，:src 与角标都会跟着重算；原先这里是 nextTick 里查 DOM 改 el.src
 const decryptSingle = async (img) => {
   try {
     const res = await comicApi.decryptImage({
@@ -606,38 +598,45 @@ const decryptSingle = async (img) => {
       overwrite: decryptConfig.value.overwrite
     })
     if (res.success) {
-      refreshImage(img)
+      img.isDecrypted = true
+      ui.success('已解密')
     } else {
-      alert(res.message || '解密失败')
+      ui.error(errText(res, '解密失败'))
     }
-  } catch (error) {
-    alert('解密失败：' + (error.message || error))
+  } catch (err) {
+    ui.error('解密失败：' + errText(err))
   }
 }
 
 const decryptAllImages = async () => {
   if (decrypting.value || !currentChapter.value) return
+  const chapterId = currentChapter.value.id
   try {
     decrypting.value = true
     applyOrderText()
     const res = await comicApi.decryptBatch({
-      chapterId: currentChapter.value.id,
+      chapterId,
       config: decryptConfig.value,
       overwrite: decryptConfig.value.overwrite
     })
     if (res.success) {
-      const successCount = res.data.results.filter(r => r.success).length
-      filteredImages.value.forEach(img => {
-        if (res.data.results.some(r => r.success && r.imageName === img.fileName)) {
-          refreshImage(img)
-        }
-      })
-      alert(`解密完成：成功 ${successCount} 张，失败 ${res.data.results.length - successCount} 张`)
+      const results = res.data.results || []
+      // 后端逐条返回的是 fileName（原先按 imageName 取，永远匹配不上，整章状态纹丝不动）
+      const done = new Set(results.filter(r => r.success).map(r => r.fileName))
+      images.value.forEach(img => { if (done.has(img.fileName)) img.isDecrypted = true })
+      // 覆盖写会重写已有解密图的内容，整章换键；未覆盖时新文件走 o→d 变体即可
+      if (decryptConfig.value.overwrite) bumpChapterRev(chapterId)
+      const successCount = results.filter(r => r.success).length
+      const failedCount = results.length - successCount
+      const summary = `解密完成：成功 ${successCount} 张，失败 ${failedCount} 张`
+      // 有失败项时不能报成绿色成功，否则"失败 N 张"读起来像成功了
+      if (failedCount > 0) ui.warn(summary)
+      else ui.success(summary)
     } else {
-      alert(res.message || '解密失败')
+      ui.error(errText(res, '解密失败'))
     }
-  } catch (error) {
-    alert('批量解密失败：' + (error.message || error))
+  } catch (err) {
+    ui.error('批量解密失败：' + errText(err))
   } finally {
     decrypting.value = false
   }
@@ -650,12 +649,13 @@ const restoreSingle = async (img) => {
       imageName: img.fileName
     })
     if (res.success) {
-      restoreImageDisplay(img)
+      img.isDecrypted = false
+      ui.success('已还原')
     } else {
-      alert(res.message || '还原失败')
+      ui.error(errText(res, '还原失败'))
     }
-  } catch (error) {
-    alert('还原失败：' + (error.message || error))
+  } catch (err) {
+    ui.error('还原失败：' + errText(err))
   }
 }
 
@@ -665,25 +665,18 @@ const restoreAllImages = async () => {
     restoring.value = true
     const res = await comicApi.restoreBatch({ chapterId: currentChapter.value.id })
     if (res.success) {
+      // 只删解密图，原图没动过，原图的缓存键可以继续用
       images.value.forEach(img => { img.isDecrypted = false })
-      nextTick(() => {
-        document.querySelectorAll('.image-item img').forEach(el => {
-          const src = el.src.split('?')[0]
-          el.src = src + '?t=' + Date.now()
-        })
-      })
-      alert(res.message || '还原完成')
+      ui.success(errText(res, '还原完成'))
     } else {
-      alert(res.message || '还原失败')
+      ui.error(errText(res, '还原失败'))
     }
-  } catch (error) {
-    alert('批量还原失败：' + (error.message || error))
+  } catch (err) {
+    ui.error('批量还原失败：' + errText(err))
   } finally {
     restoring.value = false
   }
 }
-
-// ---------- 查看器 ----------
 
 const setAsCover = async (img) => {
   if (!currentChapter.value || !comic.value) return
@@ -696,9 +689,13 @@ const setAsCover = async (img) => {
     const res = await comicApi.update(comic.value.id, { ...comic.value, coverPath: fullPath })
     if (res.success) {
       comic.value.coverPath = fullPath
+      ui.success('封面已设置')
+    } else {
+      ui.error(errText(res, '设置封面失败'))
     }
-  } catch (error) {
-    console.error('设置封面失败:', error)
+  } catch (err) {
+    console.error('设置封面失败:', err)
+    ui.error('设置封面失败：' + errText(err))
   } finally {
     settingCover.value = false
   }
@@ -707,34 +704,35 @@ const setAsCover = async (img) => {
 // ---------- 查看器 ----------
 const openViewer = (idx) => {
   stopPlay()
-  const img = filteredImages.value[idx]
-  viewer.value = {
-    show: true, index: idx,
-    currentSrc: getImageUrl(img),
-    currentDecrypted: img.isDecrypted
-  }
+  viewerError.value = false
+  viewer.value.show = true
+  viewer.value.index = idx
 }
 
-const updateViewerImage = () => {
-  const img = filteredImages.value[viewer.value.index]
-  if (!img) return
-  viewer.value.currentSrc = getImageUrl(img)
-  viewer.value.currentDecrypted = img.isDecrypted
+const prevImage = () => { stopPlay(); if (viewer.value.index > 0) viewer.value.index-- }
+const nextImage = () => {
+  stopPlay()
+  if (viewer.value.index < filteredImages.value.length - 1) viewer.value.index++
 }
-
-const prevImage = () => { stopPlay(); if (viewer.value.index > 0) { viewer.value.index--; updateViewerImage() } }
-const nextImage = () => { stopPlay(); if (viewer.value.index < filteredImages.value.length - 1) { viewer.value.index++; updateViewerImage() } }
 const closeViewer = () => { viewer.value.show = false; stopPlay() }
-const handleViewerImgError = (e) => { e.target.style.display = 'none' }
 
+// ---------- 页面动作 ----------
 const handleDelete = async () => {
-  if (!confirm('确定要删除这本漫画吗？')) return
+  if (!await ui.confirm({
+    title: '确认删除',
+    message: '确定要删除这本漫画吗？删除后不可恢复。',
+    danger: true
+  })) return
   try {
     const res = await comicApi.delete(route.params.id)
-    if (res.success) router.push('/comics')
-    else alert(res.message || '删除失败')
-  } catch (error) {
-    alert('删除失败：' + (error.message || error))
+    if (res.success) {
+      router.push('/comics')
+      ui.success('已删除')
+    } else {
+      ui.error(errText(res, '删除失败'))
+    }
+  } catch (err) {
+    ui.error('删除失败：' + errText(err))
   }
 }
 
@@ -746,67 +744,78 @@ const handleLike = async () => {
     if (res.success) {
       likeCount.value = res.likeCount
     }
-  } catch (error) {
-    console.error('点赞失败:', error)
+  } catch (err) {
+    console.error('点赞失败:', err)
   } finally {
     setTimeout(() => { likeDisabled.value = false }, 3000)
   }
 }
 
-const handleUpdate = async () => {
+// 表单弹窗与列表页共用，回传的字段仍是漫画表单那一份
+const handleUpdate = async (form) => {
+  if (savingComic.value) return
+  savingComic.value = true
   try {
     const res = await comicApi.update(route.params.id, {
-      name: editForm.value.name,
-      author: editForm.value.author || undefined,
-      description: editForm.value.description || undefined,
-      url: editForm.value.url || undefined,
-      directory: editForm.value.directory || undefined,
-      coverPath: comic.value.coverPath || undefined,
-      status: editForm.value.status
+      name: form.name,
+      author: form.author || undefined,
+      description: form.description || undefined,
+      url: form.url || undefined,
+      directory: form.directory || undefined,
+      coverPath: form.coverPath || undefined,
+      status: form.status
     })
     if (res.success) {
       showEdit.value = false
       await loadComic()
+      ui.success('已保存')
     } else {
-      alert(res.message || '更新失败')
+      ui.error(errText(res, '更新失败'))
     }
-  } catch (error) {
-    alert('更新失败：' + (error.message || error))
+  } catch (err) {
+    ui.error('更新失败：' + errText(err))
+  } finally {
+    savingComic.value = false
   }
 }
+
+// ---------- 查看器焦点归还（对话框那层由 Dialog 组件自己管） ----------
+const viewerPanel = ref(null)
+let viewerOpener = null
+
+watch(() => viewer.value.show, (open) => {
+  if (open) {
+    viewerOpener = document.activeElement
+    nextTick(() => viewerPanel.value?.focus?.())
+  } else {
+    viewerOpener?.focus?.()
+    viewerOpener = null
+  }
+})
 
 // ---------- 键盘快捷键 ----------
 const handleKeydown = (e) => {
   if (!viewer.value.show) return
+  // 焦点在间隔输入框里时，方向键与空格归它自己用，别抢去翻页
+  if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName)) {
+    if (e.key === 'Escape') closeViewer()
+    return
+  }
   if (e.key === 'ArrowLeft') prevImage()
   else if (e.key === 'ArrowRight') nextImage()
   else if (e.key === 'Escape') closeViewer()
   else if (e.key === ' ' || e.code === 'Space') { e.preventDefault(); togglePlay() }
 }
 
-// ---------- 编辑漫画弹窗预填 ----------
-watch(showEdit, (val) => {
-  if (val) {
-    editForm.value = {
-      name: comic.value?.name || '',
-      author: comic.value?.author || '',
-      description: comic.value?.description || '',
-      url: comic.value?.url || '',
-      directory: comic.value?.directory || '',
-      status: comic.value?.status || 0
-    }
-  }
+// 筛选或删改导致图片变少时，查看器索引要跟上
+watch(() => filteredImages.value.length, (len) => {
+  if (!viewer.value.show) return
+  if (len === 0) closeViewer()
+  else if (viewer.value.index > len - 1) viewer.value.index = len - 1
 })
 
-// 切换筛选项时重新筛选
-watch([showDecryptedOnly, showUndecryptedOnly], () => {
-  applyFilter()
-})
-
-// 关闭查看器时停止播放
-watch(() => viewer.value.show, (v) => {
-  if (!v) stopPlay()
-})
+// 查看器内换图或图片被重新解密时，重新给 <img> 一次机会
+watch(viewerSrc, () => { viewerError.value = false })
 
 onMounted(() => {
   loadComic()
@@ -820,538 +829,156 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-/* ---------- 整体布局 ---------- */
-.comic-detail {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.loading {
-  text-align: center;
-  color: #999;
-  font-size: 16px;
-  padding: 60px;
-}
+/* 表面、按钮、表单、遮罩全部走 main.css 令牌，这里只留本页面特有的排布 */
 
 /* ---------- 头部 ---------- */
-.detail-header {
+.comic-detail {
   display: flex;
-  align-items: center;
-  gap: 16px;
-  border-bottom: 1px solid #eee;
+  flex-direction: column;
+  gap: var(--s4);
 }
-
-.back-btn {
-  padding: 8px 16px;
-  background: #f5f5f5;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  color: #333;
-  flex-shrink: 0;
-}
-.back-btn:hover { background: #eee; }
 
 .comic-title {
   flex: 1;
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
   min-width: 0;
+  gap: var(--s2);
 }
-.comic-title h1 { margin: 0; font-size: 24px; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 6px; }
 
-.badge-completed {
-  display: inline-block;
-  padding: 2px 8px;
-  font-size: 13px;
-  font-weight: bold;
-  color: #fff;
-  background: #e74c3c;
-  border-radius: 4px;
-  flex-shrink: 0;
+.comic-name {
+  max-width: 42ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.author { font-size: 14px; color: #888; white-space: nowrap; flex-shrink: 0; }
+
+.author {
+  font-size: var(--f-sm);
+  font-weight: 400;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
 
 .header-actions {
   display: flex;
-  gap: 6px;
-  flex-shrink: 0;
-  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s2);
 }
 
-.action-btn {
-  height: 37px;
-  padding: 0 12px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  background: #fff;
-  cursor: pointer;
-  font-size: 13px;
-  color: #333;
-  transition: all 0.2s;
+.like-btn {
+  color: var(--like);
+  border-color: var(--like-soft);
 }
 
-.action-btn:hover {
-  border-color: #3498db;
-  color: #3498db;
-  background: #f0f8ff;
-}
-
-.action-btn.like-btn {
-  border-color: #e74c3c;
-  color: #e74c3c;
-}
-
-.action-btn.like-btn:hover {
-  background: #fdf2f2;
-}
-
-.action-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.like-btn:hover:not(:disabled) {
+  background: var(--like-soft);
+  border-color: var(--like);
+  color: var(--like);
 }
 
 /* ---------- 基本信息 ---------- */
 .comic-info {
-  background: #f9f9f9;
-  border-radius: 8px;
-  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--s2);
 }
 
 .info-row {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  font-size: 14px;
+  gap: var(--s3);
 }
 
-.label {
-  color: #888;
-  font-weight: 500;
-  white-space: nowrap;
-  flex-shrink: 0;
-  min-width: 40px;
+.info-row .label {
+  flex: 0 0 40px;
+  color: var(--text-dim);
 }
 
-.value { color: #333; word-break: break-all; }
-.link { color: #3498db; text-decoration: none; }
-.link:hover { text-decoration: underline; }
-.like-count { color: #e74c3c; font-weight: bold; }
+.info-row .value {
+  min-width: 0;
+  word-break: break-all;
+}
 
-/* ---------- 主区域 ---------- */
-.main-area {
+/* 目录路径用等宽字，和简介区分开 */
+.info-row .value.path {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--f-sm);
+  color: var(--text-dim);
+}
+
+.link {
+  color: var(--accent);
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+/* ---------- 主区域与章节标签栏 ---------- */
+.main-area,
+.viewer-section {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--s3);
 }
 
 /* ---------- 章节标签栏 ---------- */
 .chapter-tabs {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  overflow: hidden;
-}
-
-.chapter-tabs-inner {
-  display: flex;
-  gap: 6px;
+  gap: var(--s2);
   overflow-x: auto;
-  flex: 1;
-  scrollbar-width: thin;
-  scrollbar-color: #ddd transparent;
+  padding-bottom: var(--s1);
 }
-.chapter-tabs-inner::-webkit-scrollbar { height: 4px; }
-.chapter-tabs-inner::-webkit-scrollbar-thumb { background: #ddd; border-radius: 2px; }
 
 .chapter-tab {
+  position: relative;
+  flex: 0 0 auto;
   display: flex;
+  border: 1px solid var(--border);
+  border-radius: var(--r2);
+  background: var(--bg-elev);
+  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease),
+    color var(--dur) var(--ease);
+}
+
+.chapter-tab:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-elev-2);
+}
+
+.chapter-tab.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.tab-main {
+  display: flex;
+  flex: 1;
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  padding: 8px 14px;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  background: #fff;
-  cursor: pointer;
-  white-space: nowrap;
-  flex-shrink: 0;
-  transition: border-color 0.2s, background 0.2s, color 0.2s;
   min-width: 120px;
-}
-
-.chapter-tab:hover { border-color: #3498db; background: #f0f7ff; }
-
-.chapter-tab.active {
-  border-color: #3498db;
-  background: #3498db;
-  color: #fff;
+  padding: var(--s2) var(--s3);
+  color: inherit;
+  border-radius: inherit;
 }
 
 .tab-title {
-  font-size: 13px;
-  font-weight: 500;
   max-width: 100px;
+  font-size: var(--f-sm);
+  font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
+/* 计数跟着标签主色走，激活态不必再覆写一次 */
 .tab-count {
-  font-size: 11px;
-  opacity: 0.7;
+  font-size: var(--f-xs);
+  color: inherit;
+  opacity: .65;
 }
 
-.chapter-tab.active .tab-count { opacity: 0.85; }
-
-.chapter-tab {
-  position: relative;
-}
-
-/* 无章节/无选中提示 */
-.no-chapter-hint {
-  text-align: center;
-  color: #999;
-  padding: 48px;
-  font-size: 15px;
-  background: #fafafa;
-  border-radius: 8px;
-  border: 1px dashed #ddd;
-}
-
-/* ---------- 图片区 ---------- */
-.viewer-section {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-/* 解密工具栏 */
-.decrypt-toolbar {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
-  padding: 10px 16px;
-  background: #f5f7fa;
-  border: 1px solid #e0e6f0;
-  border-radius: 8px;
-  font-size: 14px;
-  color: #555;
-}
-
-.decrypt-toolbar.floating {
-  position: fixed;
-  right: 16px;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 1000;
-  flex-direction: column;
-  align-items: stretch;
-  flex-wrap: nowrap;
-  gap: 8px;
-  padding: 12px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-  background: #fff;
-  width: 180px;
-}
-
-.decrypt-toolbar.floating .decrypt-group {
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-}
-
-.decrypt-toolbar.floating .decrypt-input {
-  width: 100%;
-}
-
-.decrypt-toolbar.floating .overwrite-check {
-  flex-direction: row;
-  align-items: center;
-}
-
-.decrypt-toolbar.floating .btn {
-  width: 100%;
-}
-
-.float-toggle {
-  padding: 4px 8px !important;
-  font-size: 16px;
-  line-height: 1;
-}
-
-.decrypt-group {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.group-label {
-  font-size: 13px;
-  color: #666;
-  white-space: nowrap;
-}
-
-.group-hint {
-  font-size: 12px;
-  color: #999;
-  white-space: nowrap;
-}
-
-.decrypt-input {
-  width: 50px;
-  padding: 4px 8px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  font-size: 13px;
-}
-
-.order-text {
-  width: 220px;
-  text-align: left;
-  font-family: monospace;
-}
-
-.overwrite-check {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  cursor: pointer;
-  font-size: 13px;
-  white-space: nowrap;
-}
-
-.overwrite-check input { cursor: pointer; }
-
-/* 图片工具栏 */
-.image-toolbar,
-.image-toolbar-filter {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.chapter-badge {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.chapter-name {
-  font-size: 14px;
-  font-weight: 500;
-  color: #333;
-}
-
-.chapter-img-count {
-  font-size: 12px;
-  color: #888;
-  background: #f5f5f5;
-  border-radius: 10px;
-  padding: 2px 8px;
-}
-
-.show-decrypted-check {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: #555;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-/* ---------- 图片网格 ---------- */
-.image-grid {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 12px;
-}
-
-.image-item {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.cover-wrapper {
-  position: relative;
-  aspect-ratio: 3/4;
-  background: #f0f0f0;
-  border-radius: 6px;
-  overflow: hidden;
-  cursor: pointer;
-}
-
-.cover-wrapper img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: transform 0.2s;
-}
-.cover-wrapper:hover img { transform: scale(1.03); }
-.cover-wrapper img.decrypted { box-shadow: inset 0 0 0 2px #27ae60; }
-
-.img-badge {
-  position: absolute;
-  font-size: 11px;
-  padding: 2px 6px;
-  border-radius: 3px;
-  color: white;
-}
-.badge-decrypted { top: 6px; right: 6px; background: #27ae60; }
-.badge-index { bottom: 4px; right: 6px; background: rgba(0,0,0,0.55); }
-
-.image-actions { display: flex; justify-content: center; }
-
-.empty-images {
-  grid-column: 1 / -1;
-  text-align: center;
-  color: #999;
-  padding: 60px;
-  font-size: 15px;
-}
-
-/* ---------- 查看器 ---------- */
-.viewer-modal {
-  position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0,0,0,0.92);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-}
-
-.viewer-close {
-  position: absolute;
-  top: 20px; right: 24px;
-  background: none;
-  border: none;
-  color: white;
-  font-size: 36px;
-  cursor: pointer;
-  width: 50px; height: 50px;
-  display: flex; align-items: center; justify-content: center;
-}
-
-.viewer-prev, .viewer-next {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  background: rgba(255,255,255,0.15);
-  border: none;
-  color: white;
-  font-size: 24px;
-  padding: 16px 20px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-.viewer-prev { left: 24px; }
-.viewer-next { right: 24px; }
-.viewer-prev:hover:not(:disabled),
-.viewer-next:hover:not(:disabled) { background: rgba(255,255,255,0.25); }
-.viewer-prev:disabled, .viewer-next:disabled { opacity: 0.3; cursor: not-allowed; }
-
-.viewer-content {
-  max-width: 90vw;
-  max-height: 90vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.viewer-content img {
-  max-width: 100%;
-  max-height: calc(90vh - 50px);
-  object-fit: contain;
-  border-radius: 4px;
-}
-
-.viewer-info {
-  color: rgba(255,255,255,0.8);
-  font-size: 14px;
-  margin-top: 6px;
-  text-align: center;
-}
-
-/* 自动播放控制条（紧凑） */
-.viewer-controls {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 4px;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-
-.viewer-play-btn {
-  min-width: 56px;
-  padding: 4px 14px;
-  border: none;
-  border-radius: 12px;
-  background: rgba(255,255,255,0.2);
-  color: #fff;
-  font-size: 12px;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-.viewer-play-btn:hover { background: rgba(255,255,255,0.35); }
-
-.speed-control {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  color: rgba(255,255,255,0.85);
-  font-size: 12px;
-}
-
-.speed-input {
-  width: 60px;
-  padding: 3px 6px;
-  border: 1px solid rgba(255,255,255,0.3);
-  border-radius: 4px;
-  background: rgba(0,0,0,0.35);
-  color: #fff;
-  font-size: 12px;
-  text-align: center;
-}
-.speed-input:focus { outline: none; border-color: #3498db; }
-
-.speed-presets {
-  display: flex;
-  gap: 3px;
-}
-
-.speed-preset {
-  padding: 3px 7px;
-  border: 1px solid rgba(255,255,255,0.3);
-  border-radius: 4px;
-  background: transparent;
-  color: rgba(255,255,255,0.85);
-  font-size: 11px;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-.speed-preset:hover { background: rgba(255,255,255,0.15); }
-.speed-preset.active { background: #3498db; border-color: #3498db; color: #fff; }
-
-
-/* 标签操作按钮（显式展示） */
 .tab-actions {
   position: absolute;
   top: 2px;
@@ -1361,99 +988,380 @@ onUnmounted(() => {
 }
 
 .tab-action {
+  display: grid;
+  place-items: center;
   width: 18px;
   height: 18px;
-  border: none;
-  border-radius: 4px;
-  background: rgba(0,0,0,0.06);
-  color: #555;
-  font-size: 11px;
+  border-radius: var(--r1);
+  background: var(--bg-hover);
+  color: var(--text-dim);
+  font-size: var(--f-xs);
   line-height: 1;
-  padding: 0;
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+
+.tab-action:hover {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.tab-action-danger:hover {
+  background: var(--danger);
+  color: #fff;
+}
+
+/* ---------- 解密工具栏 ---------- */
+.decrypt-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s3);
+  padding: var(--s3);
+  font-size: var(--f-sm);
+}
+
+/* 漂浮模式：钉在右侧，方便一边翻页一边调参数 */
+.decrypt-toolbar.floating {
+  position: fixed;
+  right: var(--s4);
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: var(--z-fab);
+  flex-direction: column;
+  align-items: stretch;
+  flex-wrap: nowrap;
+  gap: var(--s2);
+  width: 200px;
+  box-shadow: var(--shadow-3);
+}
+
+.decrypt-group {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.decrypt-toolbar.floating .decrypt-group {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s1);
+}
+
+.decrypt-toolbar.floating .input,
+.decrypt-toolbar.floating .btn {
+  width: 100%;
+}
+
+.group-label {
+  color: var(--text-dim);
+}
+
+.group-hint {
+  font-size: var(--f-xs);
+  color: var(--text-faint);
+}
+
+.input.num,
+.order-text {
+  width: 62px;
+  padding: 5px 8px;
+}
+
+.order-text {
+  width: 150px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.decrypt-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  margin-left: auto;
+}
+
+.decrypt-toolbar.floating .decrypt-actions {
+  flex-direction: column;
+  align-items: stretch;
+  margin-left: 0;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  font-size: var(--f-sm);
+  color: var(--text-dim);
+  white-space: nowrap;
   cursor: pointer;
+}
+
+.check input {
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* ---------- 图片工具栏 ---------- */
+.image-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+  flex-wrap: wrap;
+}
+
+.chapter-badge {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  min-width: 0;
+}
+
+.chapter-name {
+  font-size: var(--f-md);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.image-toolbar-filter {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+}
+
+/* ---------- 图片网格：原先是 repeat(5, 1fr) 的明信片墙，这里只换成自适应列 ---------- */
+.image-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  gap: var(--s3);
+}
+
+.image-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  cursor: pointer;
+}
+
+.tile-cover {
+  aspect-ratio: var(--ratio-poster);
+  border: 1px solid var(--border);
+  border-radius: var(--r1);
+  overflow: hidden;
+  transition: transform var(--dur) var(--ease), border-color var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease);
+}
+
+.image-item:hover .tile-cover {
+  transform: translateY(-2px);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-2);
+}
+
+.tile-cover.is-decrypted {
+  border-color: var(--success);
+}
+
+.img-badge {
+  position: absolute;
+  top: var(--s1);
+  right: var(--s1);
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: var(--rp);
+  font-size: var(--f-xs);
+  line-height: 1.5;
+  text-align: center;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
+.badge-decrypted {
+  background: var(--success);
+}
+
+.badge-index {
+  top: auto;
+  bottom: var(--s1);
+  background: rgba(8, 10, 14, .68);
+}
+
+.image-actions {
+  display: flex;
+  justify-content: center;
+  gap: var(--s1);
+}
+
+/* ---------- 查看器：借 .overlay 的定位与淡入，只把它压得更黑、层级抬到灯箱 ---------- */
+.viewer {
+  z-index: var(--z-lightbox);
+  background: rgba(6, 8, 11, .95);
+}
+
+.viewer__close,
+.viewer__nav {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r2);
+  background: rgba(255, 255, 255, .12);
+  color: #fff;
+  line-height: 1;
+  transition: background var(--dur) var(--ease);
+}
+
+.viewer__close:hover,
+.viewer__nav:hover:not(:disabled) {
+  background: rgba(255, 255, 255, .26);
+}
+
+.viewer__close {
+  top: var(--s4);
+  right: var(--s4);
+  width: 44px;
+  height: 44px;
+  font-size: var(--f-2xl);
+}
+
+.viewer__nav {
+  top: 50%;
+  transform: translateY(-50%);
+  padding: var(--s4) var(--s3);
+  font-size: var(--f-xl);
+}
+
+.viewer__prev { left: var(--s4); }
+.viewer__next { right: var(--s4); }
+
+.viewer__nav:disabled {
+  opacity: .3;
+  cursor: not-allowed;
+}
+
+.viewer__stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s2);
+  max-width: 90vw;
+}
+
+.viewer__stage img {
+  max-width: 100%;
+  max-height: calc(92vh - 88px);
+  object-fit: contain;
+  border-radius: var(--r1);
+}
+
+.viewer__info,
+.viewer__controls {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.15s, color 0.15s;
+  flex-wrap: wrap;
+  gap: var(--s2);
+  color: rgba(255, 255, 255, .8);
 }
 
-.tab-action:hover { background: rgba(0,0,0,0.12); color: #222; }
-.tab-action-danger:hover { background: #e74c3c; color: #fff; }
+.viewer__count {
+  font-variant-numeric: tabular-nums;
+}
 
-.chapter-tab.active .tab-actions .tab-action {
-  background: rgba(255,255,255,0.25);
+.viewer__name {
+  color: rgba(255, 255, 255, .45);
+  font-size: var(--f-xs);
+}
+
+.viewer__error {
+  color: var(--danger);
+  font-size: var(--f-sm);
+}
+
+/* 深色底上的控件不跟随主题，亮色主题下也保持可读 */
+.viewer__controls .btn {
+  background: rgba(255, 255, 255, .12);
+  border-color: transparent;
   color: #fff;
 }
-.chapter-tab.active .tab-actions .tab-action:hover { background: rgba(255,255,255,0.4); }
-.chapter-tab.active .tab-actions .tab-action-danger:hover { background: #fff; color: #e74c3c; }
 
-/* ---------- 通用按钮 ---------- */
-.btn {
-  padding: 6px 14px;
-  border: 1px solid #ddd;
-  background: #fff;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  color: #333;
-  transition: background 0.2s, border-color 0.2s;
+.viewer__controls .btn:hover {
+  background: rgba(255, 255, 255, .26);
+  border-color: transparent;
+  color: #fff;
 }
-.btn:hover { background: #f5f5f5; }
-.btn-sm { padding: 4px 12px; font-size: 13px; }
-.btn-xs { padding: 2px 8px; font-size: 12px; }
 
-.btn-primary { background: #3498db; color: #fff; border-color: #3498db; }
-.btn-primary:hover { background: #2980b9; border-color: #2980b9; }
+.speed-control {
+  display: flex;
+  align-items: center;
+  gap: var(--s1);
+  font-size: var(--f-xs);
+}
 
-.btn-danger { background: #e74c3c; color: #fff; border-color: #e74c3c; }
-.btn-danger:hover { background: #c0392b; border-color: #c0392b; }
+.speed-input {
+  width: 62px;
+  padding: 3px 6px;
+  border: 1px solid rgba(255, 255, 255, .3);
+  border-radius: var(--r1);
+  background: rgba(0, 0, 0, .35);
+  color: #fff;
+  font-size: var(--f-xs);
+  text-align: center;
+}
 
-.btn-warning { background: #f39c12; color: #fff; border-color: #f39c12; }
-.btn-warning:hover { background: #e67e22; border-color: #e67e22; }
+.speed-input:focus {
+  border-color: var(--accent);
+}
 
-/* ---------- Dialog 表单 ---------- */
-.form-group {
-  margin-bottom: 14px;
+.speed-presets {
+  display: flex;
+  gap: 3px;
+}
+
+.speed-preset {
+  padding: 3px 7px;
+  border: 1px solid rgba(255, 255, 255, .3);
+  border-radius: var(--r1);
+  color: rgba(255, 255, 255, .85);
+  font-size: var(--f-xs);
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+
+.speed-preset:hover {
+  background: rgba(255, 255, 255, .15);
+}
+
+.speed-preset.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+/* ---------- 章节表单：外观走 main.css 的 .dialog/.field/.input ---------- */
+.chapter-form {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-}
-.form-group:last-child { margin-bottom: 0; }
-
-.form-group label {
-  font-size: 13px;
-  font-weight: 500;
-  color: #555;
+  gap: var(--s3);
 }
 
-.form-group input,
-.form-group textarea {
-  width: 100%;
-  padding: 8px 12px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  font-size: 14px;
-  box-sizing: border-box;
-}
-.form-group input:focus,
-.form-group textarea:focus { outline: none; border-color: #3498db; }
-
-.form-group small {
-  font-size: 12px;
-  color: #999;
+.required {
+  color: var(--danger);
 }
 
-.required { color: #e74c3c; }
-
-/* ---------- 响应式 ---------- */
-@media (max-width: 1024px) {
-  .image-grid { grid-template-columns: repeat(4, 1fr); }
+.form-hint {
+  font-size: var(--f-xs);
+  color: var(--text-faint);
 }
+
 @media (max-width: 768px) {
-  .image-grid { grid-template-columns: repeat(3, 1fr); }
-  .comic-detail { padding: 12px; gap: 16px; }
-  .detail-header { gap: 10px; }
-  .comic-title h1 { font-size: 18px; }
-  .decrypt-toolbar { gap: 8px; }
+  .image-grid {
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  }
+
+  .decrypt-actions {
+    margin-left: 0;
+  }
 }
 </style>

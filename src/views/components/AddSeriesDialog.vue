@@ -1,52 +1,92 @@
 <template>
-  <Dialog :visible="visible" :title="editingSeries ? '编辑系列' : '添加系列'" @confirm="handleSave" @cancel="handleCancel">
+  <Dialog
+    :visible="visible"
+    :title="editingSeries ? '编辑系列' : '添加系列'"
+    size="sm"
+    @confirm="handleSave"
+    @cancel="handleCancel"
+  >
     <template #content>
-      <div class="form-item">
-        <label>名称 *</label>
-        <input v-model="form.name" type="text" placeholder="系列名称（必填）" />
-      </div>
-      <div class="form-item">
-        <label>别名</label>
-        <input v-model="form.alias" type="text" placeholder="系列别名（可选）" />
-      </div>
-      <div class="form-item">
-        <label>地区</label>
-        <div class="input-with-suggestions">
-          <input 
-            v-model="form.country" 
-            type="text" 
-            placeholder="选择或输入地区"
-            @input="filterCountries"
-            @focus="showCountrySuggestions = true"
-            @blur="hideCountrySuggestions"
+      <div class="form">
+        <div class="field">
+          <label for="as-name">名称 <span class="req">*</span></label>
+          <input
+            id="as-name"
+            v-model="form.name"
+            class="input"
+            type="text"
+            placeholder="系列名称（必填）"
+            maxlength="100"
           />
-          <div v-if="showCountrySuggestions && filteredCountries.length > 0" class="suggestions">
-            <div 
-              v-for="country in filteredCountries" 
-              :key="country" 
-              class="suggestion-item"
-              @mousedown="selectCountry(country)"
-            >
-              {{ country }}
-            </div>
-          </div>
+        </div>
+
+        <div class="field">
+          <label for="as-alias">别名</label>
+          <input
+            id="as-alias"
+            v-model="form.alias"
+            class="input"
+            type="text"
+            placeholder="系列别名（可选）"
+            maxlength="100"
+          />
+        </div>
+
+        <!-- 地区：既能在已有值里搜，也能手填一个新值 -->
+        <label class="field">
+          <span class="field__label">地区</span>
+          <ComboBox
+            v-if="!customCountry"
+            v-model="form.country"
+            :options="countryOptions"
+            placeholder="选择或输入地区"
+            all-label="（无地区）"
+          />
+          <input
+            v-else
+            v-model="form.country"
+            class="input"
+            type="text"
+            placeholder="输入新的地区"
+            maxlength="20"
+          />
+          <button type="button" class="switch" @click="customCountry = !customCountry">
+            {{ customCountry ? '从已有地区中选择' : '填写新的地区' }}
+          </button>
+        </label>
+
+        <div class="field">
+          <label for="as-link">链接</label>
+          <input
+            id="as-link"
+            v-model="form.link"
+            class="input"
+            type="url"
+            placeholder="系列链接（可选）"
+          />
         </div>
       </div>
-      <div class="form-item">
-        <label>链接</label>
-        <input v-model="form.link" type="url" placeholder="系列链接（可选）" />
-      </div>
     </template>
+
     <template #extra-actions>
-      <button v-if="editingSeries" class="delete-btn" @click="handleDelete">删除</button>
+      <button
+        v-if="editingSeries"
+        type="button"
+        class="btn btn--danger btn--sm foot-left"
+        @click="handleDelete"
+      >
+        删除
+      </button>
     </template>
   </Dialog>
 </template>
 
 <script setup>
-import { ref, watch, defineProps, defineEmits, onMounted } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { seriesApi } from '@/scripts/api'
+import { useUiStore } from '@/scripts/store/ui'
 import Dialog from './Dialog.vue'
+import ComboBox from './ComboBox.vue'
 
 const props = defineProps({
   visible: Boolean,
@@ -55,9 +95,10 @@ const props = defineProps({
 
 const emit = defineEmits(['save', 'cancel', 'delete'])
 
-const existingCountries = ref([])
-const filteredCountries = ref([])
-const showCountrySuggestions = ref(false)
+const ui = useUiStore()
+
+const countries = ref([])
+const customCountry = ref(false)
 
 const form = ref({
   name: '',
@@ -66,155 +107,79 @@ const form = ref({
   link: ''
 })
 
-onMounted(async () => {
-  await loadExistingCountries()
-})
+const blankForm = () => ({ name: '', alias: '', country: '', link: '' })
 
-watch(() => props.visible, async (newVal) => {
-  if (newVal) {
-    await loadExistingCountries()
-    if (props.editingSeries) {
-      form.value = { ...props.editingSeries }
-    } else {
-      resetForm()
-    }
-  }
-})
+// 地区是字符串字段，直接拿值本身当选项 id
+const countryOptions = computed(() => countries.value.map((c) => ({ id: c, name: c })))
 
-const loadExistingCountries = async () => {
+// 专用去重接口：列表接口已把 pageSize 钳到 500，靠翻列表取地区会静默截断
+const loadCountries = async () => {
   try {
-    const res = await seriesApi.getList({ page: 1, pageSize: 1000 })
-    if (res.success && res.data) {
-      const countries = new Set()
-      res.data.forEach(series => {
-        if (series.country) countries.add(series.country)
-      })
-      existingCountries.value = Array.from(countries)
-      filteredCountries.value = existingCountries.value
-    }
+    const res = await seriesApi.getCountries()
+    countries.value = res.success && Array.isArray(res.data) ? res.data : []
   } catch (error) {
-    console.error('加载类型列表失败:', error)
+    console.error('加载地区列表失败:', error)
   }
 }
 
-const filterCountries = () => {
-  if (!form.value.country) {
-    filteredCountries.value = existingCountries.value
-  } else {
-    filteredCountries.value = existingCountries.value.filter(c => 
-      c.toLowerCase().includes(form.value.country.toLowerCase())
-    )
-  }
-}
-
-const selectCountry = (country) => {
-  form.value.country = country
-  showCountrySuggestions.value = false
-}
-
-const hideCountrySuggestions = () => {
-  setTimeout(() => {
-    showCountrySuggestions.value = false
-  }, 200)
-}
-
-const resetForm = () => {
-  form.value = {
-    name: '',
-    alias: '',
-    country: '',
-    link: ''
-  }
-}
+watch(() => props.visible, (val) => {
+  if (!val) return
+  customCountry.value = false
+  loadCountries()
+  // 编辑时保留原对象携带的其余字段（如 utime），与迁移前的整体展开一致
+  form.value = props.editingSeries
+    ? { name: '', alias: '', country: '', link: '', ...props.editingSeries }
+    : blankForm()
+})
 
 const handleSave = () => {
   if (!form.value.name) {
-    alert('请填写系列名称')
+    ui.warn('请填写系列名称')
     return
   }
   emit('save', { ...form.value })
 }
 
 const handleCancel = () => {
-  resetForm()
+  form.value = blankForm()
   emit('cancel')
 }
 
+// 删除确认由父页面统一处理（SeriesList / SeriesDetail 各自 await ui.confirm），
+// 这里再问一次会出现两个一模一样的对话框，跟 AddVideoDialog 的做法保持一致
 const handleDelete = () => {
-  if (confirm('确定要删除这个系列吗？此操作不可恢复！')) {
-    emit('delete', props.editingSeries.id)
-  }
+  emit('delete', props.editingSeries.id)
 }
 </script>
 
 <style scoped>
-.form-item {
-  margin-bottom: 20px;
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
 }
 
-.form-item label {
-  display: block;
-  margin-bottom: 8px;
-  font-weight: bold;
-  color: #333;
+/* 包着控件的 label 用 span 当题注，外观和 .field > label 对齐 */
+.field > .field__label {
+  font-size: var(--f-sm);
+  color: var(--text-dim);
 }
 
-.form-item input,
-.form-item select,
-.form-item textarea {
-  width: 100%;
-  padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 14px;
+.req {
+  color: var(--danger);
 }
 
-.form-item textarea {
-  min-height: 80px;
-  resize: vertical;
+.switch {
+  align-self: flex-start;
+  font-size: var(--f-xs);
+  color: var(--accent);
 }
 
-.input-with-suggestions {
-  position: relative;
+.switch:hover {
+  text-decoration: underline;
 }
 
-.suggestions {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  background: white;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  max-height: 200px;
-  overflow-y: auto;
-  z-index: 10;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.suggestion-item {
-  padding: 10px;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.suggestion-item:hover {
-  background: #f5f5f5;
-}
-
-.delete-btn {
-  padding: 10px 30px;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: opacity 0.3s;
-  background: #e74c3c;
-  color: white;
+.foot-left {
   margin-right: auto;
-}
-
-.delete-btn:hover {
-  opacity: 0.8;
 }
 </style>

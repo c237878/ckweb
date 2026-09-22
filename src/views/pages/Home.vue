@@ -1,137 +1,112 @@
 <template>
-  <div class="home">
+  <div class="page home">
     <!-- 顶部三个固定板块 -->
     <section v-for="sec in topSections" :key="sec.name" class="section">
-      <div class="section-header">
+      <div class="section-head">
         <h2 class="section-title">{{ sec.name }}</h2>
-        <button v-if="sec.name === '今日推荐'" class="refresh-btn" @click="refreshDaily" :disabled="dailyRefreshing">{{ dailyRefreshing ? '加载中...' : '换一批' }}</button>
+        <button v-if="sec.name === '今日推荐'" class="btn btn--sm" @click="refreshDaily" :disabled="dailyRefreshing">
+          {{ dailyRefreshing ? '加载中...' : '换一批' }}
+        </button>
       </div>
-      <div class="video-grid">
+      <div v-if="sec.videos.length" class="grid">
         <VideoCard v-for="video in sec.videos" :key="video.id" :video="video" mode="display" />
-        <div v-if="sec.videos.length === 0" class="empty-hint">暂无内容</div>
       </div>
+      <div v-else class="empty">暂无内容</div>
     </section>
 
     <!-- 分类展示（按配置显示） -->
     <section class="section" v-for="cat in categories" :key="cat.name">
-      <div class="section-header">
+      <div class="section-head">
         <h2 class="section-title">{{ cat.name }}</h2>
+        <router-link class="btn btn--sm btn--ghost" :to="`/videos?category=${encodeURIComponent(cat.name)}`">查看全部</router-link>
       </div>
-      <div class="video-grid">
+      <div v-if="cat.videos.length" class="grid">
         <VideoCard v-for="video in cat.videos" :key="video.id" :video="video" mode="display" />
-        <div v-if="cat.videos.length === 0" class="empty-hint">暂无 {{ cat.name }} 影片</div>
       </div>
+      <div v-else class="empty">暂无 {{ cat.name }} 影片</div>
     </section>
 
-    <div v-if="topSections.length === 0 && categories.length === 0" class="empty-hint" style="text-align:center;padding:60px">暂无影片</div>
+    <div v-if="!loading && topSections.length === 0 && categories.length === 0" class="empty">
+      暂无影片
+    </div>
+    <div v-if="error" class="notice notice--error">{{ error }}</div>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
 import { videoApi } from '@/scripts/api'
+import { useAppStore } from '@/scripts/store/app'
 import VideoCard from '@/views/components/VideoCard.vue'
+
+const app = useAppStore()
 
 const topSections = ref([])
 const categories = ref([])
 const dailyRefreshing = ref(false)
+const loading = ref(true)
+const error = ref('')
 
 onMounted(async () => {
   try {
-    const metaRes = await videoApi.getMeta()
-    if (!metaRes.success) return
+    // init() 幂等：App.vue 已触发过就不会重复请求设置
+    await app.init()
+    const count = app.homeCategoryCount
 
-    const count = parseInt(metaRes.homePageCategoryCount) || 12
-    const homeCats = (metaRes.homePageCategories || '').split(',').map(s => s.trim()).filter(Boolean)
-
-    // 并行加载：三个固定板块 + 分类
-    const promises = [
-      // 今日推荐
+    // 4 个请求并发：分类板块走批量端点，不再按分类各发一次。
+    // 用 allSettled，任一板块失败只让该板块空着，不会整页空白。
+    const [daily, liked, top, sections] = await Promise.allSettled([
       videoApi.getDailyRecommend(count),
-      // 最近点赞
       videoApi.getRecentlyLiked(count),
-      // 高赞影片
-      videoApi.getTopLiked(count)
-    ]
+      videoApi.getTopLiked(count),
+      videoApi.getHomeSections()
+    ]).then((rs) => rs.map((r) => (r.status === 'fulfilled' ? r.value : { success: false })))
 
-    if (homeCats.length > 0) {
-      // 有配置 → 只加载指定的分类
-      homeCats.forEach(cat => promises.push(videoApi.getList({ pageIndex: 1, pageSize: count, category: cat, hasFile: true, prioritizeUnrated: true })))
-    } else {
-      // 无配置 → 加载全部分类
-      const allCats = metaRes.categories || []
-      allCats.forEach(cat => promises.push(videoApi.getList({ pageIndex: 1, pageSize: count, category: cat, hasFile: true, prioritizeUnrated: true })))
+    const tops = []
+    if (daily.success && daily.data?.length) tops.push({ name: '今日推荐', videos: daily.data })
+    if (liked.success && liked.data?.length) tops.push({ name: '最近点赞', videos: liked.data })
+    if (top.success && top.data?.length) tops.push({ name: '高赞影片', videos: top.data })
+    topSections.value = tops
+
+    if (sections.success) {
+      categories.value = (sections.data || [])
+        .filter((item) => item.videos?.length)
+        .map((item) => ({ name: item.category, videos: item.videos }))
     }
-
-    const results = await Promise.all(promises)
-    const latestRes = results[0]
-    const likedRes = results[1]
-    const topRes = results[2]
-
-    if (latestRes.success && latestRes.data?.length > 0)
-      topSections.value.push({ name: '今日推荐', videos: latestRes.data })
-    if (likedRes.success && likedRes.data?.length > 0)
-      topSections.value.push({ name: '最近点赞', videos: likedRes.data })
-    if (topRes.success && topRes.data?.length > 0)
-      topSections.value.push({ name: '高赞影片', videos: topRes.data })
-
-    const catResults = results.slice(3)
-    if (homeCats.length > 0) {
-      homeCats.forEach((cat, i) => {
-        const res = catResults[i]
-        if (res.success && res.data?.list?.length > 0)
-          categories.value.push({ name: cat, videos: res.data.list })
-      })
-    } else {
-      const allCats = metaRes.categories || []
-      allCats.forEach((cat, i) => {
-        const res = catResults[i]
-        if (res.success && res.data?.list?.length > 0)
-          categories.value.push({ name: cat, videos: res.data.list })
-      })
-    }
-  } catch (error) {
-    console.error('加载首页失败:', error)
+  } catch (err) {
+    console.error('加载首页失败:', err)
+    error.value = '首页数据加载失败，请检查后端服务是否可用'
+  } finally {
+    loading.value = false
   }
 })
 
 const refreshDaily = async () => {
   dailyRefreshing.value = true
   try {
-    const metaRes = await videoApi.getMeta()
-    const count = parseInt(metaRes.homePageCategoryCount) || 12
-    const res = await videoApi.getDailyRecommend(count, true)
-    if (res.success && res.data?.length > 0) {
-      const idx = topSections.value.findIndex(s => s.name === '今日推荐')
-      if (idx >= 0) {
-        topSections.value[idx].videos = res.data
-      }
+    const res = await videoApi.getDailyRecommend(app.homeCategoryCount, true)
+    if (res.success && res.data?.length) {
+      const section = topSections.value.find((s) => s.name === '今日推荐')
+      if (section) section.videos = res.data
     }
   } catch (e) {
     console.error('换一批失败:', e)
+    error.value = '换一批失败'
+  } finally {
+    dailyRefreshing.value = false
   }
-  dailyRefreshing.value = false
 }
 </script>
 
 <style scoped>
-.home { padding: 20px 20px 60px; position: relative; }
-.section-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-.refresh-btn { padding: 4px 14px; border: 1px solid #4a9eff; background: transparent; color: #4a9eff; border-radius: 4px; cursor: pointer; font-size: 13px; user-select: none; }
-.refresh-btn:hover { background: #4a9eff; color: #fff; }
-.refresh-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.home {
+  gap: var(--s6);
+}
 
-.section { margin-bottom: 40px; }
-.section-title {
-  font-size: 24px;
-  font-weight: bold;
-  padding-left: 10px;
-  border-left: 4px solid #e74c3c;
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
 }
-.video-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 20px;
-}
-.empty-hint { color: #999; font-size: 14px; padding: 20px; }
 </style>
