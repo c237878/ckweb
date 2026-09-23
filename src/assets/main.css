@@ -84,6 +84,7 @@
 
   /* 版式与层级 */
   --container: 1440px;
+  --header-h: 58px;    /* 吸顶页头，锚点定位与吸顶侧栏都要留出这段高度 */
   --ratio-cover: 3 / 2;
   --ratio-poster: 2 / 3;
   --z-header: 50;
@@ -526,7 +527,8 @@ section {
   min-width: 0;
 }
 
-.field > label {
+.field > label,
+.field > .field__label {
   font-size: var(--f-sm);
   color: var(--text-dim);
 }

@@ -246,7 +246,26 @@ src/
 不要再写 `v-model.number` —— 原生 `<option>` 会把值变成字符串，`.number` 就是为补这个洞存在的，
 自绘组件直接透传 `opt.value`，不需要它。
 
+### 系统设置页
 
+`views/pages/Settings.vue` 是「左侧分组导航 + 右侧分区卡片」的两栏结构。
+分区顺序、导航项、标题与说明都取自脚本里的 `GROUPS` 一处定义；
+新增一项设置只给 `settingsList` 的元素加上 `group`，它会自动落进对应分区并共用该分区的保存按钮。
+窄屏（<900px）时导航退化成顶部一行可横滑的分组芯片。
+
+**数据源**分区管 `countries` / `categories` 两份逗号分隔清单：影片、系列、演员的地区和影片的分类，
+可选值全部来自这里（后端 `Utils.Options.CommaList`），编辑页只能选不能造词，
+所以不同页面看到的选项一定一致。清单为空时后端不回退到表内 DISTINCT —— 管理员清空是有意为之。
+
+**OptionListEditor** —— 编辑这类逗号分隔清单的控件，`v-model` 就是原始字符串，父子之间不做二次转换：
+
+```vue
+<OptionListEditor v-model="countriesValue" label="新增地区" placeholder="如：泰国" hint="顺序即显示顺序" />
+```
+
+从清单删掉某项不会改动已经使用它的记录，控件会用 toast 说明这一点。
+
+### 播放器
 
 播放器 ckplayer 只在影片详情页按需注入（`scripts/utils/ckplayer.js`），不再全局加载。
 注意播放器容器 `div#ckplayer` 会让浏览器把同名元素挂到 `window.ckplayer` 上，判断库是否就绪必须用 `typeof === 'function'`。

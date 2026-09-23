@@ -142,12 +142,6 @@ const handleDelete = () => {
   gap: var(--s4);
 }
 
-/* 包着控件的 label 用 span 当题注，外观和 .field > label 对齐 */
-.field > .field__label {
-  font-size: var(--f-sm);
-  color: var(--text-dim);
-}
-
 .req {
   color: var(--danger);
 }

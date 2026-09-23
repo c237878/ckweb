@@ -82,7 +82,7 @@ const navItems = [
   display: flex;
   align-items: center;
   gap: var(--s5);
-  min-height: 58px;
+  min-height: var(--header-h);
 }
 
 .logo a {

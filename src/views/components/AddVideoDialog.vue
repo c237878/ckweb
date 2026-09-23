@@ -631,11 +631,6 @@ const handleDelete = () => {
   display: none;
 }
 
-.field > .field__label {
-  font-size: var(--f-sm);
-  color: var(--text-dim);
-}
-
 .req {
   color: var(--danger);
 }
