@@ -52,13 +52,13 @@
       <button class="btn btn--sm btn--ghost" @click="handleReset">重置</button>
     </div>
 
-    <div v-if="loading" class="grid grid--rows" aria-busy="true" aria-label="加载中">
+    <div v-if="loading" class="grid" aria-busy="true" aria-label="加载中">
       <div v-for="n in Math.min(pageSize, 24)" :key="n" class="skeleton row-skeleton"></div>
     </div>
 
     <div v-else-if="error" class="notice notice--error">{{ error }}</div>
 
-    <div v-else-if="actors.length" class="grid grid--rows">
+    <div v-else-if="actors.length" class="grid">
       <article
         v-for="actor in actors"
         :key="actor.id"
@@ -81,7 +81,7 @@
               <span class="name card-title">
                 <span class="name-text" :title="actor.name">{{ actor.name }}</span>
               </span>
-              <div class="right-tags">
+              <div class="pills right-tags">
                 <span v-if="actor.likeCount > 0" class="tag tag--like">♥ {{ actor.likeCount }}</span>
                 <span v-if="actor.videoCount > 0" class="tag">{{ actor.videoCount }} 部</span>
                 <span v-if="actor.country" class="tag tag--accent">{{ actor.country }}</span>
@@ -429,11 +429,8 @@ const handleDelete = async (id) => {
   color: var(--accent);
 }
 
+/* 布局走全局 .pills，这里只负责把胶囊推到名称右侧 */
 .right-tags {
-  display: flex;
-  align-items: center;
-  gap: var(--s1);
-  flex-wrap: wrap;
   justify-content: flex-end;
   margin-left: auto;
 }

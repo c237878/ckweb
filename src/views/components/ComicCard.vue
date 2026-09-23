@@ -90,7 +90,6 @@ const handleClick = () => {
   flex-direction: column;
   position: relative;
   cursor: pointer;
-  container-type: inline-size;
 }
 
 .comic-card.picking {
@@ -146,11 +145,7 @@ const handleClick = () => {
 }
 
 .pills {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--s1);
-  min-width: 0;
-  margin-top: auto;
+  margin-top: auto;   /* 卡片等高时把胶囊压到底部 */
 }
 
 /* 外链角标：只在需要时才出现，键盘聚焦同样要能看到 */

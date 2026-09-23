@@ -38,7 +38,7 @@
 
       <!-- 所有胶囊同一行，放不下就换行。外观一致，只有可点的那几个有 hover
            ——由全局 a.tag:hover / button.tag:hover 负责，span 天然拿不到。
-           逐项按卡片自身宽度放开，见文末 @container -->
+           窄/宽屏各显示哪些见文末 .pill--wide -->
       <div class="pills">
         <span
           v-if="video.mediaAttrFlags > 0"
@@ -47,7 +47,7 @@
         >{{ mediaFlagText(video.mediaAttrFlags) }}</span>
 
         <button
-          v-if="mode === 'full'"
+          v-if="mode !== 'brief'"
           type="button"
           class="tag pill pill--size"
           :title="copied ? '已复制番号' : '点击复制番号；无文件时顺带重扫路径'"
@@ -58,12 +58,12 @@
         <span v-else class="tag pill pill--size">{{ video.fileSize ? formatSize(video.fileSize) : '无文件' }}</span>
 
         <span v-if="video.likeCount > 0" class="tag tag--like pill pill--likes">♥ {{ video.likeCount }}</span>
-        <span v-if="video.country" class="tag tag--accent pill pill--country">{{ video.country }}</span>
-        <span v-if="video.category && mode === 'full'" class="tag tag--success pill pill--category">{{ video.category }}</span>
+        <span v-if="video.country" class="tag tag--accent pill pill--wide pill--country">{{ video.country }}</span>
+        <span v-if="video.category && mode !== 'brief'" class="tag tag--success pill pill--wide pill--category">{{ video.category }}</span>
 
         <router-link
           v-if="video.seriesName && mode !== 'brief'"
-          class="tag tag--info pill pill--series"
+          class="tag tag--info pill pill--wide pill--series"
           :to="`/series/${video.seriesId}`"
           @click.stop
         >
@@ -73,7 +73,7 @@
         <router-link
           v-for="actor in actorList"
           :key="actor.id || actor.name"
-          class="tag pill pill--actor"
+          class="tag pill pill--wide pill--actor"
           :to="`/actor/${actor.id}`"
           @click.stop
         >
@@ -94,7 +94,7 @@ import { useUiStore, errText } from '@/scripts/store/ui'
 
 const props = defineProps({
   video: { type: Object, required: true },
-  /** full = 列表页（全部胶囊）；display = 首页板块；brief = 紧凑行 */
+  /** 只剩两态：默认（列表页与首页同一套外观）与 brief（详情页推荐条的紧凑行） */
   mode: { type: String, default: 'full' },
   /** 点整张卡片做什么：browse 进详情 / select 勾选 / pick 选一个去编辑 */
   clickAction: { type: String, default: 'browse' },
@@ -194,8 +194,6 @@ const handleClick = () => {
   flex-direction: column;
   position: relative;
   cursor: pointer;
-  /* 让卡片自己成为查询容器：胶囊放不放得下看卡片实际宽度，而不是视口宽度 */
-  container-type: inline-size;
 }
 
 .video-card.selected {
@@ -285,26 +283,19 @@ const handleClick = () => {
   transition: color var(--dur) var(--ease);
 }
 
-/* 一行摆开，放不下换行；行列间距同值，看着才是一堆胶囊而不是一表格式的行 */
-.pills {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--s1);
-  min-width: 0;
-}
-
+/* 布局走全局 .pills；这里只约束单个胶囊不撑破容器 */
 .pill {
   max-width: 100%;
 }
 
-/* 胶囊一律同行、放不下换行，所以不再逐项隐藏。
-   只有演员设了门槛：一部片可能挂十几个演员，全渲染会让卡片高度失控 */
-.pill--actor {
+/* 窄屏 2 列档只留核心三样（片源/大小/点赞），宽屏 4 列档补齐。
+   用视口而不是容器宽度，是为了跟列数档位严格一一对应 */
+.pill--wide {
   display: none;
 }
 
-@container (min-width: 240px) {
-  .pill--actor {
+@media (min-width: 900px) {
+  .pill--wide {
     display: inline-flex;
   }
 }

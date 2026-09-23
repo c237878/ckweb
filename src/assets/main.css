@@ -420,8 +420,9 @@ section {
   font-size: var(--f-sm);
 }
 
-/* 列数只有三档，按视口切换：窄 2 列、中 4 列、宽 6 列。
-   卡片内部不再靠"整行开关"适应宽度，胶囊统一一行、放不下自动换行 */
+/* 网格列数全站两档，首页/影片/系列/演员/漫画共用同一个 .grid：
+   窄屏 2 列、≥900px 4 列。卡片内部要显示哪些胶囊用同一条 900px 线，
+   保证"列数档位"与"信息档位"始终一致 */
 .grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -431,29 +432,6 @@ section {
 @media (min-width: 900px) {
   .grid {
     grid-template-columns: repeat(4, 1fr);
-  }
-}
-
-@media (min-width: 1400px) {
-  .grid {
-    grid-template-columns: repeat(6, 1fr);
-  }
-}
-
-/* 演员/系列是行卡（无封面图），信息本身要横向空间，列数另配一档 */
-.grid--rows {
-  grid-template-columns: repeat(1, 1fr);
-}
-
-@media (min-width: 900px) {
-  .grid--rows {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (min-width: 1400px) {
-  .grid--rows {
-    grid-template-columns: repeat(3, 1fr);
   }
 }
 
@@ -642,6 +620,14 @@ button.tag:hover:not(:disabled) {
 a.tag:active,
 button.tag:active:not(:disabled) {
   transform: translateY(1px);
+}
+
+/* 胶囊行：影片/漫画/演员/系列四种卡片共用这一份定义 */
+.pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s1);
+  min-width: 0;
 }
 
 /* 卡片里的属性行：不可点的次要信息，用文本而不是药丸 */
@@ -923,8 +909,7 @@ button.tag:active:not(:disabled) {
     font-size: var(--f-lg);
   }
 
-  .grid,
-  .grid--rows {
+  .grid {
     gap: var(--s3);
   }
 

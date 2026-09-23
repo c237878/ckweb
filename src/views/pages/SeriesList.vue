@@ -52,13 +52,13 @@
       <button class="btn btn--sm btn--ghost" @click="handleReset">重置</button>
     </div>
 
-    <div v-if="loading" class="grid grid--rows" aria-busy="true" aria-label="加载中">
+    <div v-if="loading" class="grid" aria-busy="true" aria-label="加载中">
       <div v-for="n in Math.min(pageSize, 24)" :key="n" class="skeleton row-skeleton"></div>
     </div>
 
     <div v-else-if="error" class="notice notice--error">{{ error }}</div>
 
-    <div v-else-if="seriesList.length" class="grid grid--rows">
+    <div v-else-if="seriesList.length" class="grid">
       <article
         v-for="series in seriesList"
         :key="series.id"
@@ -85,7 +85,7 @@
             <div class="info-row" v-if="series.alias">
               <span class="alias" :title="series.alias">{{ series.alias }}</span>
             </div>
-            <div class="info-row">
+            <div class="pills">
               <span v-if="series.likeCount > 0" class="tag tag--like">♥ {{ series.likeCount }}</span>
               <span v-if="series.videoCount > 0" class="tag">{{ series.videoCount }} 部</span>
               <span v-if="series.country" class="tag tag--accent">{{ series.country }}</span>
