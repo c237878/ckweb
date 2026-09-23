@@ -630,6 +630,55 @@ button.tag:active:not(:disabled) {
   min-width: 0;
 }
 
+/* ============================ 行卡片（演员 / 系列） ============================
+   与影片卡同一套结构：标题一行 + 胶囊一行，只差没有封面图 */
+.card--row {
+  display: flex;
+  flex-direction: column;
+}
+
+.card--row.picking {
+  cursor: pointer;
+}
+
+.card--row.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft), var(--shadow-2);
+}
+
+/* hover 只给光影，不做位移 */
+.card--row:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-2);
+}
+
+.card--row .card-main {
+  display: flex;
+  align-items: stretch;
+  gap: var(--s2);
+  flex: 1;
+  min-width: 0;
+  padding-left: var(--s3);
+}
+
+.card--row .card-checkbox {
+  flex-shrink: 0;
+  align-self: center;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.card--row .card-body {
+  padding: var(--s3);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  min-width: 0;
+}
+
 /* 卡片里的属性行：不可点的次要信息，用文本而不是药丸 */
 .facts {
   display: flex;

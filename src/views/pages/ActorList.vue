@@ -59,42 +59,16 @@
     <div v-else-if="error" class="notice notice--error">{{ error }}</div>
 
     <div v-else-if="actors.length" class="grid">
-      <article
+      <ActorCard
         v-for="actor in actors"
         :key="actor.id"
-        class="card actor-card"
-        :class="{ selected: selectedIds.includes(actor.id), picking: mode !== 'browse' }"
-        @click="onCardClick(actor)"
-      >
-        <div class="card-main">
-          <input
-            v-if="mode === 'select'"
-            type="checkbox"
-            class="card-checkbox"
-            :checked="selectedIds.includes(actor.id)"
-            :aria-label="`选择 ${actor.name}`"
-            @change="handleSelect(actor)"
-            @click.stop
-          />
-          <div class="card-body">
-            <div class="info-row">
-              <span class="name card-title">
-                <span class="name-text" :title="actor.name">{{ actor.name }}</span>
-              </span>
-              <div class="pills right-tags">
-                <span v-if="actor.likeCount > 0" class="tag tag--like">♥ {{ actor.likeCount }}</span>
-                <span v-if="actor.videoCount > 0" class="tag">{{ actor.videoCount }} 部</span>
-                <span v-if="actor.country" class="tag tag--accent">{{ actor.country }}</span>
-                <span
-                  v-if="actor.unloadedCount > 0"
-                  class="tag tag--danger"
-                  :title="`有 ${actor.unloadedCount} 部未下载`"
-                >未下载 {{ actor.unloadedCount }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </article>
+        :actor="actor"
+        :click-action="cardClickAction"
+        :selectable="mode === 'select'"
+        :selected="selectedIds.includes(actor.id)"
+        @select="handleSelect"
+        @pick="handleEdit"
+      />
     </div>
 
     <div v-else class="empty">
@@ -116,13 +90,13 @@
 
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue'
-import { useRouter } from 'vue-router'
 import { actorApi } from '@/scripts/api'
 import { useAppStore } from '@/scripts/store/app'
 import { useUiStore, errText } from '@/scripts/store/ui'
 import { SORT_OPTIONS } from '@/scripts/constants'
 import { debounce } from '@/scripts/utils/debounce'
 import AddActorDialog from '@/views/components/AddActorDialog.vue'
+import ActorCard from '@/views/components/ActorCard.vue'
 import Pagination from '@/views/components/Pagination.vue'
 import SelectList from '@/views/components/SelectList.vue'
 import { loadFilterState, saveFilterState } from '@/scripts/utils/filterPersist'
@@ -131,7 +105,6 @@ const STORAGE_KEY = 'actor-list'
 
 const app = useAppStore()
 const ui = useUiStore()
-const router = useRouter()
 
 const actors = ref([])
 const keyword = ref('')
@@ -237,11 +210,7 @@ const exitMode = () => {
   selectedIds.value = []
 }
 
-const onCardClick = (actor) => {
-  if (mode.value === 'select') handleSelect(actor)
-  else if (mode.value === 'edit') handleEdit(actor)
-  else goToDetail(actor.id)
-}
+const cardClickAction = computed(() => (mode.value === 'edit' ? 'pick' : mode.value))
 
 const handleSelect = (actor) => {
   const index = selectedIds.value.indexOf(actor.id)
@@ -253,10 +222,6 @@ const handleReset = () => {
   keyword.value = ''
   filters.value = { country: '', sortBy: '' }
   applyFilter()
-}
-
-const goToDetail = (id) => {
-  router.push(`/actor/${id}`)
 }
 
 const handleAdd = () => {
@@ -350,62 +315,6 @@ const handleDelete = async (id) => {
 .row-skeleton {
   height: calc(var(--s5) + var(--s4));
   border-radius: var(--r2);
-}
-
-.actor-card {
-  display: flex;
-  flex-direction: column;
-}
-
-/* 选择/编辑模式下整张卡片都是热区 */
-.actor-card.picking {
-  cursor: pointer;
-}
-
-.actor-card.selected {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent-soft), var(--shadow-2);
-}
-
-.actor-card:hover {
-  border-color: var(--border-strong);
-  box-shadow: var(--shadow-2);
-}
-
-.card-main {
-  display: flex;
-  align-items: stretch;
-  gap: var(--s2);
-  flex: 1;
-  min-width: 0;
-  padding-left: var(--s3);
-}
-
-.card-checkbox {
-  flex-shrink: 0;
-  align-self: center;
-  width: 18px;
-  height: 18px;
-  accent-color: var(--accent);
-  cursor: pointer;
-}
-
-.card-body {
-  padding: var(--s3);
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: var(--s2);
-  min-width: 0;
-  cursor: pointer;
-}
-
-.info-row {
-  display: flex;
-  align-items: center;
-  gap: var(--s2);
-  flex-wrap: wrap;
-  min-width: 0;
 }
 
 .name {

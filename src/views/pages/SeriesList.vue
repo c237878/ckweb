@@ -59,45 +59,16 @@
     <div v-else-if="error" class="notice notice--error">{{ error }}</div>
 
     <div v-else-if="seriesList.length" class="grid">
-      <article
+      <SeriesCard
         v-for="series in seriesList"
         :key="series.id"
-        class="card series-card"
-        :class="{ selected: selectedIds.includes(series.id), picking: mode !== 'browse' }"
-        @click="onCardClick(series)"
-      >
-        <div class="card-main">
-          <input
-            v-if="mode === 'select'"
-            type="checkbox"
-            class="card-checkbox"
-            :checked="selectedIds.includes(series.id)"
-            :aria-label="`选择 ${series.name}`"
-            @change="handleSelect(series)"
-            @click.stop
-          />
-          <div class="card-body">
-            <div class="info-row">
-              <span class="name card-title">
-                <span class="name-text" :title="series.name">{{ series.name }}</span>
-              </span>
-            </div>
-            <div class="info-row" v-if="series.alias">
-              <span class="alias" :title="series.alias">{{ series.alias }}</span>
-            </div>
-            <div class="pills">
-              <span v-if="series.likeCount > 0" class="tag tag--like">♥ {{ series.likeCount }}</span>
-              <span v-if="series.videoCount > 0" class="tag">{{ series.videoCount }} 部</span>
-              <span v-if="series.country" class="tag tag--accent">{{ series.country }}</span>
-              <span
-                v-if="series.unloadedCount > 0"
-                class="tag tag--danger"
-                :title="`有 ${series.unloadedCount} 部未下载`"
-              >未下载 {{ series.unloadedCount }}</span>
-            </div>
-          </div>
-        </div>
-      </article>
+        :series="series"
+        :click-action="cardClickAction"
+        :selectable="mode === 'select'"
+        :selected="selectedIds.includes(series.id)"
+        @select="handleSelect"
+        @pick="handleEdit"
+      />
     </div>
 
     <div v-else class="empty">
@@ -119,13 +90,13 @@
 
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue'
-import { useRouter } from 'vue-router'
 import { seriesApi } from '@/scripts/api'
 import { useAppStore } from '@/scripts/store/app'
 import { useUiStore, errText } from '@/scripts/store/ui'
 import { SORT_OPTIONS } from '@/scripts/constants'
 import { debounce } from '@/scripts/utils/debounce'
 import AddSeriesDialog from '@/views/components/AddSeriesDialog.vue'
+import SeriesCard from '@/views/components/SeriesCard.vue'
 import Pagination from '@/views/components/Pagination.vue'
 import SelectList from '@/views/components/SelectList.vue'
 import { loadFilterState, saveFilterState } from '@/scripts/utils/filterPersist'
@@ -134,7 +105,6 @@ const STORAGE_KEY = 'series-list'
 
 const app = useAppStore()
 const ui = useUiStore()
-const router = useRouter()
 
 const seriesList = ref([])
 const keyword = ref('')
@@ -239,11 +209,7 @@ const exitMode = () => {
   selectedIds.value = []
 }
 
-const onCardClick = (series) => {
-  if (mode.value === 'select') handleSelect(series)
-  else if (mode.value === 'edit') handleEdit(series)
-  else goToDetail(series.id)
-}
+const cardClickAction = computed(() => (mode.value === 'edit' ? 'pick' : mode.value))
 
 const handleSelect = (series) => {
   const index = selectedIds.value.indexOf(series.id)
@@ -255,10 +221,6 @@ const handleReset = () => {
   keyword.value = ''
   filters.value = { country: '', sortBy: '' }
   applyFilter()
-}
-
-const goToDetail = (id) => {
-  router.push(`/series/${id}`)
 }
 
 const handleAdd = () => {
@@ -355,61 +317,6 @@ const handleCancel = () => {
   border-radius: var(--r2);
 }
 
-.series-card {
-  display: flex;
-  flex-direction: column;
-}
-
-.series-card.picking {
-  cursor: pointer;
-}
-
-.series-card.selected {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent-soft), var(--shadow-2);
-}
-
-.series-card:hover {
-  border-color: var(--border-strong);
-  box-shadow: var(--shadow-2);
-}
-
-.card-main {
-  display: flex;
-  align-items: stretch;
-  gap: var(--s2);
-  flex: 1;
-  min-width: 0;
-  padding-left: var(--s3);
-}
-
-.card-checkbox {
-  flex-shrink: 0;
-  align-self: center;
-  width: 18px;
-  height: 18px;
-  accent-color: var(--accent);
-  cursor: pointer;
-}
-
-.card-body {
-  padding: var(--s3);
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: var(--s2);
-  min-width: 0;
-  cursor: pointer;
-}
-
-.info-row {
-  display: flex;
-  align-items: center;
-  gap: var(--s2);
-  flex-wrap: wrap;
-  min-width: 0;
-}
-
 .name {
   display: block;
   flex: 1 1 6em;
@@ -431,13 +338,4 @@ const handleCancel = () => {
   color: var(--accent);
 }
 
-.alias {
-  flex: 1;
-  min-width: 0;
-  font-size: var(--f-sm);
-  color: var(--text-faint);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 </style>
