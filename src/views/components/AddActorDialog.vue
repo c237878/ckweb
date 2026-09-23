@@ -33,26 +33,10 @@
         </div>
 
         <!-- 地区：既能在已有值里搜，也能手填一个新值 -->
+        <!-- 可选值来自系统设置的规范列表，这里只做选择；要新增取值去 设置 → 数据源 -->
         <label class="field">
           <span class="field__label">地区</span>
-          <ComboBox
-            v-if="!customCountry"
-            v-model="form.country"
-            :options="countryOptions"
-            placeholder="选择或输入地区"
-            all-label="（无地区）"
-          />
-          <input
-            v-else
-            v-model="form.country"
-            class="input"
-            type="text"
-            placeholder="输入新的地区"
-            maxlength="20"
-          />
-          <button type="button" class="switch" @click="customCountry = !customCountry">
-            {{ customCountry ? '从已有地区中选择' : '填写新的地区' }}
-          </button>
+          <SelectList v-model="form.country" :options="countryOptions" all-label="（无地区）" label="选择地区" />
         </label>
 
         <div class="field">
@@ -86,7 +70,8 @@ import { computed, ref, watch } from 'vue'
 import { actorApi } from '@/scripts/api'
 import { useUiStore } from '@/scripts/store/ui'
 import Dialog from './Dialog.vue'
-import ComboBox from './ComboBox.vue'
+import SelectList from './SelectList.vue'
+import { toOptions } from '@/scripts/utils/options'
 
 const props = defineProps({
   visible: Boolean,
@@ -98,7 +83,6 @@ const emit = defineEmits(['save', 'cancel', 'delete'])
 const ui = useUiStore()
 
 const countries = ref([])
-const customCountry = ref(false)
 
 const form = ref({
   id: '',
@@ -111,7 +95,7 @@ const form = ref({
 const isEdit = computed(() => !!props.editingActor)
 
 // 国家是字符串字段，直接拿值本身当选项 id
-const countryOptions = computed(() => countries.value.map((c) => ({ id: c, name: c })))
+const countryOptions = computed(() => toOptions(countries.value, form.value.country))
 
 // 专用去重接口：列表接口已把 pageSize 钳到 500，靠翻列表取地区会静默截断
 const loadCountries = async () => {
@@ -125,7 +109,6 @@ const loadCountries = async () => {
 
 watch(() => props.visible, (val) => {
   if (!val) return
-  customCountry.value = false
   loadCountries()
   const source = props.editingActor
   form.value = source

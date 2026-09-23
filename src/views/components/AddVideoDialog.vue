@@ -37,49 +37,16 @@
         </div>
 
         <div class="row row--two">
-          <!-- 地区 / 分类：优先从已有值里挑，也可以手填一个新值 -->
+          <!-- 地区 / 分类的可选值来自系统设置的规范列表，这里只做选择；
+               要新增取值去 设置 → 数据源 -->
           <label class="field">
             <span class="field__label">地区</span>
-            <ComboBox
-              v-if="!customCountry"
-              v-model="form.country"
-              :options="countryOptions"
-              placeholder="选择或输入地区"
-              all-label=""
-            />
-            <input
-              v-else
-              v-model="form.country"
-              class="input"
-              type="text"
-              placeholder="输入新的地区"
-              maxlength="20"
-            />
-            <button type="button" class="switch" @click="customCountry = !customCountry">
-              {{ customCountry ? '从已有地区中选择' : '填写新的地区' }}
-            </button>
+            <SelectList v-model="form.country" :options="countryOptions" label="选择地区" />
           </label>
 
           <label class="field">
             <span class="field__label">分类</span>
-            <ComboBox
-              v-if="!customCategory"
-              v-model="form.category"
-              :options="categoryOptions"
-              placeholder="选择或输入分类"
-              all-label=""
-            />
-            <input
-              v-else
-              v-model="form.category"
-              class="input"
-              type="text"
-              placeholder="输入新的分类"
-              maxlength="20"
-            />
-            <button type="button" class="switch" @click="customCategory = !customCategory">
-              {{ customCategory ? '从已有分类中选择' : '填写新的分类' }}
-            </button>
+            <SelectList v-model="form.category" :options="categoryOptions" label="选择分类" />
           </label>
         </div>
 
@@ -260,6 +227,8 @@ import { formatSize } from '@/scripts/utils/format'
 import { debounce } from '@/scripts/utils/debounce'
 import Dialog from './Dialog.vue'
 import ComboBox from './ComboBox.vue'
+import SelectList from './SelectList.vue'
+import { toOptions } from '@/scripts/utils/options'
 
 const props = defineProps({
   visible: Boolean,
@@ -283,8 +252,6 @@ const codeLoading = ref(false)
 const meta = ref({ categories: [], countries: [], series: [] })
 const scanDirectories = ref([])
 
-const customCountry = ref(false)
-const customCategory = ref(false)
 const showVideoDirDropdown = ref(false)
 const showCoverDirDropdown = ref(false)
 const customVideoDir = ref('')
@@ -308,13 +275,9 @@ const form = ref({
   fileSize: null
 })
 
-const countryOptions = computed(() =>
-  (meta.value.countries || []).map((c) => ({ id: c, name: c }))
-)
+const countryOptions = computed(() => toOptions(meta.value.countries, form.value.country))
 
-const categoryOptions = computed(() =>
-  (meta.value.categories || []).map((c) => ({ id: c, name: c }))
-)
+const categoryOptions = computed(() => toOptions(meta.value.categories, form.value.category))
 
 // meta 已经是 [{ id, name }]，直接给 ComboBox
 const seriesOptions = computed(() => meta.value.series || [])
@@ -563,8 +526,6 @@ const loadActorList = async () => {
 
 watch(() => props.visible, async (val) => {
   if (!val) return
-  customCountry.value = false
-  customCategory.value = false
   showVideoDirDropdown.value = false
   showCoverDirDropdown.value = false
   resetActors()
@@ -589,8 +550,6 @@ watch(() => props.visible, async (val) => {
     }
     selectedActors.value = detail.data.actors || []
     // 编辑值不在已有选项里时，直接落到手填输入框，免得看起来像没选
-    customCountry.value = !!video.country && !meta.value.countries.includes(video.country)
-    customCategory.value = !!video.category && !meta.value.categories.includes(video.category)
   } catch (e) {
     console.error('加载影片详情失败', e)
   }
