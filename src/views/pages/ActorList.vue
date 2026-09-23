@@ -3,14 +3,27 @@
     <div class="page-header">
       <h1 class="page-title">演员列表</h1>
       <div class="header-actions">
-        <label class="select-all">
-          <input type="checkbox" :checked="isAllSelected" @change="toggleSelectAll" />
-          全选
-        </label>
-        <button v-if="selectedIds.length > 0" class="btn btn--sm btn--danger" @click="batchDelete">
-          批量删除 ({{ selectedIds.length }})
-        </button>
-        <button class="btn btn--primary" @click="handleAdd">添加演员</button>
+        <template v-if="mode === 'browse'">
+          <button class="btn btn--primary" @click="handleAdd">添加演员</button>
+          <button class="btn btn--sm" @click="enterMode('select')">删除</button>
+          <button class="btn btn--sm" @click="enterMode('edit')">编辑</button>
+        </template>
+
+        <template v-else-if="mode === 'select'">
+          <label class="select-all">
+            <input type="checkbox" :checked="isAllSelected" @change="toggleSelectAll" />
+            全选
+          </label>
+          <button class="btn btn--sm btn--danger" :disabled="!selectedIds.length" @click="batchDelete">
+            删除选中 ({{ selectedIds.length }})
+          </button>
+          <button class="btn btn--sm btn--ghost" @click="exitMode">取消</button>
+        </template>
+
+        <template v-else>
+          <span class="mode-hint">点一张卡片进入编辑</span>
+          <button class="btn btn--sm btn--ghost" @click="exitMode">退出编辑</button>
+        </template>
       </div>
     </div>
 
@@ -50,10 +63,12 @@
         v-for="actor in actors"
         :key="actor.id"
         class="card actor-card"
-        :class="{ selected: selectedIds.includes(actor.id) }"
+        :class="{ selected: selectedIds.includes(actor.id), picking: mode !== 'browse' }"
+        @click="onCardClick(actor)"
       >
         <div class="card-main">
           <input
+            v-if="mode === 'select'"
             type="checkbox"
             class="card-checkbox"
             :checked="selectedIds.includes(actor.id)"
@@ -61,11 +76,11 @@
             @change="handleSelect(actor)"
             @click.stop
           />
-          <div class="card-body" @click="handleSelect(actor)">
+          <div class="card-body">
             <div class="info-row">
-              <router-link class="name" :to="`/actor/${actor.id}`" @click.stop>
+              <span class="name card-title">
                 <span class="name-text" :title="actor.name">{{ actor.name }}</span>
-              </router-link>
+              </span>
               <div class="right-tags">
                 <span v-if="actor.likeCount > 0" class="tag tag--like">♥ {{ actor.likeCount }}</span>
                 <span v-if="actor.videoCount > 0" class="tag">{{ actor.videoCount }} 部</span>
@@ -79,10 +94,6 @@
             </div>
           </div>
         </div>
-        <CardActions>
-          <button class="btn btn--sm btn--primary" @click.stop="handleEdit(actor)">编辑</button>
-          <button class="btn btn--sm" @click.stop="goToDetail(actor.id)">详情</button>
-        </CardActions>
       </article>
     </div>
 
@@ -111,7 +122,6 @@ import { useAppStore } from '@/scripts/store/app'
 import { useUiStore, errText } from '@/scripts/store/ui'
 import { SORT_OPTIONS } from '@/scripts/constants'
 import { debounce } from '@/scripts/utils/debounce'
-import CardActions from '@/views/components/CardActions.vue'
 import AddActorDialog from '@/views/components/AddActorDialog.vue'
 import Pagination from '@/views/components/Pagination.vue'
 import SelectList from '@/views/components/SelectList.vue'
@@ -214,6 +224,25 @@ const toggleSelectAll = () => {
   selectedIds.value = isAllSelected.value ? [] : actors.value.map((a) => a.id)
 }
 
+/** browse = 点卡片进详情；select = 勾选批量删；edit = 点一张开编辑框 */
+const mode = ref('browse')
+
+const enterMode = (next) => {
+  mode.value = next
+  selectedIds.value = []
+}
+
+const exitMode = () => {
+  mode.value = 'browse'
+  selectedIds.value = []
+}
+
+const onCardClick = (actor) => {
+  if (mode.value === 'select') handleSelect(actor)
+  else if (mode.value === 'edit') handleEdit(actor)
+  else goToDetail(actor.id)
+}
+
 const handleSelect = (actor) => {
   const index = selectedIds.value.indexOf(actor.id)
   if (index > -1) selectedIds.value.splice(index, 1)
@@ -262,7 +291,7 @@ const batchDelete = async () => {
       errors.push(errText(err))
     }
   }
-  selectedIds.value = []
+  exitMode()
   await loadActors()
   if (errors.length) {
     // 只报第一条原因：一屏同样的网络错误没有信息量
@@ -318,30 +347,6 @@ const handleDelete = async (id) => {
   gap: var(--s4);
 }
 
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--s2);
-  flex-wrap: wrap;
-}
-
-.select-all {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--s2);
-  font-size: var(--f-sm);
-  color: var(--text-dim);
-  cursor: pointer;
-}
-
-.select-all input {
-  accent-color: var(--accent);
-  width: 16px;
-  height: 16px;
-  cursor: pointer;
-}
-
-/* 行卡片骨架：正文一行 + 操作条一行 */
 .row-skeleton {
   height: calc(var(--s5) + var(--s4));
   border-radius: var(--r2);
@@ -350,6 +355,11 @@ const handleDelete = async (id) => {
 .actor-card {
   display: flex;
   flex-direction: column;
+}
+
+/* 选择/编辑模式下整张卡片都是热区 */
+.actor-card.picking {
+  cursor: pointer;
 }
 
 .actor-card.selected {

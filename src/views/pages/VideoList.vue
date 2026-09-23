@@ -3,17 +3,30 @@
     <div class="page-header">
       <h1 class="page-title">影片列表</h1>
       <div class="header-actions">
-        <label class="select-all">
-          <input type="checkbox" :checked="isAllSelected" @change="toggleSelectAll" />
-          全选
-        </label>
-        <button v-if="selectedIds.length > 0" class="btn btn--sm btn--danger" @click="batchDelete">
-          批量删除 ({{ selectedIds.length }})
-        </button>
-        <button class="btn btn--sm" :disabled="renaming" @click="checkAndRename">
-          {{ renaming ? '检查中...' : '校验文件名' }}
-        </button>
-        <button class="btn btn--primary" @click="openAdd">添加影片</button>
+        <template v-if="mode === 'browse'">
+          <button class="btn btn--sm" :disabled="renaming" @click="checkAndRename">
+            {{ renaming ? '检查中...' : '校验文件名' }}
+          </button>
+          <button class="btn btn--primary" @click="openAdd">添加影片</button>
+          <button class="btn btn--sm" @click="enterMode('select')">删除</button>
+          <button class="btn btn--sm" @click="enterMode('edit')">编辑</button>
+        </template>
+
+        <template v-else-if="mode === 'select'">
+          <label class="select-all">
+            <input type="checkbox" :checked="isAllSelected" @change="toggleSelectAll" />
+            全选
+          </label>
+          <button class="btn btn--sm btn--danger" :disabled="!selectedIds.length" @click="batchDelete">
+            删除选中 ({{ selectedIds.length }})
+          </button>
+          <button class="btn btn--sm btn--ghost" @click="exitMode">取消</button>
+        </template>
+
+        <template v-else>
+          <span class="mode-hint">点一张卡片进入编辑</span>
+          <button class="btn btn--sm btn--ghost" @click="exitMode">退出编辑</button>
+        </template>
       </div>
     </div>
 
@@ -81,11 +94,11 @@
         v-for="video in videos"
         :key="video.id"
         :video="video"
-        :show-actions="true"
-        :selectable="true"
+        :click-action="cardClickAction"
+        :selectable="mode === 'select'"
         :selected="selectedIds.includes(video.id)"
-        @edit="handleEditVideo"
         @select="handleSelectVideo"
+        @pick="handlePick"
       />
     </div>
 
@@ -276,6 +289,26 @@ const toggleSelectAll = () => {
   selectedIds.value = isAllSelected.value ? [] : videos.value.map((v) => v.id)
 }
 
+/** browse = 点卡片进详情；select = 勾选批量删；edit = 点一张开一个编辑框 */
+const mode = ref('browse')
+
+const cardClickAction = computed(() => (mode.value === 'edit' ? 'pick' : mode.value))
+
+const enterMode = (next) => {
+  mode.value = next
+  selectedIds.value = []
+}
+
+const exitMode = () => {
+  mode.value = 'browse'
+  selectedIds.value = []
+}
+
+const handlePick = (video) => {
+  editingVideo.value = video
+  showAddDialog.value = true
+}
+
 const handleSelectVideo = (videoId) => {
   const index = selectedIds.value.indexOf(videoId)
   if (index > -1) selectedIds.value.splice(index, 1)
@@ -289,11 +322,6 @@ const handleReset = () => {
 
 const openAdd = () => {
   editingVideo.value = null
-  showAddDialog.value = true
-}
-
-const handleEditVideo = (video) => {
-  editingVideo.value = video
   showAddDialog.value = true
 }
 
@@ -342,7 +370,7 @@ const batchDelete = async () => {
   if (choice === 'cancel') return
   try {
     await videoApi.batchDelete(selectedIds.value, { deleteFiles: choice === 'deleteAll' })
-    selectedIds.value = []
+    exitMode()
     await loadVideos()
     ui.success('已删除')
   } catch (err) {
@@ -398,29 +426,6 @@ const handleDeleteVideo = async (videoId) => {
   display: flex;
   flex-direction: column;
   gap: var(--s4);
-}
-
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--s2);
-  flex-wrap: wrap;
-}
-
-.select-all {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: var(--f-sm);
-  color: var(--text-dim);
-  cursor: pointer;
-}
-
-.select-all input {
-  accent-color: var(--accent);
-  width: 16px;
-  height: 16px;
-  cursor: pointer;
 }
 
 /* 封面 3:2 再加约三行文字的高度 */

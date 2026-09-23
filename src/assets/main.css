@@ -280,6 +280,36 @@ h1, h2, h3, h4 {
   flex-wrap: wrap;
 }
 
+/* 列表页头部操作区：添加 / 删除 / 编辑，以及进入某种模式后的替换控件 */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  flex-wrap: wrap;
+}
+
+.select-all {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  font-size: var(--f-sm);
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.select-all input {
+  accent-color: var(--accent);
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+/* 编辑/删除模式下的提示语 */
+.mode-hint {
+  font-size: var(--f-sm);
+  color: var(--text-faint);
+}
+
 .page-title {
   font-size: var(--f-2xl);
   display: flex;
@@ -398,6 +428,13 @@ section {
 
 .grid--rows {
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+}
+
+/* 宽屏少开几列，把卡片撑到 330px 以上，卡片内部的 @container 分级才有意义 */
+@media (min-width: 1200px) {
+  .grid {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  }
 }
 
 /* ============================ 控件 ============================ */

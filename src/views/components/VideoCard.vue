@@ -31,17 +31,20 @@
     </div>
 
     <div class="video-body">
-      <div class="info-row">
+      <div class="info-row info-row--name">
         <router-link class="name card-title" :to="`/video/${shown.id}`" @click.stop>
           <span v-if="shown.code" class="name-code">{{ shown.code }}</span>
           <span class="name-text" :title="`${shown.code ? shown.code + ' ' : ''}${shown.name}`">{{ shown.name }}</span>
         </router-link>
       </div>
 
-      <div class="info-row" v-if="mode !== 'brief'">
-        <span v-if="shown.country" class="tag tag--accent">{{ shown.country }}</span>
-        <span v-if="shown.category && mode === 'full'" class="tag tag--success">{{ shown.category }}</span>
-        <span v-if="shown.likeCount > 0" class="tag tag--like">♥ {{ shown.likeCount }}</span>
+      <!-- 四组信息按卡片实际宽度逐级出现，见文件末尾的 @container 分级 -->
+      <div class="info-row info-row--spec">
+        <span
+          v-if="shown.mediaAttrFlags > 0"
+          class="tag"
+          :class="mediaFlagClass(shown.mediaAttrFlags)"
+        >{{ mediaFlagText(shown.mediaAttrFlags) }}</span>
         <button
           v-if="mode === 'full'"
           type="button"
@@ -51,15 +54,16 @@
         >
 {{ copied ? '已复制' : (shown.fileSize ? formatSize(shown.fileSize) : '无文件') }}
 </button>
-        <span v-else class="tag file-size">{{ shown.fileSize ? formatSize(shown.fileSize) : '无文件' }}</span>
-        <span
-          v-if="shown.mediaAttrFlags > 0"
-          class="tag"
-          :class="mediaFlagClass(shown.mediaAttrFlags)"
-        >{{ mediaFlagText(shown.mediaAttrFlags) }}</span>
+        <span v-else class="tag tag--muted">{{ shown.fileSize ? formatSize(shown.fileSize) : '无文件' }}</span>
       </div>
 
-      <div class="info-row" v-if="shown.seriesName && mode !== 'brief'">
+      <div class="info-row info-row--tags" v-if="hasTags">
+        <span v-if="shown.country" class="tag tag--accent">{{ shown.country }}</span>
+        <span v-if="shown.category && mode === 'full'" class="tag tag--success">{{ shown.category }}</span>
+        <span v-if="shown.likeCount > 0" class="tag tag--like">♥ {{ shown.likeCount }}</span>
+      </div>
+
+      <div class="info-row info-row--series" v-if="shown.seriesName && mode !== 'brief'">
         <button
           type="button"
           class="tag tag--info clickable"
@@ -69,7 +73,7 @@
 </button>
       </div>
 
-      <div class="info-row actors" v-if="actorList.length">
+      <div class="info-row info-row--actors" v-if="actorList.length && mode !== 'brief'">
         <button
           v-for="actor in actorList"
           :key="actor.id || actor.name"
@@ -81,21 +85,12 @@
 </button>
       </div>
     </div>
-
-    <CardActions v-if="mode === 'full' && showActions" @click.stop>
-      <button class="btn btn--sm" @click.stop="handleReset" :disabled="resetting">
-        {{ resetting ? '重置中...' : '重置' }}
-      </button>
-      <button class="btn btn--sm btn--primary" @click.stop="handleEdit">编辑</button>
-      <button class="btn btn--sm" @click.stop="goToDetail">详情</button>
-    </CardActions>
   </article>
 </template>
 
 <script setup>
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import CardActions from './CardActions.vue'
 import { formatSize } from '@/scripts/utils/format'
 import { mediaFlagText, mediaFlagClass } from '@/scripts/constants'
 import { videoApi } from '@/scripts/api'
@@ -103,16 +98,17 @@ import { useUiStore, errText } from '@/scripts/store/ui'
 
 const props = defineProps({
   video: { type: Object, required: true },
-  /** full = 列表页（带操作与全部标签）；display = 首页板块；brief = 紧凑行 */
+  /** full = 列表页（全部标签）；display = 首页板块；brief = 紧凑行 */
   mode: { type: String, default: 'full' },
-  showActions: { type: Boolean, default: true },
+  /** 点整张卡片做什么：browse 进详情 / select 勾选 / pick 选一个去编辑 */
+  clickAction: { type: String, default: 'browse' },
   selectable: { type: Boolean, default: false },
   selected: { type: Boolean, default: false }
 })
 
 const router = useRouter()
 const ui = useUiStore()
-const emit = defineEmits(['edit', 'select'])
+const emit = defineEmits(['select', 'pick'])
 
 const resetting = ref(false)
 const coverFailed = ref(false)
@@ -122,6 +118,11 @@ const isPortrait = ref(false)
 // 重置接口返回的字段覆盖在本地，不回写 props
 const patch = ref({})
 const shown = computed(() => ({ ...props.video, ...patch.value }))
+
+const hasTags = computed(() =>
+  props.mode !== 'brief' &&
+  (!!shown.value.country || (props.mode === 'full' && !!shown.value.category) || shown.value.likeCount > 0)
+)
 
 // 封面比例并不统一（800x538 为主，也有 16:9 和手机竖屏 1080x1920）。
 // 竖屏图塞进 3:2 盒子会被裁到只剩中间一条，所以改成留边完整显示。
@@ -167,7 +168,8 @@ const copyCode = async () => {
 }
 
 const handleClick = () => {
-  if (props.selectable) handleSelect()
+  if (props.clickAction === 'select') handleSelect()
+  else if (props.clickAction === 'pick') emit('pick', props.video)
   else goToDetail()
 }
 
@@ -175,7 +177,6 @@ const handleSelect = () => emit('select', props.video.id)
 const goToDetail = () => router.push(`/video/${props.video.id}`)
 const goToSeries = (seriesId) => { if (seriesId) router.push(`/series/${seriesId}`) }
 const goToActor = (actorId) => { if (actorId) router.push(`/actor/${actorId}`) }
-const handleEdit = () => emit('edit', props.video)
 
 const handleReset = async () => {
   if (!props.video?.id || resetting.value) return
@@ -205,6 +206,8 @@ const handleReset = async () => {
   flex-direction: column;
   position: relative;
   cursor: pointer;
+  /* 让卡片自己成为查询容器：信息分级看卡片实际宽度，而不是视口宽度 */
+  container-type: inline-size;
 }
 
 .video-card.selected {
@@ -278,12 +281,45 @@ const handleReset = async () => {
   overflow: hidden;
 }
 
-.info-row.actors {
+.info-row--actors {
   flex-wrap: wrap;
 }
 
-.mode-brief .info-row.actors {
+.mode-brief .info-row--actors {
   flex-wrap: nowrap;
+}
+
+/* 信息分级：窄卡片只留封面 + 番号名称，卡片变宽才逐级补齐次要信息。
+   阈值针对的是卡片自身宽度（grid 列数决定），不是视口宽度。 */
+.info-row--spec,
+.info-row--tags,
+.info-row--series,
+.info-row--actors {
+  display: none;
+}
+
+@container (min-width: 200px) {
+  .info-row--spec {
+    display: flex;
+  }
+}
+
+@container (min-width: 240px) {
+  .info-row--tags {
+    display: flex;
+  }
+}
+
+@container (min-width: 280px) {
+  .info-row--series {
+    display: flex;
+  }
+}
+
+@container (min-width: 320px) {
+  .info-row--actors {
+    display: flex;
+  }
 }
 
 .name {

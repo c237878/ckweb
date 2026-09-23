@@ -3,14 +3,27 @@
     <div class="page-header">
       <h1 class="page-title">影视系列</h1>
       <div class="header-actions">
-        <label class="select-all">
-          <input type="checkbox" :checked="isAllSelected" @change="toggleSelectAll" />
-          全选
-        </label>
-        <button v-if="selectedIds.length > 0" class="btn btn--sm btn--danger" @click="batchDelete">
-          批量删除 ({{ selectedIds.length }})
-        </button>
-        <button class="btn btn--primary" @click="handleAdd">添加系列</button>
+        <template v-if="mode === 'browse'">
+          <button class="btn btn--primary" @click="handleAdd">添加系列</button>
+          <button class="btn btn--sm" @click="enterMode('select')">删除</button>
+          <button class="btn btn--sm" @click="enterMode('edit')">编辑</button>
+        </template>
+
+        <template v-else-if="mode === 'select'">
+          <label class="select-all">
+            <input type="checkbox" :checked="isAllSelected" @change="toggleSelectAll" />
+            全选
+          </label>
+          <button class="btn btn--sm btn--danger" :disabled="!selectedIds.length" @click="batchDelete">
+            删除选中 ({{ selectedIds.length }})
+          </button>
+          <button class="btn btn--sm btn--ghost" @click="exitMode">取消</button>
+        </template>
+
+        <template v-else>
+          <span class="mode-hint">点一张卡片进入编辑</span>
+          <button class="btn btn--sm btn--ghost" @click="exitMode">退出编辑</button>
+        </template>
       </div>
     </div>
 
@@ -50,10 +63,12 @@
         v-for="series in seriesList"
         :key="series.id"
         class="card series-card"
-        :class="{ selected: selectedIds.includes(series.id) }"
+        :class="{ selected: selectedIds.includes(series.id), picking: mode !== 'browse' }"
+        @click="onCardClick(series)"
       >
         <div class="card-main">
           <input
+            v-if="mode === 'select'"
             type="checkbox"
             class="card-checkbox"
             :checked="selectedIds.includes(series.id)"
@@ -61,11 +76,11 @@
             @change="handleSelect(series)"
             @click.stop
           />
-          <div class="card-body" @click="handleSelect(series)">
+          <div class="card-body">
             <div class="info-row">
-              <router-link class="name" :to="`/series/${series.id}`" @click.stop>
+              <span class="name card-title">
                 <span class="name-text" :title="series.name">{{ series.name }}</span>
-              </router-link>
+              </span>
             </div>
             <div class="info-row" v-if="series.alias">
               <span class="alias" :title="series.alias">{{ series.alias }}</span>
@@ -82,11 +97,6 @@
             </div>
           </div>
         </div>
-        <CardActions>
-          <button v-if="series.link" class="btn btn--sm" @click.stop="openLink(series.link)">链接</button>
-          <button class="btn btn--sm btn--primary" @click.stop="handleEdit(series)">编辑</button>
-          <button class="btn btn--sm" @click.stop="goToDetail(series.id)">详情</button>
-        </CardActions>
       </article>
     </div>
 
@@ -115,7 +125,6 @@ import { useAppStore } from '@/scripts/store/app'
 import { useUiStore, errText } from '@/scripts/store/ui'
 import { SORT_OPTIONS } from '@/scripts/constants'
 import { debounce } from '@/scripts/utils/debounce'
-import CardActions from '@/views/components/CardActions.vue'
 import AddSeriesDialog from '@/views/components/AddSeriesDialog.vue'
 import Pagination from '@/views/components/Pagination.vue'
 import SelectList from '@/views/components/SelectList.vue'
@@ -218,6 +227,24 @@ const toggleSelectAll = () => {
   selectedIds.value = isAllSelected.value ? [] : seriesList.value.map((s) => s.id)
 }
 
+const mode = ref('browse')
+
+const enterMode = (next) => {
+  mode.value = next
+  selectedIds.value = []
+}
+
+const exitMode = () => {
+  mode.value = 'browse'
+  selectedIds.value = []
+}
+
+const onCardClick = (series) => {
+  if (mode.value === 'select') handleSelect(series)
+  else if (mode.value === 'edit') handleEdit(series)
+  else goToDetail(series.id)
+}
+
 const handleSelect = (series) => {
   const index = selectedIds.value.indexOf(series.id)
   if (index > -1) selectedIds.value.splice(index, 1)
@@ -232,10 +259,6 @@ const handleReset = () => {
 
 const goToDetail = (id) => {
   router.push(`/series/${id}`)
-}
-
-const openLink = (link) => {
-  if (link) window.open(link, '_blank')
 }
 
 const handleAdd = () => {
@@ -270,7 +293,7 @@ const batchDelete = async () => {
       errors.push(errText(err))
     }
   }
-  selectedIds.value = []
+  exitMode()
   await loadSeries()
   if (errors.length) {
     // 只报第一条原因：一屏同样的网络错误没有信息量
@@ -326,29 +349,6 @@ const handleCancel = () => {
   gap: var(--s4);
 }
 
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--s2);
-  flex-wrap: wrap;
-}
-
-.select-all {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--s2);
-  font-size: var(--f-sm);
-  color: var(--text-dim);
-  cursor: pointer;
-}
-
-.select-all input {
-  accent-color: var(--accent);
-  width: 16px;
-  height: 16px;
-  cursor: pointer;
-}
-
 /* 行卡片骨架：正文两行 + 操作条一行 */
 .row-skeleton {
   height: calc(var(--s5) + var(--s4));
@@ -358,6 +358,10 @@ const handleCancel = () => {
 .series-card {
   display: flex;
   flex-direction: column;
+}
+
+.series-card.picking {
+  cursor: pointer;
 }
 
 .series-card.selected {
