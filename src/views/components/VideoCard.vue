@@ -1,7 +1,7 @@
 <template>
   <article
-    class="video-card card"
-    :class="[`mode-${mode}`, { selected, selectable }]"
+    class="video-card card card--clickable"
+    :class="{ selected, selectable }"
     @click="handleClick"
   >
     <div v-if="selectable" class="select-checkbox" @click.stop>
@@ -38,7 +38,7 @@
 
       <!-- 所有胶囊同一行，放不下就换行。外观一致，只有可点的那几个有 hover
            ——由全局 a.tag:hover / button.tag:hover 负责，span 天然拿不到。
-           窄/宽屏各显示哪些见文末 .pill--wide -->
+           卡片窄时只显示其中一部分，见文末 .pill--wide -->
       <div class="pills">
         <span
           v-if="video.mediaAttrFlags > 0"
@@ -47,7 +47,6 @@
         >{{ mediaFlagText(video.mediaAttrFlags) }}</span>
 
         <button
-          v-if="mode !== 'brief'"
           type="button"
           class="tag pill pill--size"
           :title="copied ? '已复制番号' : '点击复制番号；无文件时顺带重扫路径'"
@@ -55,14 +54,12 @@
         >
 {{ copied ? '已复制' : (video.fileSize ? formatSize(video.fileSize) : '无文件') }}
 </button>
-        <span v-else class="tag pill pill--size">{{ video.fileSize ? formatSize(video.fileSize) : '无文件' }}</span>
-
         <span v-if="video.likeCount > 0" class="tag tag--like pill pill--likes">♥ {{ video.likeCount }}</span>
         <span v-if="video.country" class="tag tag--accent pill pill--wide pill--country">{{ video.country }}</span>
-        <span v-if="video.category && mode !== 'brief'" class="tag tag--success pill pill--wide pill--category">{{ video.category }}</span>
+        <span v-if="video.category" class="tag tag--success pill pill--wide pill--category">{{ video.category }}</span>
 
         <router-link
-          v-if="video.seriesName && mode !== 'brief'"
+          v-if="video.seriesName"
           class="tag tag--info pill pill--wide pill--series"
           :to="`/series/${video.seriesId}`"
           @click.stop
@@ -94,8 +91,6 @@ import { useUiStore, errText } from '@/scripts/store/ui'
 
 const props = defineProps({
   video: { type: Object, required: true },
-  /** 只剩两态：默认（列表页与首页同一套外观）与 brief（详情页推荐条的紧凑行） */
-  mode: { type: String, default: 'full' },
   /** 点整张卡片做什么：browse 进详情 / select 勾选 / pick 选一个去编辑 */
   clickAction: { type: String, default: 'browse' },
   selectable: { type: Boolean, default: false },
@@ -193,18 +188,8 @@ const handleClick = () => {
   display: flex;
   flex-direction: column;
   position: relative;
-  cursor: pointer;
-}
-
-.video-card.selected {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent-soft), var(--shadow-2);
-}
-
-/* hover 只换光影，不做位移 */
-.video-card:hover {
-  border-color: var(--border-strong);
-  box-shadow: var(--shadow-2);
+  /* 卡片自己就是查询容器：显示哪些胶囊取决于这张卡片实际拿到多宽 */
+  container-type: inline-size;
 }
 
 .video-cover {
@@ -288,15 +273,20 @@ const handleClick = () => {
   max-width: 100%;
 }
 
-/* 窄屏 2 列档只留核心三样（片源/大小/点赞），宽屏 4 列档补齐。
-   用视口而不是容器宽度，是为了跟列数档位严格一一对应 */
+/* 只有两种形态：默认迷你（片源/大小/点赞），视口 ≥900px 且这张卡片本身有 200px
+   才补齐地区/分类/系列/演员。
+   视口条件对应列数档位（<900px 两列、≥900px 四列）；容器条件管的是
+   详情页右侧那种"屏幕很大但卡片很窄"的槽位——300px 面板排两列只有 146px，
+   按视口判会给它完全形态，挤成一团 */
 .pill--wide {
   display: none;
 }
 
 @media (min-width: 900px) {
-  .pill--wide {
-    display: inline-flex;
+  @container (min-width: 200px) {
+    .pill--wide {
+      display: inline-flex;
+    }
   }
 }
 </style>

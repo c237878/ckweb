@@ -91,8 +91,6 @@
                                 v-for="item in recommendList"
                                 :key="item.id"
                                 :video="item"
-                                mode="brief"
-                                @click="goToVideo(item.id)"
                             />
                         </div>
                     </div>
@@ -628,11 +626,6 @@ const goToSeries = (id) => {
 
 const goToActor = (id) => {
     router.push(`/actor/${id}`)
-}
-
-const goToVideo = (id) => {
-    router.push(`/video/${id}`)
-    window.scrollTo(0, 0)
 }
 
 const handleLike = async () => {

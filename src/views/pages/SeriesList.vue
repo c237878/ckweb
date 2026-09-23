@@ -317,25 +317,4 @@ const handleCancel = () => {
   border-radius: var(--r2);
 }
 
-.name {
-  display: block;
-  flex: 1 1 6em;
-  min-width: 6em;
-  font-size: var(--f-lg);
-  font-weight: 600;
-  color: var(--text);
-}
-
-.name-text {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  transition: color var(--dur) var(--ease);
-}
-
-.name:hover .name-text {
-  color: var(--accent);
-}
-
 </style>

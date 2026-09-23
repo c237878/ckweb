@@ -57,7 +57,7 @@
         <div v-else-if="videosError" class="notice notice--error">{{ videosError }}</div>
 
         <div v-else-if="videos.length" class="grid">
-          <VideoCard v-for="video in videos" :key="video.id" :video="video" mode="display" />
+          <VideoCard v-for="video in videos" :key="video.id" :video="video" />
         </div>
 
         <div v-else class="empty">

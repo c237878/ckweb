@@ -259,6 +259,7 @@ h1, h2, h3, h4 {
      卡片标题    .card-title        14/600 + 单行省略
      元信息      .meta              12px --text-faint
      标签/芯片   .tag + .tag--*     高 --ctl-h-xs，禁止页面内自建 chip 类
+     可点卡片    .card + .card--clickable   手型光标与 hover 光影、.selected 描边都在这里
      控件        .btn/.input/.tag          高 --ctl-h*，只给水平内缩
      下拉选择    SelectList / ComboBox     原生 select 的外观不可控，已全站停用
    ============================ ================================= */
@@ -639,21 +640,6 @@ button.tag:active:not(:disabled) {
   flex-direction: column;
 }
 
-.card--row.picking {
-  cursor: pointer;
-}
-
-.card--row.selected {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent-soft), var(--shadow-2);
-}
-
-/* hover 只给光影，不做位移 */
-.card--row:hover {
-  border-color: var(--border-strong);
-  box-shadow: var(--shadow-2);
-}
-
 .card--row .card-main {
   display: flex;
   align-items: stretch;
@@ -739,10 +725,21 @@ button.tag:active:not(:disabled) {
     border-color var(--dur) var(--ease);
 }
 
-/* hover 只给光影，卡片位置不动 */
-.card--link:hover {
+/* 四种卡片（影片/漫画/演员/系列）整张可点：手型光标与 hover 光影统一由这个类提供，
+   组件里不要再各写一份。hover 只换光影，不做位移 */
+.card--clickable {
+  cursor: pointer;
+}
+
+.card--clickable:hover {
   border-color: var(--border-strong);
   box-shadow: var(--shadow-2);
+}
+
+/* 选中态排在 hover 之后：悬停时不要抢掉强调环 */
+.card.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft), var(--shadow-2);
 }
 
 .panel {

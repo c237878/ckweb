@@ -316,31 +316,4 @@ const handleDelete = async (id) => {
   height: calc(var(--s5) + var(--s4));
   border-radius: var(--r2);
 }
-
-.name {
-  display: block;
-  flex: 1 1 6em;
-  min-width: 6em;
-  font-size: var(--f-lg);
-  font-weight: 600;
-  color: var(--text);
-}
-
-.name-text {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  transition: color var(--dur) var(--ease);
-}
-
-.name:hover .name-text {
-  color: var(--accent);
-}
-
-/* 布局走全局 .pills，这里只负责把胶囊推到名称右侧 */
-.right-tags {
-  justify-content: flex-end;
-  margin-left: auto;
-}
 </style>

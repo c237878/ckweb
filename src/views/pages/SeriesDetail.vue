@@ -79,7 +79,7 @@
             @dragend="onDragEnd"
           >
             <div v-if="sorting" class="sort-badge">{{ index + 1 }}</div>
-            <VideoCard :video="video" mode="display" />
+            <VideoCard :video="video" />
           </div>
         </div>
 

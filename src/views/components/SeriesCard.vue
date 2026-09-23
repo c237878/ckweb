@@ -1,7 +1,7 @@
 <template>
   <article
-    class="card card--row series-card"
-    :class="{ selected, picking: clickAction !== 'browse' }"
+    class="card card--row card--clickable series-card"
+    :class="{ selected }"
     @click="handleClick"
   >
     <div class="card-main">

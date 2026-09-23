@@ -1,7 +1,7 @@
 <template>
   <article
-    class="comic-card card card--link"
-    :class="{ selected, picking: clickAction !== 'browse' }"
+    class="comic-card card card--clickable"
+    :class="{ selected }"
     @click="handleClick"
   >
     <div v-if="selectable" class="select-checkbox" @click.stop>
@@ -89,16 +89,6 @@ const handleClick = () => {
   display: flex;
   flex-direction: column;
   position: relative;
-  cursor: pointer;
-}
-
-.comic-card.picking {
-  cursor: pointer;
-}
-
-.comic-card.selected {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent-soft), var(--shadow-2);
 }
 
 .select-checkbox {

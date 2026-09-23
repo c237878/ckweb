@@ -9,7 +9,7 @@
         </button>
       </div>
       <div v-if="sec.videos.length" class="grid">
-        <VideoCard v-for="video in sec.videos" :key="video.id" :video="video" mode="display" />
+        <VideoCard v-for="video in sec.videos" :key="video.id" :video="video" />
       </div>
       <div v-else class="empty">暂无内容</div>
     </section>
@@ -21,7 +21,7 @@
         <router-link class="btn btn--sm btn--ghost" :to="`/videos?category=${encodeURIComponent(cat.name)}`">查看全部</router-link>
       </div>
       <div v-if="cat.videos.length" class="grid">
-        <VideoCard v-for="video in cat.videos" :key="video.id" :video="video" mode="display" />
+        <VideoCard v-for="video in cat.videos" :key="video.id" :video="video" />
       </div>
       <div v-else class="empty">暂无 {{ cat.name }} 影片</div>
     </section>
