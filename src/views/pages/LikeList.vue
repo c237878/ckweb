@@ -26,12 +26,13 @@
         placeholder="搜索名称或番号..."
         @keyup.enter="handleSearch"
       />
-      <label class="sr-only" for="like-type">内容类型</label>
-      <select id="like-type" v-model="targetType" class="select" @change="handleSearch">
-        <option value="">全部类型</option>
-        <option value="video">影片</option>
-        <option value="comic">漫画</option>
-      </select>
+      <SelectList
+        v-model="targetType"
+        :options="LIKE_TARGET_OPTIONS"
+        all-label="全部类型"
+        label="内容类型"
+        @change="handleSearch"
+      />
       <label for="like-start">点赞时间</label>
       <input id="like-start" v-model="startDate" class="input" type="date" @change="handleSearch" />
       <span class="date-sep">~</span>
@@ -122,8 +123,10 @@ import { likeApi, videoApi, comicApi } from '@/scripts/api'
 import { useAppStore } from '@/scripts/store/app'
 import { useUiStore } from '@/scripts/store/ui'
 import { formatDate } from '@/scripts/utils/format'
+import { LIKE_TARGET_OPTIONS } from '@/scripts/constants'
 import { loadFilterState, saveFilterState } from '@/scripts/utils/filterPersist'
 import Pagination from '@/views/components/Pagination.vue'
+import SelectList from '@/views/components/SelectList.vue'
 
 const router = useRouter()
 const app = useAppStore()

@@ -18,23 +18,34 @@
     </div>
 
     <div class="filters">
-      <select v-model="filters.country" class="select" @change="applyFilter">
-        <option value="">全部地区</option>
-        <option v-for="c in countries" :key="c" :value="c">{{ c }}</option>
-      </select>
-      <select v-model="filters.category" class="select" @change="applyFilter">
-        <option value="">全部分类</option>
-        <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
-      </select>
-      <select v-model="filters.downloaded" class="select" @change="applyFilter">
-        <option value="">全部状态</option>
-        <option value="yes">已下载</option>
-        <option value="no">未下载</option>
-      </select>
-      <select v-model="filters.mediaAttrFlags" class="select" @change="applyFilter">
-        <option value="">全部片源</option>
-        <option v-for="opt in mediaFlagOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-      </select>
+      <SelectList
+        v-model="filters.country"
+        :options="countries"
+        all-label="全部地区"
+        label="按地区筛选"
+        @change="applyFilter"
+      />
+      <SelectList
+        v-model="filters.category"
+        :options="categories"
+        all-label="全部分类"
+        label="按分类筛选"
+        @change="applyFilter"
+      />
+      <SelectList
+        v-model="filters.downloaded"
+        :options="DOWNLOAD_OPTIONS"
+        all-label="全部状态"
+        label="按下载状态筛选"
+        @change="applyFilter"
+      />
+      <SelectList
+        v-model="filters.mediaAttrFlags"
+        :options="mediaFlagOptions"
+        all-label="全部片源"
+        label="按片源筛选"
+        @change="applyFilter"
+      />
       <ComboBox
         v-model="filters.seriesId"
         :options="seriesList"
@@ -50,9 +61,12 @@
         @keyup.enter="applyFilter"
         @input="debouncedSearch"
       />
-      <select v-model="filters.sortBy" class="select" @change="applyFilter">
-        <option v-for="opt in SORT_OPTIONS.video" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-      </select>
+      <SelectList
+        v-model="filters.sortBy"
+        :options="SORT_OPTIONS.video"
+        label="排序方式"
+        @change="applyFilter"
+      />
       <button class="btn btn--sm btn--ghost" @click="handleReset">重置</button>
     </div>
 
@@ -133,9 +147,15 @@ import VideoCard from '@/views/components/VideoCard.vue'
 import AddVideoDialog from '@/views/components/AddVideoDialog.vue'
 import Pagination from '@/views/components/Pagination.vue'
 import ComboBox from '@/views/components/ComboBox.vue'
+import SelectList from '@/views/components/SelectList.vue'
 import { loadFilterState, saveFilterState } from '@/scripts/utils/filterPersist'
 
 const STORAGE_KEY = 'video-list'
+
+const DOWNLOAD_OPTIONS = [
+  { value: 'yes', label: '已下载' },
+  { value: 'no', label: '未下载' }
+]
 
 const app = useAppStore()
 const ui = useUiStore()

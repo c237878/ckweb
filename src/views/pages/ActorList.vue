@@ -15,10 +15,13 @@
     </div>
 
     <div class="filters">
-      <select v-model="filters.country" class="select" @change="applyFilter">
-        <option value="">全部地区</option>
-        <option v-for="c in countries" :key="c" :value="c">{{ c }}</option>
-      </select>
+      <SelectList
+        v-model="filters.country"
+        :options="countries"
+        all-label="全部地区"
+        label="按地区筛选"
+        @change="applyFilter"
+      />
       <input
         v-model="keyword"
         class="input grow"
@@ -27,9 +30,12 @@
         @keyup.enter="applyFilter"
         @input="debouncedSearch"
       />
-      <select v-model="filters.sortBy" class="select" @change="applyFilter">
-        <option v-for="opt in SORT_OPTIONS.actor" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-      </select>
+      <SelectList
+        v-model="filters.sortBy"
+        :options="SORT_OPTIONS.actor"
+        label="排序方式"
+        @change="applyFilter"
+      />
       <button class="btn btn--sm btn--ghost" @click="handleReset">重置</button>
     </div>
 
@@ -108,6 +114,7 @@ import { debounce } from '@/scripts/utils/debounce'
 import CardActions from '@/views/components/CardActions.vue'
 import AddActorDialog from '@/views/components/AddActorDialog.vue'
 import Pagination from '@/views/components/Pagination.vue'
+import SelectList from '@/views/components/SelectList.vue'
 import { loadFilterState, saveFilterState } from '@/scripts/utils/filterPersist'
 
 const STORAGE_KEY = 'actor-list'

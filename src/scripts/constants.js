@@ -37,5 +37,22 @@ export const SORT_OPTIONS = {
     { value: 'name', label: '名称' },
     { value: 'likecount', label: '获赞数' },
     { value: 'videocount', label: '影片数' }
+  ],
+  comic: [
+    { value: '', label: '默认排序' },
+    { value: 'name', label: '按名称' },
+    { value: 'likes', label: '按点赞' }
   ]
 }
+
+/** 漫画连载状态：库里 comics.status，0=连载中 1=完结 */
+export const COMIC_STATUS_OPTIONS = [
+  { value: 0, label: '连载中' },
+  { value: 1, label: '完结' }
+]
+
+/** 点赞记录的目标类型：video_likes.target_type */
+export const LIKE_TARGET_OPTIONS = [
+  { value: 'video', label: '影片' },
+  { value: 'comic', label: '漫画' }
+]

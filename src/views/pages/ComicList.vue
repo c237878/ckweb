@@ -6,16 +6,18 @@
     </div>
 
     <div class="filters">
-      <select v-model.number="statusFilter" class="select" @change="applyFilter">
-        <option :value="-1">全部状态</option>
-        <option :value="0">连载中</option>
-        <option :value="1">完结</option>
-      </select>
-      <select v-model="sortBy" class="select" @change="applyFilter">
-        <option value="">默认排序</option>
-        <option value="name">按名称</option>
-        <option value="likes">按点赞</option>
-      </select>
+      <SelectList
+        v-model="statusFilter"
+        :options="STATUS_OPTIONS"
+        label="按连载状态筛选"
+        @change="applyFilter"
+      />
+      <SelectList
+        v-model="sortBy"
+        :options="SORT_OPTIONS.comic"
+        label="排序方式"
+        @change="applyFilter"
+      />
       <input
         v-model="keyword"
         class="input grow"
@@ -70,11 +72,13 @@ import { useRouter } from 'vue-router'
 import { comicApi } from '@/scripts/api'
 import { useAppStore } from '@/scripts/store/app'
 import { useUiStore, errText } from '@/scripts/store/ui'
+import { SORT_OPTIONS, COMIC_STATUS_OPTIONS } from '@/scripts/constants'
 import { debounce } from '@/scripts/utils/debounce'
 import { loadFilterState, saveFilterState } from '@/scripts/utils/filterPersist'
 import ComicCard from '@/views/components/ComicCard.vue'
 import ComicFormDialog from '@/views/components/ComicFormDialog.vue'
 import Pagination from '@/views/components/Pagination.vue'
+import SelectList from '@/views/components/SelectList.vue'
 
 const router = useRouter()
 const app = useAppStore()
@@ -85,6 +89,9 @@ const comicList = ref([])
 const page = ref(1)
 const total = ref(0)
 const keyword = ref('')
+// 全部状态用 -1 占位，服务端没有这个值，过滤时当作"不限"
+const STATUS_OPTIONS = [{ value: -1, label: '全部状态' }, ...COMIC_STATUS_OPTIONS]
+
 const statusFilter = ref(-1)
 const sortBy = ref('')
 const loading = ref(true)

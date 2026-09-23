@@ -49,11 +49,13 @@
         <div class="videos-head">
           <h2 class="section-title">系列影片 ({{ total }})</h2>
           <div class="media-filter">
-            <label class="sr-only" for="series-media-filter">按片源筛选影片</label>
-            <select id="series-media-filter" v-model="mediaAttrFilter" class="select" :disabled="videosLoading">
-              <option value="">全部片源</option>
-              <option v-for="opt in mediaFlagOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-            </select>
+            <SelectList
+              v-model="mediaAttrFilter"
+              :options="mediaFlagOptions"
+              all-label="全部片源"
+              label="按片源筛选影片"
+              :disabled="videosLoading"
+            />
           </div>
         </div>
 
@@ -116,6 +118,7 @@ import { MEDIA_FLAGS } from '@/scripts/constants'
 import VideoCard from '@/views/components/VideoCard.vue'
 import AddSeriesDialog from '@/views/components/AddSeriesDialog.vue'
 import Pagination from '@/views/components/Pagination.vue'
+import SelectList from '@/views/components/SelectList.vue'
 
 const route = useRoute()
 const router = useRouter()

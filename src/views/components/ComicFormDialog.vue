@@ -90,11 +90,12 @@
         </div>
 
         <div class="field">
-          <label for="cf-status">状态</label>
-          <select id="cf-status" v-model.number="draft.status" class="select">
-            <option :value="0">连载中</option>
-            <option :value="1">完结</option>
-          </select>
+          <label>状态</label>
+          <SelectList
+            v-model="draft.status"
+            :options="COMIC_STATUS_OPTIONS"
+            label="连载状态"
+          />
         </div>
       </form>
     </template>
@@ -112,6 +113,8 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import Dialog from '@/views/components/Dialog.vue'
+import SelectList from '@/views/components/SelectList.vue'
+import { COMIC_STATUS_OPTIONS } from '@/scripts/constants'
 import { comicApi } from '@/scripts/api'
 import { useUiStore } from '@/scripts/store/ui'
 

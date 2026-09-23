@@ -1,5 +1,5 @@
 <template>
-  <div class="combobox" ref="root">
+  <div class="combobox dropdown" ref="root">
     <input
       class="input"
       ref="inputEl"
@@ -28,10 +28,10 @@
 &times;
 </button>
 
-    <ul v-if="open" class="combobox-list" role="listbox">
+    <ul v-if="open" class="dropdown-menu" role="listbox">
       <li
         v-if="allLabel"
-        class="combobox-option"
+        class="dropdown-option"
         :class="{ active: !modelValue, 'is-hl': highlight === -1 }"
         role="option"
         :aria-selected="!modelValue"
@@ -42,7 +42,7 @@
       <li
         v-for="(opt, i) in visible"
         :key="opt.id"
-        class="combobox-option"
+        class="dropdown-option"
         :class="{ active: opt.id === modelValue, 'is-hl': highlight === i }"
         role="option"
         :aria-selected="opt.id === modelValue"
@@ -51,7 +51,7 @@
       >
 {{ opt.name }}
 </li>
-      <li v-if="visible.length === 0" class="combobox-empty">无匹配项</li>
+      <li v-if="visible.length === 0" class="dropdown-empty">无匹配项</li>
     </ul>
   </div>
 </template>
@@ -144,11 +144,6 @@ const onBlur = () => {
 </script>
 
 <style scoped>
-.combobox {
-  position: relative;
-  min-width: 160px;
-}
-
 .combobox .input {
   padding-right: 26px;
 }
@@ -173,48 +168,4 @@ const onBlur = () => {
   background: var(--bg-hover);
 }
 
-.combobox-list {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
-  z-index: 30;
-  max-height: 288px;
-  overflow-y: auto;
-  list-style: none;
-  padding: 4px;
-  background: var(--bg-elev);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--r1);
-  box-shadow: var(--shadow-2);
-}
-
-.combobox-option {
-  padding: 6px 9px;
-  border-radius: var(--r1);
-  font-size: var(--f-md);
-  color: var(--text-dim);
-  cursor: pointer;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.combobox-option:hover,
-.combobox-option.is-hl {
-  background: var(--bg-hover);
-  color: var(--text);
-}
-
-.combobox-option.active {
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-weight: 600;
-}
-
-.combobox-empty {
-  padding: 6px 9px;
-  color: var(--text-faint);
-  font-size: var(--f-sm);
-}
 </style>

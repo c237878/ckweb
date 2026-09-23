@@ -146,8 +146,27 @@ src/
 
 ### 可复用控件
 
-`ComboBox` 是带输入过滤的下拉，选项多时（如 711 个系列）替代原生 `<select>`；
-选项只有几项的枚举（排序、片源、状态、地区）继续用原生 `<select class="select">` 更合适。
+全站已不再使用原生 `<select>`（弹出层外观不可控），统一走两个自绘组件；
+两者的浮层与选项行共用 `main.css` 里的 `.dropdown-menu` / `.dropdown-option`，不要另写一份。
+
+**SelectList** —— 普通单选下拉，选项少时用：
+
+```vue
+<SelectList v-model="filters.country" :options="countries"
+            all-label="全部地区" label="按地区筛选" @change="applyFilter" />
+<SelectList v-model="filters.sortBy" :options="SORT_OPTIONS.video" label="排序方式" />
+```
+
+| prop | 说明 |
+| --- | --- |
+| `modelValue` | 选中项的 `value`，String 或 Number |
+| `options` | `[{ value, label }]`，也可传纯字符串数组（value 即自身） |
+| `all-label` | 顶部"全部"项文案（对应值 `''`），传空串则不渲染 |
+| `placeholder` | 无选中项时的占位文案 |
+| `label` | 触发按钮的无障碍名；页面没有可见 label 时必须给 |
+| `disabled` | 禁用 |
+
+**ComboBox** —— 带输入过滤的下拉，选项多时用（如 711 个系列）：
 
 ```vue
 <ComboBox v-model="filters.seriesId" :options="seriesList"
@@ -162,8 +181,13 @@ src/
 | `all-label` | 顶部"全部"项文案，传空串则不渲染该项 |
 | `limit` | 下拉最多渲染条数，默认 50 |
 
-emit：`update:modelValue`（配合 `v-model`）、`change`（值真正变化时）。
-已支持键盘上下/Enter/Esc、点击外部收起、清除按钮。
+两者都 emit `update:modelValue`（配合 `v-model`）与 `change`（值真正变化时），
+都支持键盘上下/Enter/Esc、点击外部收起。ComboBox 额外有清除按钮。
+
+**数字值注意**：`options` 里放真正的数字（`{ value: 0, label: '连载中' }`），
+不要再写 `v-model.number` —— 原生 `<option>` 会把值变成字符串，`.number` 就是为补这个洞存在的，
+自绘组件直接透传 `opt.value`，不需要它。
+
 
 
 播放器 ckplayer 只在影片详情页按需注入（`scripts/utils/ckplayer.js`），不再全局加载。
