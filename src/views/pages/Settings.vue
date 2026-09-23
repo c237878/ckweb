@@ -77,15 +77,10 @@
             所以各个页面看到的选项一定一致。编辑页只能选择，要新增或删掉选项来这里。
           </p>
 
-          <div v-if="loadingTaxonomy" class="taxonomy-grid" aria-busy="true">
+          <div v-if="loadingSettings" class="taxonomy-grid" aria-busy="true">
             <div class="skeleton field-skeleton"></div>
             <div class="skeleton field-skeleton"></div>
           </div>
-
-          <p v-else-if="taxonomyError" class="notice notice--error" role="alert">
-            <span>{{ taxonomyError }}</span>
-            <button class="btn btn--sm" @click="loadTaxonomy">重试</button>
-          </p>
 
           <div v-else class="taxonomy-grid">
             <div class="field">
@@ -110,7 +105,7 @@
 
           <div class="panel-foot">
             <span class="hint">从清单里删掉某项，不会改动已经使用它的影片、系列或演员</span>
-            <button class="btn btn--primary" :disabled="savingGroup !== '' || loadingTaxonomy || !!taxonomyError" @click="saveTaxonomy">
+            <button class="btn btn--primary" :disabled="savingGroup !== '' || loadingSettings || !taxonomyReady" @click="saveTaxonomy">
               <span v-if="savingGroup === 'taxonomy'" class="spinner"></span>
               保存数据源
             </button>
@@ -306,17 +301,17 @@ const ui = useUiStore()
 
 const CATEGORY_OPTIONS = ['视频', '封面', '字幕']
 
-/** 分区的唯一来源：左侧导航、各分区标题与说明都读这里，新增分组只改这一份 */
+/** 分区的唯一来源：左侧导航与各分区标题读这里，新增分组只改这一份 */
 const GROUPS = [
   { id: 'site', label: '站点信息', desc: '网站名称与各列表页的分页条数。' },
   { id: 'home', label: '首页', desc: '首页取哪几个分类、每个分类显示多少条。' },
   { id: 'media', label: '媒体路径', desc: '海报墙使用的图片目录；影片扫描目录见「扫描目录」。' },
-  { id: 'taxonomy', label: '数据源', desc: '' },
-  { id: 'dirs', label: '扫描目录', desc: '' },
-  { id: 'links', label: '友情链接', desc: '' }
+  { id: 'taxonomy', label: '数据源' },
+  { id: 'dirs', label: '扫描目录' },
+  { id: 'links', label: '友情链接' }
 ]
 
-/** 后端只有单条读写接口，content 一律按字符串提交，所以这里不能用 v-model.number */
+/** content 一律按字符串提交（后端存的就是字符串），所以这里不能用 v-model.number */
 const settingsList = ref([
   { id: 'siteName', group: 'site', label: '网站名称', value: '', placeholder: '影视网站', hint: '显示在页头与浏览器标签' },
   { id: 'pageSize', group: 'site', label: '每页数量', value: '', type: 'number', min: 1, max: 100, placeholder: '默认 24', hint: '各列表页每页显示的条数' },
@@ -348,8 +343,8 @@ const savingLink = ref(false)
 
 const countriesValue = ref('')
 const categoriesValue = ref('')
-const loadingTaxonomy = ref(true)
-const taxonomyError = ref('')
+// 没成功读到过就不允许保存：否则"空清单"会在下一次保存时把线上数据抹掉
+const taxonomyReady = ref(false)
 
 // 文件目录
 const scanDirList = ref([])
@@ -367,54 +362,30 @@ const friendLinkFormError = ref('')
 
 const loadAll = async () => {
   loadError.value = ''
-  await Promise.all([loadSettings(), loadTaxonomy(), loadScanDirList(), loadFriendLinkList()])
+  await Promise.all([loadSettings(), loadScanDirList(), loadFriendLinkList()])
 }
 
-/** 单条 GET：/systemsetting/{name} 在键不存在时返回 success:false，那是"没配过"而不是出错 */
-const loadOne = async (name) => {
-  const res = await settingApi.getByName(name)
-  if (!res?.success) throw new Error(res?.message || 'not found')
-  return res.data ?? ''
-}
-
+/**
+ * 一次 GET /api/systemsetting 拿到全部设置：单条接口在键不存在时返回 success:false，
+ * 那是"没配过"而不是出错，只有整个请求失败才算加载失败。
+ */
 const loadSettings = async () => {
   loadingSettings.value = true
   try {
-    const results = await Promise.allSettled(settingsList.value.map((item) => loadOne(item.id)))
-    const failed = []
-    results.forEach((result, i) => {
-      const item = settingsList.value[i]
-      if (result.status === 'fulfilled') {
-        if (result.value) item.value = result.value
-      } else {
-        failed.push(item.label)
-      }
-    })
-    if (failed.length) loadError.value = `以下设置加载失败：${failed.join('、')}`
+    const res = await settingApi.getAll()
+    if (!res?.success) throw new Error(res?.message || '加载失败')
+    const map = {}
+    ;(res.data || []).forEach((row) => { map[row.name] = row.content })
+
+    settingsList.value.forEach((item) => { if (map[item.id]) item.value = map[item.id] })
+    countriesValue.value = map.countries ?? ''
+    categoriesValue.value = map.categories ?? ''
+    taxonomyReady.value = true
   } catch (error) {
     console.error('加载设置失败:', error)
     loadError.value = '系统设置加载失败，请确认后端服务可用'
   } finally {
     loadingSettings.value = false
-  }
-}
-
-/**
- * 两份清单一起读：任一失败就整体禁用保存，
- * 否则"读失败 = 空列表"会在下一次保存时把线上数据清空。
- */
-const loadTaxonomy = async () => {
-  loadingTaxonomy.value = true
-  taxonomyError.value = ''
-  try {
-    const [countries, categories] = await Promise.all([loadOne('countries'), loadOne('categories')])
-    countriesValue.value = countries
-    categoriesValue.value = categories
-  } catch (error) {
-    console.error('加载数据源失败:', error)
-    taxonomyError.value = '数据源加载失败，请确认后端服务可用'
-  } finally {
-    loadingTaxonomy.value = false
   }
 }
 

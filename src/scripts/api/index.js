@@ -119,7 +119,6 @@ export const highlightApi = {
 // 系统设置相关API
 export const settingApi = {
   getAll: () => api.get('/systemsetting'),
-  getByName: (name) => api.get(`/systemsetting/${name}`),
   save: (data) => api.post('/systemsetting', data)
 }
 
