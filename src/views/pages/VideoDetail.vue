@@ -642,6 +642,8 @@ const handleLike = async () => {
         const res = await videoApi.like(video.value.id)
         if (res.success) {
             likeCount.value = res.likeCount
+            // 观影日历挂在 App 上，不会自己知道点赞发生了
+            window.dispatchEvent(new CustomEvent('likesUpdated', { detail: { id: video.value.id } }))
         }
     } catch (error) {
         console.error('点赞失败:', error)

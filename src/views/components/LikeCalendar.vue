@@ -280,13 +280,18 @@ const handleMediaChange = (e) => {
   if (!e.matches) collapsed.value = true
 }
 
+// 点赞发生在别的页面（影片/漫画详情），日历得自己重取当天与月度统计
+const handleLikesUpdated = () => loadStats()
+
 onMounted(() => {
   media?.addEventListener('change', handleMediaChange)
+  window.addEventListener('likesUpdated', handleLikesUpdated)
   loadStats()
 })
 
 onBeforeUnmount(() => {
   media?.removeEventListener('change', handleMediaChange)
+  window.removeEventListener('likesUpdated', handleLikesUpdated)
 })
 </script>
 

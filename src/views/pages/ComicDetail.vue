@@ -743,6 +743,7 @@ const handleLike = async () => {
     const res = await comicApi.like(route.params.id)
     if (res.success) {
       likeCount.value = res.likeCount
+      window.dispatchEvent(new CustomEvent('likesUpdated', { detail: { id: route.params.id } }))
     }
   } catch (err) {
     console.error('点赞失败:', err)
