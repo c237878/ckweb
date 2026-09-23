@@ -1,5 +1,18 @@
 <template>
-  <article class="comic-card card card--link" @click="$emit('click', comic)">
+  <article
+    class="comic-card card card--link"
+    :class="{ selected, picking: clickAction !== 'browse' }"
+    @click="handleClick"
+  >
+    <div v-if="selectable" class="select-checkbox" @click.stop>
+      <input
+        type="checkbox"
+        :checked="selected"
+        :aria-label="`选择 ${comic.name}`"
+        @change="emit('select', comic)"
+      />
+    </div>
+
     <div class="cover">
       <img
         v-if="comic.coverPath && !coverFailed"
@@ -27,37 +40,34 @@
     <div class="card-info">
       <h2 class="comic-name card-title" :title="comic.name">
         <span class="comic-name-text">{{ comic.name }}</span>
+        <!-- 完结是状态，保留药丸 -->
         <span v-if="comic.status === 1" class="tag tag--danger">完结</span>
       </h2>
       <div class="comic-author" v-if="comic.author">{{ comic.author }}</div>
-      <div class="comic-meta">
-        <span class="tag">{{ comic.chapterCount }} 章</span>
-        <span v-if="comic.likeCount > 0" class="tag tag--like">♥ {{ comic.likeCount }}</span>
+      <!-- 章数与点赞不可点，用文本而不是药丸 -->
+      <div class="facts" v-if="comic.chapterCount || comic.likeCount > 0">
+        <span class="fact fact--chapters">{{ comic.chapterCount }} 章</span>
+        <span v-if="comic.likeCount > 0" class="fact fact--likes">♥ {{ comic.likeCount }}</span>
       </div>
     </div>
-
-    <CardActions @click.stop>
-      <slot name="actions">
-        <button class="btn btn--sm btn--primary" @click.stop="$emit('edit', comic)">编辑</button>
-        <button class="btn btn--sm btn--danger" @click.stop="$emit('delete', comic)">删除</button>
-      </slot>
-    </CardActions>
   </article>
 </template>
 
 <script setup>
 import { computed, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { comicApi } from '@/scripts/api'
-import CardActions from '@/views/components/CardActions.vue'
 
 const props = defineProps({
-  comic: {
-    type: Object,
-    required: true
-  }
+  comic: { type: Object, required: true },
+  /** 点整张卡片做什么：browse 进详情 / select 勾选 / pick 选一个去编辑 */
+  clickAction: { type: String, default: 'browse' },
+  selectable: { type: Boolean, default: false },
+  selected: { type: Boolean, default: false }
 })
 
-defineEmits(['click', 'edit', 'delete'])
+const emit = defineEmits(['select', 'pick'])
+const router = useRouter()
 
 const coverFailed = ref(false)
 
@@ -65,14 +75,45 @@ const coverUrl = computed(() => comicApi.getCoverUrl(props.comic.coverPath))
 
 // 列表复用卡片时（换漫画对象但组件被复用），旧的加载失败状态不能留着
 watch(() => props.comic.coverPath, () => { coverFailed.value = false })
+
+const handleClick = () => {
+  if (props.clickAction === 'select') emit('select', props.comic)
+  else if (props.clickAction === 'pick') emit('pick', props.comic)
+  else router.push(`/comic/${props.comic.id}`)
+}
 </script>
 
 <style scoped>
-/* 外观全部走 .card / .cover / .tag，这里只补卡片特有的排布 */
+/* 外观全部走 .card / .cover / .tag / .facts，这里只补卡片特有的排布 */
 .comic-card {
   display: flex;
   flex-direction: column;
+  position: relative;
   cursor: pointer;
+  container-type: inline-size;
+}
+
+.comic-card.picking {
+  cursor: pointer;
+}
+
+.comic-card.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft), var(--shadow-2);
+}
+
+.select-checkbox {
+  position: absolute;
+  top: var(--s2);
+  left: var(--s2);
+  z-index: 2;
+}
+
+.select-checkbox input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--accent);
 }
 
 .card-info {
@@ -104,11 +145,19 @@ watch(() => props.comic.coverPath, () => { coverFailed.value = false })
   white-space: nowrap;
 }
 
-.comic-meta {
-  display: flex;
-  align-items: center;
-  gap: var(--s1);
+.facts {
   margin-top: auto;
+}
+
+/* 窄卡片先收点赞，章数一直保留 */
+.fact--likes {
+  display: none;
+}
+
+@container (min-width: 200px) {
+  .fact--likes {
+    display: inline;
+  }
 }
 
 /* 外链角标：只在需要时才出现，键盘聚焦同样要能看到 */

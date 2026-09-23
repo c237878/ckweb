@@ -806,16 +806,15 @@ const handleLike = async () => {
 
 /* 芯片外形走全局 .tag，这里只补"可点选择"这一层交互态 */
 .media-option {
-    border: 1px solid var(--border);
+    border-color: var(--border);
     color: var(--text-dim);
     cursor: pointer;
-    transition: color var(--dur) var(--ease), background var(--dur) var(--ease),
-      border-color var(--dur) var(--ease);
 }
 
-.media-option.media-1:hover { border-color: var(--danger); color: var(--danger); background: var(--danger-soft); }
-.media-option.media-2:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
-.media-option.media-3:hover { border-color: var(--success); color: var(--success); background: var(--success-soft); }
+/* 描边由全局 a.tag/button.tag:hover 的 currentColor 负责，这里只改色与底 */
+.media-option.media-1:hover { color: var(--danger); background: var(--danger-soft); }
+.media-option.media-2:hover { color: var(--accent); background: var(--accent-soft); }
+.media-option.media-3:hover { color: var(--success); background: var(--success-soft); }
 
 /* ==================== 右侧面板 ==================== */
 

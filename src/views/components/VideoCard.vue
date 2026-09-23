@@ -16,73 +16,60 @@
     <!-- 封面：容器固定宽高比，图片迟到也不塌陷；加载失败留首字占位而不是隐藏 -->
     <div class="cover video-cover" :class="{ 'cover--fit': isPortrait }">
       <img
-        v-if="shown.coverPath && !coverFailed"
+        v-if="video.coverPath && !coverFailed"
         :src="coverUrl"
-        :alt="shown.name || '影片封面'"
+        :alt="video.name || '影片封面'"
         loading="lazy"
         decoding="async"
         @load="onCoverLoad"
         @error="coverFailed = true"
       />
-      <span v-else class="cover-fallback">{{ shown.name?.charAt(0) || '?' }}</span>
-      <div v-if="!shown.fileSize" class="cover-mask">
+      <span v-else class="cover-fallback">{{ video.name?.charAt(0) || '?' }}</span>
+      <div v-if="!video.fileSize" class="cover-mask">
         <span class="mask-badge">无文件</span>
       </div>
     </div>
 
     <div class="video-body">
       <div class="info-row info-row--name">
-        <router-link class="name card-title" :to="`/video/${shown.id}`" @click.stop>
-          <span v-if="shown.code" class="name-code">{{ shown.code }}</span>
-          <span class="name-text" :title="`${shown.code ? shown.code + ' ' : ''}${shown.name}`">{{ shown.name }}</span>
+        <router-link class="name card-title" :to="`/video/${video.id}`" @click.stop>
+          <span v-if="video.code" class="name-code">{{ video.code }}</span>
+          <span class="name-text" :title="`${video.code ? video.code + ' ' : ''}${video.name}`">{{ video.name }}</span>
         </router-link>
       </div>
 
-      <!-- 四组信息按卡片实际宽度逐级出现，见文件末尾的 @container 分级 -->
+      <!-- 状态 + 属性：片源是状态所以用药丸，大小/点赞/地区/分类不可点，用文本。
+           逐项按卡片宽度放开，见文件末尾 @container -->
       <div class="info-row info-row--spec">
         <span
-          v-if="shown.mediaAttrFlags > 0"
+          v-if="video.mediaAttrFlags > 0"
           class="tag"
-          :class="mediaFlagClass(shown.mediaAttrFlags)"
-        >{{ mediaFlagText(shown.mediaAttrFlags) }}</span>
-        <button
-          v-if="mode === 'full'"
-          type="button"
-          class="tag file-size"
-          :title="copied ? '已复制番号' : '点击复制番号'"
-          @click.stop="copyCode"
-        >
-{{ copied ? '已复制' : (shown.fileSize ? formatSize(shown.fileSize) : '无文件') }}
-</button>
-        <span v-else class="tag tag--muted">{{ shown.fileSize ? formatSize(shown.fileSize) : '无文件' }}</span>
+          :class="mediaFlagClass(video.mediaAttrFlags)"
+        >{{ mediaFlagText(video.mediaAttrFlags) }}</span>
+        <span class="facts" v-if="hasFacts">
+          <span class="fact fact--size">{{ video.fileSize ? formatSize(video.fileSize) : '无文件' }}</span>
+          <span v-if="video.likeCount > 0" class="fact fact--likes">♥ {{ video.likeCount }}</span>
+          <span v-if="video.country" class="fact fact--country">{{ video.country }}</span>
+          <span v-if="video.category && mode === 'full'" class="fact fact--category">{{ video.category }}</span>
+        </span>
       </div>
 
-      <div class="info-row info-row--tags" v-if="hasTags">
-        <span v-if="shown.country" class="tag tag--accent">{{ shown.country }}</span>
-        <span v-if="shown.category && mode === 'full'" class="tag tag--success">{{ shown.category }}</span>
-        <span v-if="shown.likeCount > 0" class="tag tag--like">♥ {{ shown.likeCount }}</span>
-      </div>
-
-      <div class="info-row info-row--series" v-if="shown.seriesName && mode !== 'brief'">
-        <button
-          type="button"
-          class="tag tag--info clickable"
-          @click.stop="goToSeries(shown.seriesId)"
-        >
-{{ shown.seriesName }}
-</button>
+      <div class="info-row info-row--series" v-if="video.seriesName && mode !== 'brief'">
+        <router-link class="tag tag--info" :to="`/series/${video.seriesId}`" @click.stop>
+{{ video.seriesName }}
+</router-link>
       </div>
 
       <div class="info-row info-row--actors" v-if="actorList.length && mode !== 'brief'">
-        <button
+        <router-link
           v-for="actor in actorList"
           :key="actor.id || actor.name"
-          type="button"
-          class="tag clickable actor-tag"
-          @click.stop="goToActor(actor.id)"
+          class="tag actor-tag"
+          :to="`/actor/${actor.id}`"
+          @click.stop
         >
 {{ actor.name }}
-</button>
+</router-link>
       </div>
     </div>
   </article>
@@ -94,7 +81,6 @@ import { useRouter } from 'vue-router'
 import { formatSize } from '@/scripts/utils/format'
 import { mediaFlagText, mediaFlagClass } from '@/scripts/constants'
 import { videoApi } from '@/scripts/api'
-import { useUiStore, errText } from '@/scripts/store/ui'
 
 const props = defineProps({
   video: { type: Object, required: true },
@@ -107,21 +93,15 @@ const props = defineProps({
 })
 
 const router = useRouter()
-const ui = useUiStore()
 const emit = defineEmits(['select', 'pick'])
 
-const resetting = ref(false)
 const coverFailed = ref(false)
-const copied = ref(false)
 const isPortrait = ref(false)
 
-// 重置接口返回的字段覆盖在本地，不回写 props
-const patch = ref({})
-const shown = computed(() => ({ ...props.video, ...patch.value }))
-
-const hasTags = computed(() =>
-  props.mode !== 'brief' &&
-  (!!shown.value.country || (props.mode === 'full' && !!shown.value.category) || shown.value.likeCount > 0)
+// 属性行只要有一项可显示才渲染，否则空行占高
+const hasFacts = computed(() =>
+  !!props.video.fileSize || props.video.likeCount > 0 || !!props.video.country ||
+  (props.mode === 'full' && !!props.video.category)
 )
 
 // 封面比例并不统一（800x538 为主，也有 16:9 和手机竖屏 1080x1920）。
@@ -142,31 +122,6 @@ const actorList = computed(() => {
   })
 })
 
-const copyCode = async () => {
-  const code = props.video.code || ''
-  if (!code) return
-  try {
-    await navigator.clipboard.writeText(code)
-    copied.value = true
-    setTimeout(() => { copied.value = false }, 1500)
-  } catch {
-    // 非安全上下文（局域网 http 直连）下 clipboard 不可用，退回 execCommand
-    const ta = document.createElement('textarea')
-    ta.value = code
-    ta.style.position = 'fixed'
-    ta.style.opacity = '0'
-    document.body.appendChild(ta)
-    ta.select()
-    document.execCommand('copy')
-    document.body.removeChild(ta)
-    copied.value = true
-    setTimeout(() => { copied.value = false }, 1500)
-  }
-
-  // 无文件时复制番号顺带触发一次路径重扫
-  if (!shown.value.fileSize) handleReset()
-}
-
 const handleClick = () => {
   if (props.clickAction === 'select') handleSelect()
   else if (props.clickAction === 'pick') emit('pick', props.video)
@@ -175,29 +130,6 @@ const handleClick = () => {
 
 const handleSelect = () => emit('select', props.video.id)
 const goToDetail = () => router.push(`/video/${props.video.id}`)
-const goToSeries = (seriesId) => { if (seriesId) router.push(`/series/${seriesId}`) }
-const goToActor = (actorId) => { if (actorId) router.push(`/actor/${actorId}`) }
-
-const handleReset = async () => {
-  if (!props.video?.id || resetting.value) return
-  resetting.value = true
-  try {
-    const res = await videoApi.resetFileSize(props.video.id)
-    if (res.success) {
-      // 只覆盖本卡片显示的值，不去改父组件传进来的对象（改 prop 会让列表数据与卡片悄悄分叉）
-      patch.value = { ...patch.value, ...(res.data ?? {}) }
-      if (res.data?.coverPath !== undefined) coverFailed.value = false
-      ui.success('已重置')
-    } else {
-      ui.error('重置失败：' + errText(res, '未知错误'))
-    }
-  } catch (error) {
-    console.error('重置失败:', error)
-    ui.error('重置失败：' + errText(error))
-  } finally {
-    resetting.value = false
-  }
-}
 </script>
 
 <style scoped>
@@ -289,12 +221,17 @@ const handleReset = async () => {
   flex-wrap: nowrap;
 }
 
-/* 信息分级：窄卡片只留封面 + 番号名称，卡片变宽才逐级补齐次要信息。
-   阈值针对的是卡片自身宽度（grid 列数决定），不是视口宽度。 */
+/* 信息分级：窄卡片只留封面 + 番号名称，卡片变宽才逐级补齐。
+   阈值针对卡片自身宽度（由 grid 列数决定），不是视口宽度。 */
 .info-row--spec,
-.info-row--tags,
 .info-row--series,
 .info-row--actors {
+  display: none;
+}
+
+.fact--likes,
+.fact--country,
+.fact--category {
   display: none;
 }
 
@@ -305,14 +242,19 @@ const handleReset = async () => {
 }
 
 @container (min-width: 240px) {
-  .info-row--tags {
-    display: flex;
+  .fact--likes,
+  .fact--country {
+    display: inline;
   }
 }
 
 @container (min-width: 280px) {
+  .fact--category,
   .info-row--series {
     display: flex;
+  }
+  .fact--category {
+    display: inline;
   }
 }
 
@@ -346,28 +288,9 @@ const handleReset = async () => {
   transition: color var(--dur) var(--ease);
 }
 
-.clickable {
-  cursor: pointer;
-}
-
-.clickable:hover {
-  filter: brightness(1.18);
-}
-
+/* 可点药丸的 hover 统一走全局 a.tag / button.tag，这里只留配色差异 */
 .actor-tag {
   color: var(--text-dim);
   background: var(--bg-elev-2);
-}
-
-.file-size {
-  margin-left: auto;
-  color: var(--text-faint);
-  border: 1px solid transparent;
-  cursor: pointer;
-}
-
-.file-size:hover {
-  color: var(--text);
-  border-color: var(--border);
 }
 </style>

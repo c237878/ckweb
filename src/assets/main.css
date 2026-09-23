@@ -600,12 +600,41 @@ section {
   gap: 4px;
   height: var(--ctl-h-xs);
   padding-inline: var(--ctl-pad-x-xs);
+  /* 透明边框先占位，hover 上色时尺寸不变 */
+  border: 1px solid transparent;
   border-radius: var(--rp);
   font-size: var(--f-xs);
   line-height: 1;
   white-space: nowrap;
   background: var(--bg-elev-2);
   color: var(--text-dim);
+  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease),
+    color var(--dur) var(--ease);
+}
+
+/* 药丸的可点态只有一套：描边取自己的文字色。
+   不可点的 .tag 没有 hover，也不再各自发明 brightness/背景式反馈 */
+a.tag:hover,
+button.tag:hover:not(:disabled) {
+  border-color: currentColor;
+}
+
+a.tag:active,
+button.tag:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+/* 卡片里的属性行：不可点的次要信息，用文本而不是药丸 */
+.facts {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0 var(--s2);
+  min-width: 0;
+  font-size: var(--f-xs);
+  line-height: 1.6;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
 }
 
 .tag--accent {

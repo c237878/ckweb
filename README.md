@@ -140,6 +140,9 @@ src/
 - **控件尺寸用高度 token 定死**，不靠 padding 撑：`--ctl-h-xs`(24) 标签、`--ctl-h-sm`(32) 小按钮、
   `--ctl-h` (38) 标准按钮/输入框/下拉框；纵向不留 padding，水平内缩用 `--ctl-pad-x*`。
   文字居中靠 `display:flex + align-items/justify-content`。
+- **药丸的 hover 全站只有一套**：`a.tag:hover` / `button.tag:hover` 描边取 `currentColor`，
+  `.tag` 基础态就有 1px 透明边框占位，所以 hover 不改变尺寸。不可点的 `.tag` 没有 hover。
+  不要再写 `filter: brightness()` 或自定义背景式 hover。
 - **同功能元素只有一个类**，对照表在 `main.css` 的「布局」段注释里：
   页面主标题 `.page-title` / 区块标题 `.section-title` / 卡片标题 `.card-title` / 元信息 `.meta` /
   标签 `.tag + .tag--*` / 控件 `.btn .input .select`。不要在页面里再造同义类。
@@ -154,22 +157,26 @@ src/
 | `select` | 头部「删除」 | 勾选/取消 | 出现勾选框，头部变「全选 / 删除选中 (N) / 取消」 |
 | `edit` | 头部「编辑」 | 打开该条编辑框 | 无勾选框；**关完弹窗仍是编辑模式**，可继续点下一条，点「退出编辑」才回 browse |
 
-`VideoCard` 用 `click-action`（`browse`/`select`/`pick`）表达这个差异，`selectable` 只管勾选框显不显示。
+`VideoCard` 与 `ComicCard` 用 `click-action`（`browse`/`select`/`pick`）表达这个差异，`selectable` 只管勾选框显不显示。
 演员、系列卡片是页面内联结构，用各自的 `onCardClick` 分派。
-「重置」不再出现在卡片上，只在影片详情页有。漫画卡片未纳入此模型（仍是编辑/删除两按钮）。
+「重置」与「点击番号复制」都不再出现在卡片上，前者只在影片详情页有。
+漫画没有批量删除接口，批量删除是前端逐条调 `DELETE /api/comic/{id}`，中途失败会把已删数量与首条原因一起报出来。
 
 ### 卡片信息分级（容器查询）
 
-`VideoCard` 设了 `container-type: inline-size`，信息按**卡片自身宽度**逐级放开，
+`VideoCard` / `ComicCard` 设了 `container-type: inline-size`，信息按**卡片自身宽度**逐级放开，
 而不是按视口——网格列数变化时卡片宽度才真正变化：
 
 | 卡片宽度 | 追加显示 |
 | --- | --- |
-| 基础 | 封面 + 番号 + 名称 |
-| ≥ 200px | 片源标记、文件大小 |
-| ≥ 240px | 地区、分类、点赞数 |
-| ≥ 280px | 所属系列 |
+| 基础 | 封面 + 番号 + 名称（漫画：章数、完结状态） |
+| ≥ 200px | 片源标记、文件大小（漫画：点赞数） |
+| ≥ 240px | 点赞数、地区 |
+| ≥ 280px | 分类、所属系列 |
 | ≥ 320px | 演员 |
+
+**信息分层原则**：药丸只表示「可点」或「状态」，不可点的属性一律用 `.facts` 里的次要文本，
+分隔只靠 gap 不加标点。所以卡片里最多两排药丸（状态+属性文本、关联链接），不再是四五排一模一样的药丸。
 
 `.grid` 在 ≥1200px 视口下把最小列宽提到 300px（容器 1440 下约 4 列、卡片 ~336px），
 否则桌面卡片只有 ~265px，走不到高分级档。改阈值前先确认卡片实际宽度。

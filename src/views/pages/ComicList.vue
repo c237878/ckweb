@@ -2,7 +2,29 @@
   <div class="page comic-list">
     <div class="page-header">
       <h1 class="page-title">漫画管理</h1>
-      <button class="btn btn--primary" @click="handleAdd">添加漫画</button>
+      <div class="header-actions">
+        <template v-if="mode === 'browse'">
+          <button class="btn btn--primary" @click="handleAdd">添加漫画</button>
+          <button class="btn btn--sm" @click="enterMode('select')">删除</button>
+          <button class="btn btn--sm" @click="enterMode('edit')">编辑</button>
+        </template>
+
+        <template v-else-if="mode === 'select'">
+          <label class="select-all">
+            <input type="checkbox" :checked="isAllSelected" @change="toggleSelectAll" />
+            全选
+          </label>
+          <button class="btn btn--sm btn--danger" :disabled="!selectedIds.length" @click="batchDelete">
+            删除选中 ({{ selectedIds.length }})
+          </button>
+          <button class="btn btn--sm btn--ghost" @click="exitMode">取消</button>
+        </template>
+
+        <template v-else>
+          <span class="mode-hint">点一张卡片进入编辑</span>
+          <button class="btn btn--sm btn--ghost" @click="exitMode">退出编辑</button>
+        </template>
+      </div>
     </div>
 
     <div class="filters">
@@ -41,9 +63,11 @@
         v-for="comic in comicList"
         :key="comic.id"
         :comic="comic"
-        @click="goToDetail"
-        @edit="handleEdit"
-        @delete="handleDelete"
+        :click-action="cardClickAction"
+        :selectable="mode === 'select'"
+        :selected="selectedIds.includes(comic.id)"
+        @select="handleSelect"
+        @pick="handleEdit"
       />
     </div>
 
@@ -68,7 +92,6 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
 import { comicApi } from '@/scripts/api'
 import { useAppStore } from '@/scripts/store/app'
 import { useUiStore, errText } from '@/scripts/store/ui'
@@ -80,7 +103,6 @@ import ComicFormDialog from '@/views/components/ComicFormDialog.vue'
 import Pagination from '@/views/components/Pagination.vue'
 import SelectList from '@/views/components/SelectList.vue'
 
-const router = useRouter()
 const app = useAppStore()
 const ui = useUiStore()
 const STORAGE_KEY = 'comic-list'
@@ -150,10 +172,6 @@ const handleReset = () => {
   applyFilter()
 }
 
-const goToDetail = (comic) => {
-  router.push(`/comic/${comic.id}`)
-}
-
 const handleCancel = () => {
   showDialog.value = false
 }
@@ -189,18 +207,64 @@ const handleSave = async (form) => {
   ui.success('已保存')
 }
 
-const handleDelete = async (comic) => {
-  if (!await ui.confirm({
+/** browse = 点卡片进详情；select = 勾选批量删；edit = 点一张开编辑框 */
+const mode = ref('browse')
+const selectedIds = ref([])
+
+const cardClickAction = computed(() => (mode.value === 'edit' ? 'pick' : mode.value))
+
+const isAllSelected = computed(
+  () => comicList.value.length > 0 && selectedIds.value.length === comicList.value.length
+)
+
+const enterMode = (next) => {
+  mode.value = next
+  selectedIds.value = []
+}
+
+const exitMode = () => {
+  mode.value = 'browse'
+  selectedIds.value = []
+}
+
+const handleSelect = (comic) => {
+  const i = selectedIds.value.indexOf(comic.id)
+  if (i > -1) selectedIds.value.splice(i, 1)
+  else selectedIds.value.push(comic.id)
+}
+
+const toggleSelectAll = () => {
+  selectedIds.value = isAllSelected.value ? [] : comicList.value.map((c) => c.id)
+}
+
+// 后端没有批量删除接口，逐条删：中途失败时前面那些已经真的删掉了，
+// 所以要把已删数量和失败原因都算进最后的提示里
+const batchDelete = async () => {
+  const ids = [...selectedIds.value]
+  const go = await ui.confirm({
     title: '确认删除',
-    message: `确定要删除漫画「${comic.name}」吗？删除后不可恢复。`,
+    message: `确定要删除选中的 ${ids.length} 部漫画吗？删除后不可恢复。`,
     danger: true
-  })) return
-  try {
-    await comicApi.delete(comic.id)
-    await loadComics()
-    ui.success('已删除')
-  } catch (err) {
-    ui.error('删除失败：' + errText(err))
+  })
+  if (!go) return
+
+  let done = 0
+  const errors = []
+  for (const id of ids) {
+    try {
+      await comicApi.delete(id)
+      done += 1
+    } catch (err) {
+      console.error('批量删除漫画失败:', err)
+      errors.push(errText(err))
+    }
+  }
+  exitMode()
+  await loadComics()
+  if (errors.length) {
+    ui.error(`批量删除：已删除 ${done} 部，失败 ${errors.length} 部（${errors[0]}）`)
+  } else {
+    ui.success(`已删除 ${done} 部`)
   }
 }
 
