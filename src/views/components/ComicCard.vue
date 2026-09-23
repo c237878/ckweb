@@ -44,10 +44,10 @@
         <span v-if="comic.status === 1" class="tag tag--danger">完结</span>
       </h2>
       <div class="comic-author" v-if="comic.author">{{ comic.author }}</div>
-      <!-- 章数与点赞不可点，用文本而不是药丸 -->
-      <div class="facts" v-if="comic.chapterCount || comic.likeCount > 0">
-        <span class="fact fact--chapters">{{ comic.chapterCount }} 章</span>
-        <span v-if="comic.likeCount > 0" class="fact fact--likes">♥ {{ comic.likeCount }}</span>
+      <!-- 与影片卡片同一套：胶囊同行、放不下换行；不可点的自然没有 hover -->
+      <div class="pills">
+        <span class="tag pill">{{ comic.chapterCount }} 章</span>
+        <span v-if="comic.likeCount > 0" class="tag tag--like pill">♥ {{ comic.likeCount }}</span>
       </div>
     </div>
   </article>
@@ -145,19 +145,12 @@ const handleClick = () => {
   white-space: nowrap;
 }
 
-.facts {
+.pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s1);
+  min-width: 0;
   margin-top: auto;
-}
-
-/* 窄卡片先收点赞，章数一直保留 */
-.fact--likes {
-  display: none;
-}
-
-@container (min-width: 200px) {
-  .fact--likes {
-    display: inline;
-  }
 }
 
 /* 外链角标：只在需要时才出现，键盘聚焦同样要能看到 */

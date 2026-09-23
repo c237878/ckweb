@@ -420,20 +420,40 @@ section {
   font-size: var(--f-sm);
 }
 
+/* 列数只有三档，按视口切换：窄 2 列、中 4 列、宽 6 列。
+   卡片内部不再靠"整行开关"适应宽度，胶囊统一一行、放不下自动换行 */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(228px, 1fr));
+  grid-template-columns: repeat(2, 1fr);
   gap: var(--s4);
 }
 
-.grid--rows {
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+@media (min-width: 900px) {
+  .grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
 }
 
-/* 宽屏少开几列，把卡片撑到 330px 以上，卡片内部的 @container 分级才有意义 */
-@media (min-width: 1200px) {
+@media (min-width: 1400px) {
   .grid {
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    grid-template-columns: repeat(6, 1fr);
+  }
+}
+
+/* 演员/系列是行卡（无封面图），信息本身要横向空间，列数另配一档 */
+.grid--rows {
+  grid-template-columns: repeat(1, 1fr);
+}
+
+@media (min-width: 900px) {
+  .grid--rows {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1400px) {
+  .grid--rows {
+    grid-template-columns: repeat(3, 1fr);
   }
 }
 
@@ -682,8 +702,8 @@ button.tag:active:not(:disabled) {
     border-color var(--dur) var(--ease);
 }
 
+/* hover 只给光影，卡片位置不动 */
 .card--link:hover {
-  transform: translateY(-3px);
   border-color: var(--border-strong);
   box-shadow: var(--shadow-2);
 }
@@ -905,7 +925,6 @@ button.tag:active:not(:disabled) {
 
   .grid,
   .grid--rows {
-    grid-template-columns: repeat(auto-fill, minmax(158px, 1fr));
     gap: var(--s3);
   }
 

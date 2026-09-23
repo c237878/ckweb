@@ -31,40 +31,49 @@
     </div>
 
     <div class="video-body">
-      <div class="info-row info-row--name">
-        <router-link class="name card-title" :to="`/video/${video.id}`" @click.stop>
-          <span v-if="video.code" class="name-code">{{ video.code }}</span>
-          <span class="name-text" :title="`${video.code ? video.code + ' ' : ''}${video.name}`">{{ video.name }}</span>
-        </router-link>
-      </div>
+      <router-link class="name card-title" :to="`/video/${video.id}`" @click.stop>
+        <span v-if="video.code" class="name-code">{{ video.code }}</span>
+        <span class="name-text" :title="`${video.code ? video.code + ' ' : ''}${video.name}`">{{ video.name }}</span>
+      </router-link>
 
-      <!-- 状态 + 属性：片源是状态所以用药丸，大小/点赞/地区/分类不可点，用文本。
-           逐项按卡片宽度放开，见文件末尾 @container -->
-      <div class="info-row info-row--spec">
+      <!-- 所有胶囊同一行，放不下就换行。外观一致，只有可点的那几个有 hover
+           ——由全局 a.tag:hover / button.tag:hover 负责，span 天然拿不到。
+           逐项按卡片自身宽度放开，见文末 @container -->
+      <div class="pills">
         <span
           v-if="video.mediaAttrFlags > 0"
-          class="tag"
+          class="tag pill pill--flag"
           :class="mediaFlagClass(video.mediaAttrFlags)"
         >{{ mediaFlagText(video.mediaAttrFlags) }}</span>
-        <span class="facts" v-if="hasFacts">
-          <span class="fact fact--size">{{ video.fileSize ? formatSize(video.fileSize) : '无文件' }}</span>
-          <span v-if="video.likeCount > 0" class="fact fact--likes">♥ {{ video.likeCount }}</span>
-          <span v-if="video.country" class="fact fact--country">{{ video.country }}</span>
-          <span v-if="video.category && mode === 'full'" class="fact fact--category">{{ video.category }}</span>
-        </span>
-      </div>
 
-      <div class="info-row info-row--series" v-if="video.seriesName && mode !== 'brief'">
-        <router-link class="tag tag--info" :to="`/series/${video.seriesId}`" @click.stop>
+        <button
+          v-if="mode === 'full'"
+          type="button"
+          class="tag pill pill--size"
+          :title="copied ? '已复制番号' : '点击复制番号；无文件时顺带重扫路径'"
+          @click.stop="copyCode"
+        >
+{{ copied ? '已复制' : (video.fileSize ? formatSize(video.fileSize) : '无文件') }}
+</button>
+        <span v-else class="tag pill pill--size">{{ video.fileSize ? formatSize(video.fileSize) : '无文件' }}</span>
+
+        <span v-if="video.likeCount > 0" class="tag tag--like pill pill--likes">♥ {{ video.likeCount }}</span>
+        <span v-if="video.country" class="tag tag--accent pill pill--country">{{ video.country }}</span>
+        <span v-if="video.category && mode === 'full'" class="tag tag--success pill pill--category">{{ video.category }}</span>
+
+        <router-link
+          v-if="video.seriesName && mode !== 'brief'"
+          class="tag tag--info pill pill--series"
+          :to="`/series/${video.seriesId}`"
+          @click.stop
+        >
 {{ video.seriesName }}
 </router-link>
-      </div>
 
-      <div class="info-row info-row--actors" v-if="actorList.length && mode !== 'brief'">
         <router-link
           v-for="actor in actorList"
           :key="actor.id || actor.name"
-          class="tag actor-tag"
+          class="tag pill pill--actor"
           :to="`/actor/${actor.id}`"
           @click.stop
         >
@@ -81,10 +90,11 @@ import { useRouter } from 'vue-router'
 import { formatSize } from '@/scripts/utils/format'
 import { mediaFlagText, mediaFlagClass } from '@/scripts/constants'
 import { videoApi } from '@/scripts/api'
+import { useUiStore, errText } from '@/scripts/store/ui'
 
 const props = defineProps({
   video: { type: Object, required: true },
-  /** full = 列表页（全部标签）；display = 首页板块；brief = 紧凑行 */
+  /** full = 列表页（全部胶囊）；display = 首页板块；brief = 紧凑行 */
   mode: { type: String, default: 'full' },
   /** 点整张卡片做什么：browse 进详情 / select 勾选 / pick 选一个去编辑 */
   clickAction: { type: String, default: 'browse' },
@@ -93,16 +103,17 @@ const props = defineProps({
 })
 
 const router = useRouter()
+const ui = useUiStore()
 const emit = defineEmits(['select', 'pick'])
 
+const resetting = ref(false)
 const coverFailed = ref(false)
+const copied = ref(false)
 const isPortrait = ref(false)
 
-// 属性行只要有一项可显示才渲染，否则空行占高
-const hasFacts = computed(() =>
-  !!props.video.fileSize || props.video.likeCount > 0 || !!props.video.country ||
-  (props.mode === 'full' && !!props.video.category)
-)
+// 重置接口返回的字段覆盖在本地，不回写 props（改 prop 会让列表数据与卡片悄悄分叉）
+const patch = ref({})
+const video = computed(() => ({ ...props.video, ...patch.value }))
 
 // 封面比例并不统一（800x538 为主，也有 16:9 和手机竖屏 1080x1920）。
 // 竖屏图塞进 3:2 盒子会被裁到只剩中间一条，所以改成留边完整显示。
@@ -122,14 +133,59 @@ const actorList = computed(() => {
   })
 })
 
+const copyCode = async () => {
+  const code = props.video.code || ''
+  if (!code) return
+  try {
+    await navigator.clipboard.writeText(code)
+    copied.value = true
+    setTimeout(() => { copied.value = false }, 1500)
+  } catch {
+    // 非安全上下文（局域网 http 直连）下 clipboard 不可用，退回 execCommand
+    const ta = document.createElement('textarea')
+    ta.value = code
+    ta.style.position = 'fixed'
+    ta.style.opacity = '0'
+    document.body.appendChild(ta)
+    ta.select()
+    document.execCommand('copy')
+    document.body.removeChild(ta)
+    copied.value = true
+    setTimeout(() => { copied.value = false }, 1500)
+  }
+
+  // 无文件时复制番号顺带触发一次路径重扫
+  if (!video.value.fileSize) handleReset()
+}
+
+const handleReset = async () => {
+  if (!props.video?.id || resetting.value) return
+  resetting.value = true
+  try {
+    const res = await videoApi.resetFileSize(props.video.id)
+    if (res.success) {
+      patch.value = { ...patch.value, ...(res.data ?? {}) }
+      if (res.data?.coverPath !== undefined) coverFailed.value = false
+      ui.success('已重置')
+    } else {
+      ui.error('重置失败：' + errText(res, '未知错误'))
+    }
+  } catch (error) {
+    console.error('重置失败:', error)
+    ui.error('重置失败：' + errText(error))
+  } finally {
+    resetting.value = false
+  }
+}
+
+const handleSelect = () => emit('select', props.video.id)
+const goToDetail = () => router.push(`/video/${props.video.id}`)
+
 const handleClick = () => {
   if (props.clickAction === 'select') handleSelect()
   else if (props.clickAction === 'pick') emit('pick', props.video)
   else goToDetail()
 }
-
-const handleSelect = () => emit('select', props.video.id)
-const goToDetail = () => router.push(`/video/${props.video.id}`)
 </script>
 
 <style scoped>
@@ -138,7 +194,7 @@ const goToDetail = () => router.push(`/video/${props.video.id}`)
   flex-direction: column;
   position: relative;
   cursor: pointer;
-  /* 让卡片自己成为查询容器：信息分级看卡片实际宽度，而不是视口宽度 */
+  /* 让卡片自己成为查询容器：胶囊放不放得下看卡片实际宽度，而不是视口宽度 */
   container-type: inline-size;
 }
 
@@ -147,8 +203,8 @@ const goToDetail = () => router.push(`/video/${props.video.id}`)
   box-shadow: 0 0 0 2px var(--accent-soft), var(--shadow-2);
 }
 
+/* hover 只换光影，不做位移 */
 .video-card:hover {
-  transform: translateY(-3px);
   border-color: var(--border-strong);
   box-shadow: var(--shadow-2);
 }
@@ -200,68 +256,9 @@ const goToDetail = () => router.push(`/video/${props.video.id}`)
   padding: var(--s3);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--s2);
   min-width: 0;
   flex: 1;
-}
-
-.info-row {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  min-height: 21px;
-  overflow: hidden;
-}
-
-.info-row--actors {
-  flex-wrap: wrap;
-}
-
-.mode-brief .info-row--actors {
-  flex-wrap: nowrap;
-}
-
-/* 信息分级：窄卡片只留封面 + 番号名称，卡片变宽才逐级补齐。
-   阈值针对卡片自身宽度（由 grid 列数决定），不是视口宽度。 */
-.info-row--spec,
-.info-row--series,
-.info-row--actors {
-  display: none;
-}
-
-.fact--likes,
-.fact--country,
-.fact--category {
-  display: none;
-}
-
-@container (min-width: 200px) {
-  .info-row--spec {
-    display: flex;
-  }
-}
-
-@container (min-width: 240px) {
-  .fact--likes,
-  .fact--country {
-    display: inline;
-  }
-}
-
-@container (min-width: 280px) {
-  .fact--category,
-  .info-row--series {
-    display: flex;
-  }
-  .fact--category {
-    display: inline;
-  }
-}
-
-@container (min-width: 320px) {
-  .info-row--actors {
-    display: flex;
-  }
 }
 
 .name {
@@ -288,9 +285,27 @@ const goToDetail = () => router.push(`/video/${props.video.id}`)
   transition: color var(--dur) var(--ease);
 }
 
-/* 可点药丸的 hover 统一走全局 a.tag / button.tag，这里只留配色差异 */
-.actor-tag {
-  color: var(--text-dim);
-  background: var(--bg-elev-2);
+/* 一行摆开，放不下换行；行列间距同值，看着才是一堆胶囊而不是一表格式的行 */
+.pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s1);
+  min-width: 0;
+}
+
+.pill {
+  max-width: 100%;
+}
+
+/* 胶囊一律同行、放不下换行，所以不再逐项隐藏。
+   只有演员设了门槛：一部片可能挂十几个演员，全渲染会让卡片高度失控 */
+.pill--actor {
+  display: none;
+}
+
+@container (min-width: 240px) {
+  .pill--actor {
+    display: inline-flex;
+  }
 }
 </style>
