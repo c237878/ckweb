@@ -82,7 +82,7 @@ cd ckweb && npm install && npm run dev
 | GET | `/api/Video/meta` | 分类/国家/系列 + 首页配置 |
 | GET | `/api/Video/home-sections` | **首页各分类板块一次返回**（替代按分类多次请求） |
 | GET | `/api/Video/autocode` | 生成下一个 `AUTOCODE-###` |
-| GET | `/api/Video/daily-recommend` | 今日推荐，按天内存缓存，`?refresh=true` 重取 |
+| GET | `/api/Video/daily-recommend` | 今日推荐：只缓存未看过影片的 id（不够数才掺看过的），卡片字段每次现查；按天缓存，`count` 变化或 `?refresh=true` 都会重建 |
 | GET | `/api/Video/recently-liked` | 最近点赞 |
 | GET | `/api/Video/top-liked` | 高赞影片 |
 | GET | `/api/Video/likes/stats` | 点赞日历 + 近 12 个月统计 |
