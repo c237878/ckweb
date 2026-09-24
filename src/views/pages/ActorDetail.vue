@@ -47,6 +47,7 @@
           :syncing="syncing"
           empty-text="这位演员还没有照片"
           @sync="syncImages"
+          @set-primary="setPrimary"
         />
       </section>
 
@@ -244,6 +245,22 @@ const syncImages = async () => {
     ui.error('同步失败：' + errText(err))
   } finally {
     syncing.value = false
+  }
+}
+
+// 换列表页那张脸：后端整组换主图标记，这里重取一次详情让相册与徽章跟上
+const setPrimary = async (fileName) => {
+  try {
+    const res = await actorApi.setPrimaryImage(route.params.id, fileName)
+    if (!res.success) {
+      ui.error(res.message || '设置失败')
+      return
+    }
+    ui.success(res.message || '已设为头像')
+    await loadActor()
+  } catch (err) {
+    console.error('设置演员头像失败:', err)
+    ui.error('设置失败：' + errText(err))
   }
 }
 

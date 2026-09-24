@@ -53,10 +53,24 @@
     </div>
 
     <div class="album__foot">
-      <span class="album__count">{{ index + 1 }} / {{ count }}</span>
-      <button type="button" class="btn btn--sm btn--ghost" :disabled="syncing" @click="sync">
-        {{ syncing ? '同步中…' : '重新同步' }}
-      </button>
+      <span class="album__count">
+        {{ index + 1 }} / {{ count }}
+        <span v-if="current.primary" class="album__badge">头像</span>
+      </span>
+      <div class="album__actions">
+        <button
+          v-if="!current.primary"
+          type="button"
+          class="btn btn--sm btn--ghost"
+          title="把这一张设为演员列表页上的脸"
+          @click="emit('set-primary', current.fileName)"
+        >
+          设为头像
+        </button>
+        <button type="button" class="btn btn--sm btn--ghost" :disabled="syncing" @click="sync">
+          {{ syncing ? '同步中…' : '重新同步' }}
+        </button>
+      </div>
     </div>
   </div>
 
@@ -115,23 +129,26 @@ const props = defineProps({
   syncing: { type: Boolean, default: false }
 })
 
-const emit = defineEmits(['sync'])
+const emit = defineEmits(['sync', 'set-primary'])
 
-const index = ref(0)
+const key = ref('')
 const zoomed = ref(false)
 const zoomEl = ref(null)
 let lastFocused = null
 
 const count = computed(() => props.images.length)
-const current = computed(() => props.images[Math.min(index.value, count.value - 1)] || props.images[0] || {})
+// 当前看的是哪张按文件名记，不按序号：设为主图后后端会把那张挪到最前，
+// 记序号的话翻页会跳到别的图片上
+const current = computed(
+  () => props.images.find((x) => x.fileName === key.value) || props.images[0] || {}
+)
+const index = computed(() => {
+  const at = props.images.findIndex((x) => x.fileName === current.value.fileName)
+  return at < 0 ? 0 : at
+})
 
 const thumbUrl = (fileName) => `/api/actor/${props.actorId}/thumb/m/${encodeURIComponent(fileName)}`
 const posterUrl = (fileName) => `/api/actor/${props.actorId}/poster/${encodeURIComponent(fileName)}`
-
-// 同步后张数可能变少，越界就拉回最后一张
-watch(count, (n) => {
-  if (index.value > n - 1) index.value = Math.max(0, n - 1)
-})
 
 // 知道原图宽高就把画框比例调成它的，画框就不会在竖图两侧留白。
 // 表里没尺寸（这张还没出过缩略图）时用刚加载到的自然尺寸顶上，
@@ -151,8 +168,11 @@ const onThumbLoad = (event) => {
 const mb = (bytes) => (bytes ? `${(bytes / 1048576).toFixed(1)} MB` : '')
 
 const step = (delta) => {
-  if (count.value < 2) return
-  index.value = (index.value + delta + count.value) % count.value
+  const n = count.value
+  if (n < 2) return
+  key.value = props.images[(index.value + delta + n) % n].fileName
+  // 新的一张还没解码出来之前，别把上一张的比例当成它的
+  liveAr.value = ''
 }
 
 const sync = () => emit('sync')
@@ -183,9 +203,10 @@ function onKeydown(event) {
   }
 }
 
-// 换演员时别带着上一个的页码
+// 换演员时别带着上一个的那张图
 watch(() => props.actorId, () => {
-  index.value = 0
+  key.value = ''
+  liveAr.value = ''
   closeZoom()
 })
 </script>
@@ -286,6 +307,25 @@ watch(() => props.actorId, () => {
   font-size: var(--f-xs);
   color: var(--text-faint);
   font-variant-numeric: tabular-nums;
+}
+
+.album__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+}
+
+/* 当前这张就是列表页那张脸时的标记，与全站胶囊同一套形状 */
+.album__badge {
+  display: inline-flex;
+  align-items: center;
+  height: var(--ctl-h-xs);
+  padding-inline: var(--ctl-pad-x-xs);
+  border-radius: var(--rp);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: var(--f-xs);
+  line-height: 1;
 }
 
 .album-lightbox {

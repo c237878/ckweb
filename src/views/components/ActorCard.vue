@@ -14,6 +14,15 @@
         @change="emit('select', actor)"
         @click.stop
       />
+      <!-- 脸只有同步过照片的演员才有；没图时整张卡片与原来一模一样 -->
+      <img
+        v-if="actor.avatar"
+        class="card-face"
+        :src="`/api/actor/${actor.id}/thumb/s/${encodeURIComponent(actor.avatar)}`"
+        :alt="`${actor.name} 的头像`"
+        loading="lazy"
+        decoding="async"
+      />
       <div class="card-body">
         <div class="card-title" :title="actor.name">{{ actor.name }}</div>
         <div class="pills">
@@ -51,3 +60,15 @@ const handleClick = () => {
   else router.push(`/actor/${props.actor.id}`)
 }
 </script>
+
+<style scoped>
+/* 头像跟着卡片高度走：行卡的高度由标题+胶囊决定，这里不反过来撑高卡片 */
+.card-face {
+  flex-shrink: 0;
+  width: 56px;
+  align-self: stretch;
+  object-fit: cover;
+  border-radius: var(--r1);
+  background: var(--bg-elev-2);
+}
+</style>

@@ -106,6 +106,8 @@ export const actorApi = {
   getCountries: () => api.get('/actor/countries'),
   /** 把艳图目录里的图片扫进 actor_images；不传 id 就是扫全部演员。清单本身由详情接口带出 */
   syncImages: (id) => api.post(id ? `/actor/${id}/images/sync` : '/actor/images/sync'),
+  /** 指定列表页那张脸用哪张图 */
+  setPrimaryImage: (id, fileName) => api.put(`/actor/${id}/image/primary`, { fileName }),
   add: (data) => api.post('/actor', data),
   update: (id, data) => api.put(`/actor/${id}`, data),
   delete: (id) => api.delete(`/actor/${id}`)

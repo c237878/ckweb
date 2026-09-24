@@ -74,7 +74,9 @@ v4 迁移把含 `http` 的简介逐条抽出（382 位演员 → 528 行，379 �
 同步只 `stat` 不打开文件；同名文件被换掉（mtime 变了）就刷新 `size` 并清掉 `width/height`；
 磁盘上没了的行会被删掉，整个目录没了的演员也一样——但**根目录不可读时一律直接报错、一个字都不写**，
 否则卷没挂上就等于把整张表清空。每人自动选一张主图（先看 `默认/default/cover/avatar/1…` 这类命名，否则按文件名取第一张），
-部分唯一索引保证一人只有一张，界面后续可手工改。
+部分唯一索引保证一人只有一张，详情页相册里可以「设为头像」手工改（`PUT /api/actor/{id}/image/primary`，
+先全清再置一，命不中就不动）。主图就是列表页那张脸：列表 SQL 用标量子查询带出 `avatar`，
+`ActorCard` 有值才渲染一个 56px 宽的头像条，没同步过照片的演员卡片与原来完全一样。
 `width/height` 由第一次生成缩略图时顺带回填，不额外解码一次。
 > 缩略图：`GET /api/actor/{id}/thumb/{s|m}/{fileName}`，`s`=160（列表页头像）、`m`=400（详情页相册），
 > WebP q80，落在 `Media:ThumbCache` 下按 `<演员ID>/<宽度>-<原文件名>.webp` 存，
@@ -125,8 +127,9 @@ v4 迁移把含 `http` 的简介逐条抽出（382 位演员 → 528 行，379 �
 `GET /stream/{id}`（支持 Range）· `GET /cover/{id}`（带 ETag + 一周强缓存）· `GET /{code}/subtitle/check` · `GET /{code}/subtitle` · `GET /{id}/recommend` · `POST /{id}/reset-file-size` · `PUT /{id}/file-info` · `PUT /{id}/media-flags` · `DELETE /{id}/file` · `POST /rename-to-code`
 
 ### /api/Actor
-`GET /` · `GET /{id}` · `POST /` · `PUT /{id}` · `DELETE /{id}` · `GET /countries` · `GET /{id}/videos` · `POST /images/sync` · `POST /{id}/images/sync` · `GET /{id}/poster/{fileName}` · `GET /{id}/thumb/{s|m}/{fileName}`
+`GET /` · `GET /{id}` · `POST /` · `PUT /{id}` · `DELETE /{id}` · `GET /countries` · `GET /{id}/videos` · `POST /images/sync` · `POST /{id}/images/sync` · `PUT /{id}/image/primary` · `GET /{id}/poster/{fileName}` · `GET /{id}/thumb/{s|m}/{fileName}`
 > 图片清单不再单独请求：`GET /{id}` 的 `data.images` 里就带着（来自 `actor_images`）。
+> 列表每行带 `avatar`（主图文件名，没有照片则为 null）——脸只出现在演员列表页这一处。
 > `GET /{id}/videos` 支持 `page` `pageSize` `mediaAttrFlags` `hasFile`，筛选在服务端完成后再分页。
 
 ### /api/Series
@@ -336,6 +339,9 @@ src/
 
 - 画框比例跟随图片：表里有宽高就用它，没有就用缩略图加载出来的自然尺寸，
   所以竖图不会在框里留出两条底色边。
+- **当前看的是哪张按文件名记，不按序号**：设为主图后后端会把那张挪到数组最前，
+  记序号的话翻页会跳去别的图片。
+- 底部两个动作：「设为头像」（当前这张不是主图时才出现，主图会带一枚"头像"徽章）与「重新同步」。
 - **没有照片时不占半页**：退化成一条虚线空态（"这位演员还没有照片" + 同步照片），头部回到单栏。
 - 与「艳图」的 `PosterWall` 是两套东西：那边一墙小图供浏览、随机取批、可换一批；
   这边逐张翻看、要能放大看细节。两者的灯箱各自实现，不互相牵连。
