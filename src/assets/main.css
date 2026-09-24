@@ -379,7 +379,9 @@ section {
   left: 0;
   right: 0;
   z-index: 30;
-  max-height: 288px;
+  /* 正好 9 行：9 × --ctl-h-sm(32) + 上下内缩 8 + 边框 2 = 298。
+     原来的 288 是 9 行的整数倍但没算内缩和边框，实际露出 8.7 行，最后一行被切成半截 */
+  max-height: 298px;
   overflow-y: auto;
   list-style: none;
   padding: 4px;
