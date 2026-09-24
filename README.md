@@ -34,7 +34,7 @@ cd ckweb && npm install && npm run dev
 启动时由 `ckapi/Services/DataService.cs` 负责：建表 → 按 `PRAGMA user_version` 逐级迁移 → 建索引 → `ANALYZE`。
 **`CreateBaseTables` 是"当前完整结构"的唯一权威声明**，`Migrations` 是历史库的追赶路径，两者必须保持等价（改结构时同时改两处）。全新库会直接标记为最新版本、跳过迁移。
 
-索引：`videos(ctime)`、`videos(category,ctime)`、`videos(code)`、`videos(country)`、`videos(seriesid,sort_order)`、`video_actors(actor_id)`、`video_likes(video_id,target_type)`、`video_likes(liked_at)`、`comics(ctime)`、`comic_chapters(comic_id,sort_order)`、`video_series(name)`。
+索引：`videos(ctime)`、`videos(category,ctime)`、`videos(code)`、`videos(country)`、`videos(seriesid,sort_order)`、`video_actors(actor_id)`、`video_likes(video_id,target_type)`、`video_likes(liked_at)`、`comics(ctime)`、`comic_chapters(comic_id,sort_order)`、`video_series(name)`、`actor_aliases(alias)`、`actor_links(actor_id,kind)`。
 
 ### 表
 
@@ -52,6 +52,19 @@ v3 迁移按空白拆分去重后把列删掉了；清洗规则与迁移共用 `
 （去空去重、丢掉与本人姓名相同的项、单项 ≤60 字、每人 ≤20 个）。
 检索：`/api/actor?keyword=` 会同时匹配姓名与曾用名，列表与详情都返回 `aliases: string[]`；
 新增/更新传 `aliases` 数组，整组替换。
+**actor_links** — `id` `actor_id` `kind` `url`，演员外链**一行一条**（schema v4 起）。
+以前这些地址是塞在 `bio` 里的，等于从没被信任过：接口原样吐出去，前端也就原样渲染。
+v4 迁移把含 `http` 的简介逐条抽出（382 位演员 → 528 行，379 条简介抽完就空了——它们本来就不是简介，
+是被当成链接容器用了），剩下的正文写回 `bio`。校验/归类规则与迁移共用 `ckapi/Utils/Links.cs`：
+只放行 http/https（`javascript:`、`data:` 一旦进了 `href` 就是现成的 XSS）、`www.` 开头补协议、
+按主机名归类（x.com/twitter.com→`twitter`、instagram.com→`instagram`、javcup/av-wiki/fanza→`profile`，
+都命中不了→`other`；`homepage` 只能手选）、忽略大小写与结尾斜杠去重、每人 ≤10 条、单条 ≤300 字。
+`kind` 传空串表示"按域名自动归类"，非白名单值同样回落到自动归类。
+列表与详情都返回 `links: [{kind, url}]`，新增/更新整组替换。
+编辑器就在 `AddActorDialog` 里（一行一条：类型下拉 + 地址输入 + 移除），没抽成公共组件——目前只有这一处用。
+详情页把每条渲染成一颗 `.tag.tag--info` 药丸，文案是「类型 + 主机名」（同一个类型常挂好几个站，只写类型分不清），
+`href` 只放 http(s)：前端也再挡一道，万一有人直接改库塞进 `javascript:` 也不会变成可点链接。
+前端 `LINK_KIND_OPTIONS`（`constants.js`）与后端 `Links.Kinds` 必须一一对应，改一边就要改另一边。
 > 演员照片仍是**文件墙**，不走数据库列：目录取 `system_settings.posterDir`，按 `<posterDir>/<演员ID>/*.jpg|png|webp` 枚举，经 `GET /api/actor/{id}/posters` 返回文件名。原先那个始终为空的 `avatar_path` 列已在 schema v2 删除，别再去库里找演员头像字段。
 
 **video_actors** — `(video_id, actor_id)` 复合主键，多对多

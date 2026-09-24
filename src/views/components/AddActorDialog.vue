@@ -39,6 +39,46 @@
         </label>
 
         <div class="field">
+          <span class="field__label">外部链接</span>
+          <div v-if="form.links.length" class="link-rows">
+            <div v-for="(row, i) in form.links" :key="i" class="link-row">
+              <SelectList
+                v-model="row.kind"
+                :options="LINK_KIND_OPTIONS"
+                all-label="自动归类"
+                class="link-row__kind"
+                label="链接类型"
+              />
+              <input
+                v-model.trim="row.url"
+                class="input"
+                type="text"
+                maxlength="300"
+                placeholder="https://example.com/…"
+                :aria-label="`第 ${i + 1} 条链接地址`"
+              />
+              <button
+                type="button"
+                class="btn btn--sm btn--ghost"
+                :aria-label="`移除第 ${i + 1} 条链接`"
+                @click="removeLink(i)"
+              >
+&times;
+</button>
+            </div>
+          </div>
+          <button
+            type="button"
+            class="btn btn--sm link-add"
+            :disabled="form.links.length >= MAX_LINKS"
+            @click="addLink"
+          >
+            添加链接
+          </button>
+          <span class="hint">只支持 http/https，最多 {{ MAX_LINKS }} 条；类型不选会按域名自动归类</span>
+        </div>
+
+        <div class="field">
           <label for="aa-bio">简介</label>
           <textarea
             id="aa-bio"
@@ -72,6 +112,9 @@ import Dialog from './Dialog.vue'
 import SelectList from './SelectList.vue'
 import ChipListEditor from './ChipListEditor.vue'
 import { toOptions } from '@/scripts/utils/options'
+import { LINK_KIND_OPTIONS } from '@/scripts/constants'
+
+const MAX_LINKS = 10
 
 const props = defineProps({
   visible: Boolean,
@@ -88,9 +131,21 @@ const form = ref({
   id: '',
   name: '',
   aliases: [],
+  links: [],
   country: '',
   bio: ''
 })
+
+const blankForm = () => ({ id: '', name: '', aliases: [], links: [], country: '', bio: '' })
+
+const addLink = () => {
+  // 空串是"自动归类"：新行一律留空，让后端按域名判型，判不到才算 other
+  form.value.links.push({ kind: '', url: '' })
+}
+
+const removeLink = (index) => {
+  form.value.links.splice(index, 1)
+}
 
 const isEdit = computed(() => !!props.editingActor)
 
@@ -117,10 +172,11 @@ watch(() => props.visible, (val) => {
         id: source.id || '',
         name: source.name || '',
         aliases: Array.isArray(source.aliases) ? [...source.aliases] : [],
+        links: Array.isArray(source.links) ? source.links.map((l) => ({ ...l })) : [],
         country: source.country || '',
         bio: source.bio || ''
       }
-    : { id: '', name: '', aliases: [], country: '', bio: '' }
+    : blankForm()
 })
 
 const handleSave = () => {
@@ -128,7 +184,9 @@ const handleSave = () => {
     ui.warn('请输入演员姓名')
     return
   }
-  emit('save', { ...form.value })
+  // 空地址行不发出去：后端会丢，但没必要把半成品当成一次有效提交
+  const { links, ...rest } = form.value
+  emit('save', { ...rest, links: links.filter((l) => l.url) })
 }
 
 const handleCancel = () => {
@@ -151,6 +209,32 @@ const handleDelete = () => {
 
 .req {
   color: var(--danger);
+}
+
+.link-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+
+.link-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+}
+
+.link-row .input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 类型列定宽，地址列吃剩余空间 */
+.link-row__kind {
+  flex-shrink: 0;
+}
+
+.link-add {
+  align-self: flex-start;
 }
 
 .switch {

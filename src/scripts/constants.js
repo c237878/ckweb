@@ -56,3 +56,19 @@ export const LIKE_TARGET_OPTIONS = [
   { value: 'video', label: '影片' },
   { value: 'comic', label: '漫画' }
 ]
+
+/**
+ * 演员外链类型：actor_links.kind。
+ * 取值必须与后端 Utils/Links.cs 的白名单一致，两边不一致会被静默归成 other。
+ * profile = 女优资料站（javcup / av-wiki 这类），这批数据里占绝大多数
+ */
+export const LINK_KIND_OPTIONS = [
+  { value: 'homepage', label: '个人主页' },
+  { value: 'profile', label: '资料页' },
+  { value: 'twitter', label: 'X / Twitter' },
+  { value: 'instagram', label: 'Instagram' },
+  { value: 'other', label: '其他' }
+]
+
+export const linkKindLabel = (kind) =>
+  LINK_KIND_OPTIONS.find((o) => o.value === kind)?.label || kind

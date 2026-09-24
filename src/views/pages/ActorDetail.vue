@@ -23,6 +23,19 @@
         </div>
 
         <p v-if="actor.aliases?.length" class="alias-row">曾用名：{{ actor.aliases.join('、') }}</p>
+
+        <div v-if="safeLinks.length" class="tag-row">
+          <a
+            v-for="link in safeLinks"
+            :key="link.url"
+            class="tag tag--info"
+            :href="link.url"
+            target="_blank"
+            rel="noopener noreferrer"
+            :title="link.url"
+          >{{ linkLabel(link) }}</a>
+        </div>
+
         <p v-if="actor.bio" class="bio-row">{{ decodeBio(actor.bio) }}</p>
       </section>
 
@@ -85,7 +98,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { actorApi } from '@/scripts/api'
 import { useAppStore } from '@/scripts/store/app'
 import { useUiStore, errText } from '@/scripts/store/ui'
-import { MEDIA_FLAGS } from '@/scripts/constants'
+import { MEDIA_FLAGS, linkKindLabel } from '@/scripts/constants'
 import VideoCard from '@/views/components/VideoCard.vue'
 import AddActorDialog from '@/views/components/AddActorDialog.vue'
 import PosterWall from '@/views/components/PosterWall.vue'
@@ -113,6 +126,18 @@ const mediaAttrFilter = ref('')
 const showEditDialog = ref(false)
 
 const pageSize = computed(() => app.pageSize)
+
+// 后端写入时已校验过 scheme，这里再挡一道：非 http(s) 不渲染成链接，
+// 免得哪天直接改库把 javascript: 塞进来就是一条现成的 XSS
+const safeLinks = computed(() =>
+  (actor.value?.links || []).filter((l) => /^https?:\/\//i.test(l.url || ''))
+)
+
+// 同一类型常挂好几个站（资料页尤其多），只写类型看不出是哪个，补一段主机名
+const linkLabel = (link) => {
+  const host = (link.url.match(/^https?:\/\/([^/]+)/i)?.[1] || '').replace(/^www\./i, '')
+  return host ? `${linkKindLabel(link.kind)} ${host}` : linkKindLabel(link.kind)
+}
 
 // 片源筛选下沉到后端，所以 '0'（未标记）是一个真实的筛选值而不是"排除"
 const mediaFlagOptions = computed(() =>
