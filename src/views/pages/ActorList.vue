@@ -15,6 +15,14 @@
           >
             {{ syncing ? '同步中…' : '同步照片' }}
           </button>
+          <button
+            class="btn btn--sm"
+            :class="{ 'btn--ghost': grabbing }"
+            :title="grabbing ? '再点一次停下来' : '按姓名与曾用名去 av-wiki 找头像，只有唯一命中且名字对得上才抓；查重候选里的演员会跳过'"
+            @click="grabAvatars"
+          >
+            {{ grabbing ? grabLabel || '抓取中…' : '抓取头像' }}
+          </button>
           <button class="btn btn--sm" title="列出共享曾用名或本名互指的演员，逐组决定要不要合并" @click="showMerge = true">
             查重
           </button>
@@ -102,7 +110,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onBeforeUnmount, onMounted, computed, watch } from 'vue'
 import { actorApi } from '@/scripts/api'
 import { useAppStore } from '@/scripts/store/app'
 import { useUiStore, errText } from '@/scripts/store/ui'
@@ -263,6 +271,53 @@ const handleSyncImages = async () => {
     ui.error('同步失败：' + errText(err))
   } finally {
     syncing.value = false
+  }
+}
+
+// 抓取是长活：站端要一个个查、还要节流，所以后端每次只处理一批，
+// 这里循环调用直到 remaining 归零；中途想停就再点一次按钮
+const grabbing = ref(false)
+const grabLabel = ref('')
+let grabAbort = false
+// 离开本页就把循环停掉：请求是人发起的，页面都没了还在替它轮询没道理
+let grabLeft = false
+onBeforeUnmount(() => { grabLeft = true })
+
+const grabAvatars = async () => {
+  if (grabbing.value) {
+    grabAbort = true
+    return
+  }
+  grabbing.value = true
+  grabAbort = false
+  grabLeft = false
+  let fetched = 0
+  let checked = 0
+  try {
+    while (!grabAbort && !grabLeft) {
+      const res = await actorApi.fetchAvatars(40)
+      if (!res.success) {
+        ui.error(res.message || '抓取失败')
+        break
+      }
+      checked += res.data.processed
+      fetched += res.data.fetched
+      grabLabel.value = `已抓 ${fetched} / 查 ${checked}${res.data.remaining ? ` · 剩 ${res.data.remaining}` : ''}`
+      if (!res.data.remaining || res.data.stopped) {
+        if (res.data.stopped) ui.warn(res.message)
+        break
+      }
+    }
+    if (grabAbort) ui.info(`已中止：查到 ${checked} 位，抓到 ${fetched} 张头像`)
+    else if (checked) ui.success(`查到 ${checked} 位，抓到 ${fetched} 张头像`)
+    await loadActors()
+  } catch (err) {
+    console.error('批量抓取头像失败:', err)
+    ui.error('抓取失败：' + errText(err))
+  } finally {
+    grabbing.value = false
+    grabLabel.value = ''
+    grabAbort = false
   }
 }
 

@@ -7,28 +7,34 @@
   </div>
 
   <div v-else class="album">
+    <!-- 重叠扇形：当前这张抬到正中、收成圆形当头像，其余按左右偏移斜着压在它后面。
+         位置只由槽位号 --r 派生，所以"切换"就是改槽位，卡片移动全交给 CSS 过渡 -->
     <div
-      class="album__frame"
-      :style="aspectStyle"
+      class="album__fan"
       role="group"
       aria-roledescription="相册"
       :aria-label="`演员照片 ${index + 1} / ${count}，${name}`"
     >
-      <!-- 放大与翻页都挂在同一个按钮上：整个相册只占一个 Tab 停靠点 -->
       <button
+        v-for="at in slots"
+        :key="at.image.fileName"
         type="button"
-        class="album__zoom"
-        :aria-label="`放大查看原图：${current.fileName}（左右方向键翻页）`"
-        @click="openZoom"
-        @keydown="onKeydown"
+        class="album__card"
+        :class="{ 'is-current': at.r === 0, 'is-ghost': !at.visible }"
+        :style="{ '--r': at.slot, '--d': Math.abs(at.slot), '--z': 9 - Math.abs(at.slot) }"
+        :tabindex="at.r === 0 ? 0 : -1"
+        :aria-label="at.r === 0
+          ? `放大查看原图：${at.image.fileName}（左右方向键翻页）`
+          : `看第 ${at.pos + 1} 张：${at.image.fileName}`"
+        @click="at.r === 0 ? openZoom() : go(at.pos)"
+        @keydown="at.r === 0 ? onKeydown($event) : null"
       >
         <img
-          :key="current.fileName"
+          v-if="at.visible"
           class="album__img"
-          :src="thumbUrl(current.fileName)"
-          :alt="`${name} 照片 ${index + 1}`"
+          :src="thumbUrl(at.image.fileName)"
+          :alt="`${name} 照片 ${at.pos + 1}`"
           decoding="async"
-          @load="onThumbLoad"
         />
       </button>
 
@@ -37,6 +43,7 @@
         type="button"
         class="album__nav album__nav--prev"
         aria-label="上一张"
+        tabindex="-1"
         @click="step(-1)"
       >
         &lsaquo;
@@ -46,6 +53,7 @@
         type="button"
         class="album__nav album__nav--next"
         aria-label="下一张"
+        tabindex="-1"
         @click="step(1)"
       >
         &rsaquo;
@@ -67,6 +75,15 @@
         >
           设为头像
         </button>
+        <button
+          type="button"
+          class="btn btn--sm btn--ghost"
+          :disabled="fetching"
+          title="按姓名与曾用名去 av-wiki 的档案页找头像：只有唯一命中、且名字对得上才抓，拿不准就跳过"
+          @click="emit('fetch-avatar')"
+        >
+          {{ fetching ? '抓取中…' : '抓头像' }}
+        </button>
         <button type="button" class="btn btn--sm btn--ghost" :disabled="syncing" @click="sync">
           {{ syncing ? '同步中…' : '重新同步' }}
         </button>
@@ -74,7 +91,7 @@
     </div>
   </div>
 
-  <!-- 放大看原图：缩略图只到 400px，要看细节得回源 -->
+  <!-- 放大看原图：扇面里只有 400px 缩略图，要看细节得回源 -->
   <div v-if="zoomed" class="overlay album-lightbox" @click.self="closeZoom">
     <figure
       ref="zoomEl"
@@ -105,7 +122,9 @@
       >
         &rsaquo;
       </button>
-      <button type="button" class="album-lightbox__close" aria-label="关闭预览" @click="closeZoom">&times;</button>
+      <button type="button" class="album-lightbox__close" aria-label="关闭预览" @click="closeZoom">
+        &times;
+      </button>
     </figure>
   </div>
 </template>
@@ -116,9 +135,12 @@ import { computed, nextTick, ref, watch } from 'vue'
 /**
  * 演员相册：详情页头部右侧那一格。
  *
- * 与「艳图」的 PosterWall 是两回事——那边是一墙小图供浏览，这边是一次看一张、
- * 左右翻页，因为演员图片动辄几十张、单张细节才有意义。
- * 图片清单来自 actor_images 表（由「同步照片」按钮触发扫描），这里不再隐式扫盘。
+ * 排版是"一把摊开的照片"：当前这张抬到正中收成圆形头像，其余斜着压在它后面。
+ * 卡片位置 = f(与当前张的槽位差)，切换时只是槽位差变了，于是 CSS 过渡把每张
+ * 都滑到新位置 —— 不需要 JS 动画，也不会跳位。
+ *
+ * 图片清单来自 actor_images 表（由「同步照片」触发扫描），这里不再隐式扫盘。
+ * 与「艳图」的 PosterWall 是两回事：那边一墙小图供浏览，这边逐张翻看并能放大。
  */
 const props = defineProps({
   actorId: { type: String, required: true },
@@ -126,10 +148,16 @@ const props = defineProps({
   images: { type: Array, default: () => [] },
   name: { type: String, default: '' },
   emptyText: { type: String, default: '还没有照片' },
-  syncing: { type: Boolean, default: false }
+  syncing: { type: Boolean, default: false },
+  fetching: { type: Boolean, default: false }
 })
 
-const emit = defineEmits(['sync', 'set-primary'])
+const emit = defineEmits(['sync', 'set-primary', 'fetch-avatar'])
+
+// 扇面上摆 ±3 张。再多留几格缓冲是为了让卡片有"滑进来"的落点而不是凭空出现；
+// 几百张图全建节点没意义，所以按窗口切片
+const SPAN = 3
+const BUFFER = 3
 
 const key = ref('')
 const zoomed = ref(false)
@@ -137,8 +165,8 @@ const zoomEl = ref(null)
 let lastFocused = null
 
 const count = computed(() => props.images.length)
-// 当前看的是哪张按文件名记，不按序号：设为主图后后端会把那张挪到最前，
-// 记序号的话翻页会跳到别的图片上
+// 当前看的是哪张按文件名记，不按序号：设为主图后后端会把那张挪到数组最前，
+// 记序号的话翻页会跳去别的图片上
 const current = computed(
   () => props.images.find((x) => x.fileName === key.value) || props.images[0] || {}
 )
@@ -147,32 +175,37 @@ const index = computed(() => {
   return at < 0 ? 0 : at
 })
 
+const slots = computed(() => {
+  const out = []
+  const from = Math.max(0, index.value - SPAN - BUFFER)
+  const to = Math.min(props.images.length - 1, index.value + SPAN + BUFFER)
+  for (let pos = from; pos <= to; pos++) {
+    const r = pos - index.value
+    out.push({
+      image: props.images[pos],
+      pos,
+      r,
+      slot: Math.max(-SPAN, Math.min(SPAN, r)),
+      visible: Math.abs(r) <= SPAN
+    })
+  }
+  return out
+})
+
 const thumbUrl = (fileName) => `/api/actor/${props.actorId}/thumb/m/${encodeURIComponent(fileName)}`
 const posterUrl = (fileName) => `/api/actor/${props.actorId}/poster/${encodeURIComponent(fileName)}`
 
-// 知道原图宽高就把画框比例调成它的，画框就不会在竖图两侧留白。
-// 表里没尺寸（这张还没出过缩略图）时用刚加载到的自然尺寸顶上，
-// 首次浏览也不会先按 2:3 摆好再跳一下
-const liveAr = ref('')
-const aspectStyle = computed(() => {
-  const { width, height } = current.value
-  if (width > 0 && height > 0) return { '--ar': (width / height).toFixed(4) }
-  return liveAr.value ? { '--ar': liveAr.value } : {}
-})
-
-const onThumbLoad = (event) => {
-  const { naturalWidth: w, naturalHeight: h } = event.target
-  liveAr.value = w > 0 && h > 0 ? (w / h).toFixed(4) : ''
-}
-
 const mb = (bytes) => (bytes ? `${(bytes / 1048576).toFixed(1)} MB` : '')
+
+const go = (pos) => {
+  const img = props.images[pos]
+  if (img) key.value = img.fileName
+}
 
 const step = (delta) => {
   const n = count.value
   if (n < 2) return
-  key.value = props.images[(index.value + delta + n) % n].fileName
-  // 新的一张还没解码出来之前，别把上一张的比例当成它的
-  liveAr.value = ''
+  go((index.value + delta + n) % n)
 }
 
 const sync = () => emit('sync')
@@ -206,7 +239,6 @@ function onKeydown(event) {
 // 换演员时别带着上一个的那张图
 watch(() => props.actorId, () => {
   key.value = ''
-  liveAr.value = ''
   closeZoom()
 })
 </script>
@@ -231,59 +263,92 @@ watch(() => props.actorId, () => {
   font-size: var(--f-sm);
 }
 
-.album__frame {
-  /* 画框跟着图片的比例走：定死高度再按 ar 反算宽度，才不会在竖图两侧留一大片底色 */
-  --ar: 0.667;
+.album__fan {
   position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: min(420px, 56vh);
-  aspect-ratio: var(--ar);
-  max-width: 100%;
-  margin-inline: auto;
+  height: 200px;
+  /* 侧栏窄的时候最外层的卡片会探出去一点，裁掉即可，别撑出横向滚动 */
+  overflow: hidden;
+}
+
+.album__card {
+  position: absolute;
+  top: 12px;
+  /* 横向偏移用百分比：窄栏里扇形自动收拢，不会顶到左边文字那一栏 */
+  left: calc(50% + var(--r) * 13.5%);
+  width: 124px;
+  height: 124px;
+  padding: 0;
   overflow: hidden;
   background: var(--bg-elev-2);
   border: 1px solid var(--border);
-  border-radius: var(--r2);
+  /* 圆角只给当前这张：它是头像；其余保持方角，才有"照片"的样子 */
+  border-radius: 12px;
+  box-shadow: var(--shadow-2);
+  z-index: var(--z);
+  /* --d 越大压得越低、缩得越小，扇形才有前后层次 */
+  transform: translateX(-50%) translateY(calc(var(--d) * 11px)) rotate(calc(var(--r) * 8deg))
+    scale(calc(1 - var(--d) * 0.09));
+  transition: transform 380ms cubic-bezier(.22, .61, .36, 1),
+    border-radius 380ms cubic-bezier(.22, .61, .36, 1), width 380ms cubic-bezier(.22, .61, .36, 1),
+    height 380ms cubic-bezier(.22, .61, .36, 1), top 380ms cubic-bezier(.22, .61, .36, 1),
+    opacity 260ms var(--ease), box-shadow var(--dur) var(--ease);
 }
 
-.album__zoom {
-  display: block;
-  width: 100%;
-  height: 100%;
-  padding: 0;
-  border: 0;
-  background: none;
+.album__card.is-current {
+  top: 26px;
+  width: 148px;
+  height: 148px;
+  border-radius: 50%;
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-3);
+  transform: translateX(-50%) scale(1);
   cursor: zoom-in;
 }
 
-.album__zoom:focus-visible {
+.album__card:not(.is-current):hover {
+  /* 侧面的卡片抬一点，摆明"点得动" */
+  transform: translateX(-50%) translateY(calc(var(--d) * 11px - 8px)) rotate(calc(var(--r) * 8deg))
+    scale(calc(1.04 - var(--d) * 0.09));
+}
+
+.album__card:focus-visible {
   outline: none;
-  box-shadow: var(--ring);
+  box-shadow: var(--ring), var(--shadow-3);
+}
+
+/* 滑出扇面的那些：停在边上并淡掉。位置仍然连续，所以滑进来时是移动而不是闪现 */
+.album__card.is-ghost {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .album__img {
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+/* 圆里要看到的是脸：竖构图的照片裁中间会只剩腰，所以取上三分 */
+.album__card.is-current .album__img {
+  object-position: center 18%;
 }
 
 .album__nav {
   position: absolute;
-  top: 50%;
+  top: 84px;
+  z-index: 20;
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   border-radius: var(--rp);
   background: var(--overlay);
   /* 半透明底上的字固定用 #fff，与海报灯箱同一套 */
   color: #fff;
   font-size: var(--f-lg);
   line-height: 1;
-  transform: translateY(-50%);
   transition: background var(--dur) var(--ease);
 }
 
@@ -292,11 +357,11 @@ watch(() => props.actorId, () => {
 }
 
 .album__nav--prev {
-  left: var(--s2);
+  left: 0;
 }
 
 .album__nav--next {
-  right: var(--s2);
+  right: 0;
 }
 
 .album__foot {
@@ -304,6 +369,7 @@ watch(() => props.actorId, () => {
   align-items: center;
   justify-content: space-between;
   gap: var(--s3);
+  flex-wrap: wrap;
   font-size: var(--f-xs);
   color: var(--text-faint);
   font-variant-numeric: tabular-nums;

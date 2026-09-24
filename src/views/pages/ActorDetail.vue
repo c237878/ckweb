@@ -45,9 +45,11 @@
           :images="images"
           :name="actor.name"
           :syncing="syncing"
+          :fetching="fetching"
           empty-text="这位演员还没有照片"
           @sync="syncImages"
           @set-primary="setPrimary"
+          @fetch-avatar="fetchAvatar"
         />
       </section>
 
@@ -113,6 +115,7 @@ const ui = useUiStore()
 
 const actor = ref(null)
 const syncing = ref(false)
+const fetching = ref(false)
 const videos = ref([])
 const page = ref(1)
 const total = ref(0)
@@ -261,6 +264,24 @@ const setPrimary = async (fileName) => {
   } catch (err) {
     console.error('设置演员头像失败:', err)
     ui.error('设置失败：' + errText(err))
+  }
+}
+
+// 抓不到是常态（站上没有档案、或名字对不上），所以原因用同一条 toast 说清楚，
+// 不要静默失败让人以为按钮坏了
+const fetchAvatar = async () => {
+  if (fetching.value) return
+  fetching.value = true
+  try {
+    const res = await actorApi.fetchAvatar(route.params.id)
+    if (res.success) ui.success(res.message || '已抓到头像')
+    else ui.warn(res.message || '没抓到')
+    await loadActor()
+  } catch (err) {
+    console.error('抓取头像失败:', err)
+    ui.error('抓取失败：' + errText(err))
+  } finally {
+    fetching.value = false
   }
 }
 

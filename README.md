@@ -134,7 +134,7 @@ v4 迁移把含 `http` 的简介逐条抽出（382 位演员 → 528 行，379 �
 `GET /stream/{id}`（支持 Range）· `GET /cover/{id}`（带 ETag + 一周强缓存）· `GET /{code}/subtitle/check` · `GET /{code}/subtitle` · `GET /{id}/recommend` · `POST /{id}/reset-file-size` · `PUT /{id}/file-info` · `PUT /{id}/media-flags` · `DELETE /{id}/file` · `POST /rename-to-code`
 
 ### /api/Actor
-`GET /` · `GET /{id}` · `POST /` · `PUT /{id}` · `DELETE /{id}` · `GET /countries` · `GET /{id}/videos` · `POST /images/sync` · `POST /{id}/images/sync` · `PUT /{id}/image/primary` · `GET /{id}/poster/{fileName}` · `GET /{id}/thumb/{s|m}/{fileName}` · `GET /duplicates` · `POST /merge`
+`GET /` · `GET /{id}` · `POST /` · `PUT /{id}` · `DELETE /{id}` · `GET /countries` · `GET /{id}/videos` · `POST /images/sync` · `POST /{id}/images/sync` · `PUT /{id}/image/primary` · `POST /{id}/avatar/fetch` · `POST /avatars/fetch?limit=40` · `GET /{id}/poster/{fileName}` · `GET /{id}/thumb/{s|m}/{fileName}` · `GET /duplicates` · `POST /merge`
 > 图片清单不再单独请求：`GET /{id}` 的 `data.images` 里就带着（来自 `actor_images`）。
 > 列表每行带 `avatar`（主图文件名，没有照片则为 null）——脸只出现在演员列表页这一处。
 > `GET /{id}/videos` 支持 `page` `pageSize` `mediaAttrFlags` `hasFile`，筛选在服务端完成后再分页。
@@ -339,18 +339,43 @@ src/
 
 ### 演员相册（`views/components/ActorAlbum.vue`）
 
-详情页头部是**左文本 / 右相册**两栏（`.actor-header--split`，断点 900px 与影视卡片的完全形态同一条线）：
-一次看一张、`‹ ›` 翻页、底部 `n / 总数` + 重新同步；点图片放大看原图，Esc 关闭、焦点回到触发按钮。
-整个相册只占**一个 Tab 停靠点**（放大与翻页都在同一个按钮上，方向键就地翻页）。
+详情页头部是**左文本 / 右相册**两栏（`.actor-header--split`，断点 900px 与影视卡片的完全形态同一条线）。
+右边是**一把摊开的照片**：当前这张抬到正中、收成圆形当头像，其余按左右偏移斜着压在它后面（重叠扇形）。
+卡片位置只由"与当前张的槽位差"派生（`--r` / `--d` 两个 CSS 变量），切换时只是槽位差变了，
+于是 CSS 过渡把每张都滑到新位置 —— 没有一行 JS 动画代码，也不会跳位。
 
-- 画框比例跟随图片：表里有宽高就用它，没有就用缩略图加载出来的自然尺寸，
-  所以竖图不会在框里留出两条底色边。
+- 圆里取的是图片**上三分**（`object-position: center 18%`）：竖构图按中间裁，头像会只剩腰。
+- 扇面上摆 ±3 张，再往外各留 3 格缓冲：卡片是"滑进来"的，不是凭空出现；
+  几百张图不会全建节点，按窗口切片。
+- 侧面的卡片点一下就切过去（当前这张点了是放大原图）。整个相册只占**一个 Tab 停靠点**，
+  方向键翻页、Esc 关灯箱、关闭后焦点落回原处。
 - **当前看的是哪张按文件名记，不按序号**：设为主图后后端会把那张挪到数组最前，
   记序号的话翻页会跳去别的图片。
-- 底部两个动作：「设为头像」（当前这张不是主图时才出现，主图会带一枚"头像"徽章）与「重新同步」。
+- 底部三个动作：「设为头像」（当前这张不是主图时才出现，主图带一枚"头像"徽章）、
+  「抓头像」（见下节）、「重新同步」。
 - **没有照片时不占半页**：退化成一条虚线空态（"这位演员还没有照片" + 同步照片），头部回到单栏。
 - 与「艳图」的 `PosterWall` 是两套东西：那边一墙小图供浏览、随机取批、可换一批；
   这边逐张翻看、要能放大看细节。两者的灯箱各自实现，不互相牵连。
+
+### av-wiki 头像抓取（`ckapi/Utils/AvWiki.cs`）
+
+站上每个女优是一个 WordPress tag，档案块（`AV女優名` / `別名義` / 头像直链 / SNS）就挂在 tag 的
+`description` 里，所以走 `/wp-json/wp/v2/tags` 这个 JSON 接口，不去解析网页排版。
+
+**认错人比抓不到严重得多**：一张别人的脸会长期挂在演员列表上，而且没人会去核对。
+"确定"的口径写死在 `AvWiki.Certify`：命中结果里**恰好一个**档案的名字集合
+与我们库里的姓名/曾用名对得上（交集项 ≥2 字）才算数；零个、多个、没有头像一律跳过并给出原因。
+查询顺序：库里已有的 av-wiki 档案链接（自己的数据已经指向它）→ 含假名的曾用名（最接近站上的写法）
+→ 其余曾用名 → 本名，每人最多问 5 次。繁简字形不同就是不同的人，**不做繁简归一**——
+归一就把「泽/沢」这类差异抹平了，那正是查重风险所在。
+
+- 落盘文件名固定 `默认.<ext>`：`ImageIndex` 补选主图时第一个就认它，不用额外置位。
+- 已有照片的演员不动手；**还在查重候选里的一律跳过**（先合并再抓，免得同一张脸在两个名字下各存一份）。
+- 站间节流 300ms；连续 3 次站点失败就中止本轮，不跟限流硬碰。
+- 批量接口按每次 40 位分批，前端循环调用到 `remaining` 归零；中途可停，离开页面自动停。
+  实测约 1~5 秒/位，全库是小时级的活，跑一半随时可以停。
+- 每抓成一张写一行日志（演员 ID、我们的名字、档案名与 slug）：批量跑的时候，
+  这是唯一能回看"这张脸是从哪个档案抓来的"的地方。
 
 ### 重复演员合并（`views/components/ActorMergeDialog.vue`）
 

@@ -62,13 +62,15 @@ const handleClick = () => {
 </script>
 
 <style scoped>
-/* 头像跟着卡片高度走：行卡的高度由标题+胶囊决定，这里不反过来撑高卡片 */
+/* 与详情页相册同一套语言：脸就是头像，所以是圆的，不参与卡片高度的拉伸 */
 .card-face {
   flex-shrink: 0;
-  width: 56px;
-  align-self: stretch;
+  align-self: center;
+  width: 60px;
+  height: 60px;
   object-fit: cover;
-  border-radius: var(--r1);
+  border: 1px solid var(--border);
+  border-radius: 50%;
   background: var(--bg-elev-2);
 }
 </style>
