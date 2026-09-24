@@ -1,7 +1,7 @@
 <template>
   <div class="page highlights">
     <div class="page-header">
-      <h1 class="page-title">精彩瞬间</h1>
+      <h1 class="page-title">掠影</h1>
       <div v-if="posters.length" class="header-actions">
         <span class="tag tag--accent">{{ countLabel }}</span>
         <button v-if="canShuffle" class="btn btn--sm" @click="seed++">换一批</button>
@@ -30,7 +30,7 @@
 
     <div v-else class="empty">
       <p>{{ emptyHint }}</p>
-      <p class="hint">海报放在海报墙目录的 default 子目录下</p>
+      <p class="hint">照片放在「掠影目录」的 default 子目录下</p>
       <router-link class="btn btn--sm" to="/settings">前往设置</router-link>
     </div>
   </div>
@@ -44,7 +44,7 @@ import PosterWall from '@/views/components/PosterWall.vue'
 const posters = ref([])
 const loading = ref(true)
 const error = ref('')
-const emptyHint = ref('暂无精彩瞬间')
+const emptyHint = ref('暂无掠影')
 
 // 画布不滚动，装不下就由 PosterWall 随机取一批；自增 seed 即换一批
 const seed = ref(0)
@@ -72,14 +72,14 @@ const loadPosters = async () => {
         })
         .filter((p) => p.src)
       // 未配置目录 / default 不存在时后端回 success:true + 提示语，直接用它
-      emptyHint.value = posters.value.length ? '暂无精彩瞬间' : res.message || '暂无精彩瞬间'
+      emptyHint.value = posters.value.length ? '暂无掠影' : res.message || '暂无掠影'
     } else {
-      error.value = res.message || '精彩瞬间加载失败'
+      error.value = res.message || '掠影加载失败'
     }
   } catch (err) {
     console.error('加载失败:', err)
     // 原先这里塞了一批 picsum 假图，后端挂了也看不出来
-    error.value = '精彩瞬间加载失败，请确认后端服务可用'
+    error.value = '掠影加载失败，请确认后端服务可用'
   } finally {
     loading.value = false
   }

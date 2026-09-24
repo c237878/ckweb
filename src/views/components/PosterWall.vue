@@ -39,7 +39,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 /**
- * 散贴海报墙：演员海报与「精彩瞬间」共用。
+ * 散贴照片墙：演员海报与「掠影」共用。
  *
  * 要的效果是"一面贴满照片的墙"：乍一看歪歪扭扭，细看每张之间间距又均匀。
  * 做法是抖动网格——先把画布等分成格子（每行的张数尽量平均，不留短尾行），
@@ -69,16 +69,15 @@ const emit = defineEmits(['shown'])
 
 const ASPECT = 1.4        // 海报竖比（高 / 宽）
 const GAP = 18            // 期望间隙
-const MAX_ROTATION = 5    // 最大倾角（deg）
 const MAX_COLS = 10
 const MIN_RATIO = 0.72    // 相对 baseWidth 的最小/最大缩放
 const MAX_RATIO = 1.5
 
-// 两种模式的松散程度。scatter 允许压叠的前提：位移不超过格心的 0.34、
+// 两种模式的松散度。scatter 允许压叠的前提：位移不超过格心的 0.34、
 // 单边不超过 1.3 倍格宽，所以每张总有大半面积露在最外侧，点得到
 const LAYOUT = {
-  grid: { fill: 0.86, jitter: 0.26, size: [0.92, 1.08], aspectJitter: 0 },
-  scatter: { fill: 1, jitter: 0.34, size: [0.74, 1.3], aspectJitter: 0.16 }
+  grid: { fill: 0.86, jitter: 0.26, size: [0.92, 1.08], aspectJitter: 0, rotation: 5 },
+  scatter: { fill: 1, jitter: 0.34, size: [0.74, 1.3], aspectJitter: 0.16, rotation: 11 }
 }
 
 const wallRef = ref(null)
@@ -188,7 +187,7 @@ const layout = computed(() => {
         width: `${pw}px`,
         height: `${ph}px`,
         // 倾角与叠放次序都交给 CSS 变量，悬停在样式表里覆盖 transform
-        '--rot': `${((unit(seed, 3) - 0.5) * MAX_ROTATION * 2).toFixed(2)}deg`,
+        '--rot': `${((unit(seed, 3) - 0.5) * mode.rotation * 2).toFixed(2)}deg`,
         '--z': String(1 + Math.floor(unit(seed, 5) * 12))
       }
     }
