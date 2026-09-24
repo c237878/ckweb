@@ -122,6 +122,12 @@ export const settingApi = {
   save: (data) => api.post('/systemsetting', data)
 }
 
+// 数据源（地区 / 分类）管理：清单 + 引用计数，改名带级联
+export const taxonomyApi = {
+  get: () => api.get('/taxonomy'),
+  save: (data) => api.post('/taxonomy', data)
+}
+
 // 系列相关API
 export const seriesApi = {
   getList: (params) => api.get('/series', { params }),

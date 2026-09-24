@@ -4,7 +4,7 @@
       <h1 class="page-title">影视系列</h1>
       <div class="header-actions">
         <template v-if="mode === 'browse'">
-          <button class="btn btn--primary" @click="handleAdd">添加系列</button>
+          <button class="btn btn--sm" @click="handleAdd">添加</button>
           <button class="btn btn--sm" @click="enterMode('select')">删除</button>
           <button class="btn btn--sm" @click="enterMode('edit')">编辑</button>
         </template>

@@ -345,40 +345,6 @@ onMounted(async () => {
   border-radius: var(--r1);
 }
 
-.table-wrap {
-  overflow-x: auto;
-}
-
-.table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--f-md);
-}
-
-.table th,
-.table td {
-  padding: var(--s2) var(--s3);
-  border-bottom: 1px solid var(--border);
-  text-align: left;
-  vertical-align: middle;
-}
-
-.table thead th {
-  background: var(--bg-elev-2);
-  color: var(--text-dim);
-  font-size: var(--f-sm);
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.table tbody tr:last-child td {
-  border-bottom: none;
-}
-
-.table tbody tr:hover {
-  background: var(--bg-hover);
-}
-
 .col-check {
   width: 40px;
 }

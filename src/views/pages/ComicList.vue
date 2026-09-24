@@ -4,7 +4,7 @@
       <h1 class="page-title">漫画管理</h1>
       <div class="header-actions">
         <template v-if="mode === 'browse'">
-          <button class="btn btn--primary" @click="handleAdd">添加漫画</button>
+          <button class="btn btn--sm" @click="handleAdd">添加</button>
           <button class="btn btn--sm" @click="enterMode('select')">删除</button>
           <button class="btn btn--sm" @click="enterMode('edit')">编辑</button>
         </template>
@@ -72,7 +72,7 @@
     </div>
 
     <div v-else class="empty">
-      <p>{{ hasFilter ? '没有符合条件的漫画' : '暂无漫画，点击上方「添加漫画」开始' }}</p>
+      <p>{{ hasFilter ? '没有符合条件的漫画' : '暂无漫画，点击上方「添加」开始' }}</p>
       <button v-if="hasFilter" class="btn btn--sm" @click="handleReset">清除筛选</button>
     </div>
 

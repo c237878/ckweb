@@ -91,14 +91,6 @@ const navItems = [
   letter-spacing: .3px;
   color: var(--text);
   white-space: nowrap;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--s2);
-}
-
-.logo a::before {
-  content: '◐';
-  color: var(--accent);
 }
 
 .nav-menu {

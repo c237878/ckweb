@@ -258,22 +258,31 @@ src/
 
 ### 系统设置页
 
-`views/pages/Settings.vue` 是「左侧分组导航 + 右侧分区卡片」的两栏结构。
+`views/pages/Settings.vue` 是「左侧标签 + 右侧单个分区卡片」的两栏结构：
+点标签只显示对应分区（`role=tablist` / `tab` / `tabpanel`，方向键切换）。
+之前用锚点滚动定位 + 滚动高亮，手机上要滚很久且高亮跟不上，已废弃，不要改回去。
 分区顺序、导航项、标题与说明都取自脚本里的 `GROUPS` 一处定义；
 新增一项设置只给 `settingsList` 的元素加上 `group`，它会自动落进对应分区并共用该分区的保存按钮。
-窄屏（<900px）时导航退化成顶部一行可横滑的分组芯片。
+窄屏（<900px）时标签变成顶部一行可横滑的标签条。
 
-**数据源**分区管 `countries` / `categories` 两份逗号分隔清单：影片、系列、演员的地区和影片的分类，
+**数据源**分区管 `countries` / `categories` 两份清单：影片、系列、演员的地区和影片的分类，
 可选值全部来自这里（后端 `Utils.Options.CommaList`），编辑页只能选不能造词，
 所以不同页面看到的选项一定一致。清单为空时后端不回退到表内 DISTINCT —— 管理员清空是有意为之。
 
-**OptionListEditor** —— 编辑这类逗号分隔清单的控件，`v-model` 就是原始字符串，父子之间不做二次转换：
+数据源用 **TaxonomyTable** 管理（`GET/POST /api/taxonomy`）：表格里能同时看到现有值、
+每个值的分表引用数，并可改名 / 删除 / 上移下移 / 新增，每个操作立即落库，没有整页"保存"按钮。
 
 ```vue
-<OptionListEditor v-model="countriesValue" label="新增地区" placeholder="如：泰国" hint="顺序即显示顺序" />
+<TaxonomyTable kind="countries" label="地区" :rows="countryRows" :orphans="countryOrphans" @saved="loadTaxonomy" />
 ```
 
-从清单删掉某项不会改动已经使用它的记录，控件会用 toast 说明这一点。
+两条约定要记住：
+
+- **改名会级联**：后端在同一个事务里 `UPDATE videos / actors / video_series`，
+  再写清单，并同步 `homePageCategories`。只改清单不动记录，就会出现"清单和数据显示两套值"，
+  正是当初各页面地区选项不一致的根源。前端在有引用数时先弹二次确认并列出影响条数。
+- **清单外的值会被列出来**：记录里用着但不在清单上的值（`orphans`）单独显示，可一键加入清单。
+  没有这一栏，"下拉框为什么少一项"就永远查不出来。
 
 ### 播放器
 

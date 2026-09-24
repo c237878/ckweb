@@ -7,7 +7,7 @@
           <button class="btn btn--sm" :disabled="renaming" @click="checkAndRename">
             {{ renaming ? '检查中...' : '校验文件名' }}
           </button>
-          <button class="btn btn--primary" @click="openAdd">添加影片</button>
+          <button class="btn btn--sm" @click="openAdd">添加</button>
           <button class="btn btn--sm" @click="enterMode('select')">删除</button>
           <button class="btn btn--sm" @click="enterMode('edit')">编辑</button>
         </template>

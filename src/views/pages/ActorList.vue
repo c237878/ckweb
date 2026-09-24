@@ -4,7 +4,7 @@
       <h1 class="page-title">演员列表</h1>
       <div class="header-actions">
         <template v-if="mode === 'browse'">
-          <button class="btn btn--primary" @click="handleAdd">添加演员</button>
+          <button class="btn btn--sm" @click="handleAdd">添加</button>
           <button class="btn btn--sm" @click="enterMode('select')">删除</button>
           <button class="btn btn--sm" @click="enterMode('edit')">编辑</button>
         </template>
