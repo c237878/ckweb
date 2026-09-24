@@ -7,6 +7,14 @@
           <button class="btn btn--sm" @click="handleAdd">添加</button>
           <button class="btn btn--sm" @click="enterMode('select')">删除</button>
           <button class="btn btn--sm" @click="enterMode('edit')">编辑</button>
+          <button
+            class="btn btn--sm"
+            :disabled="syncing"
+            title="把艳图目录里各演员的图片文件夹重新扫一遍，新增/换名/删掉的都会跟上"
+            @click="handleSyncImages"
+          >
+            {{ syncing ? '同步中…' : '同步照片' }}
+          </button>
         </template>
 
         <template v-else-if="mode === 'select'">
@@ -116,6 +124,7 @@ const error = ref('')
 const showDialog = ref(false)
 const editingActor = ref(null)
 const selectedIds = ref([])
+const syncing = ref(false)
 
 const filters = ref({ country: '', sortBy: '' })
 
@@ -227,6 +236,27 @@ const handleReset = () => {
 const handleAdd = () => {
   editingActor.value = null
   showDialog.value = true
+}
+
+// 照片是人在磁盘上放的（<艳图目录>/<演员ID>/），所以入库这一步得留个明确的动作；
+// 不放在详情页做，是因为一次要扫十几个人，逐页点不现实
+const handleSyncImages = async () => {
+  if (syncing.value) return
+  syncing.value = true
+  try {
+    const res = await actorApi.syncImages()
+    if (!res.success) {
+      ui.error(res.message || '同步失败')
+      return
+    }
+    ui.success(res.message || '已同步')
+    await loadActors()
+  } catch (err) {
+    console.error('同步演员图片失败:', err)
+    ui.error('同步失败：' + errText(err))
+  } finally {
+    syncing.value = false
+  }
 }
 
 const handleEdit = (actor) => {

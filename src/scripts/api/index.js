@@ -104,8 +104,8 @@ export const actorApi = {
   getDetail: (id) => api.get(`/actor/${id}`),
   getVideos: (id, params) => api.get(`/actor/${id}/videos`, { params }),
   getCountries: () => api.get('/actor/countries'),
-  /** 演员海报墙的文件名列表 */
-  getPosters: (id) => api.get(`/actor/${id}/posters`),
+  /** 把艳图目录里的图片扫进 actor_images；不传 id 就是扫全部演员。清单本身由详情接口带出 */
+  syncImages: (id) => api.post(id ? `/actor/${id}/images/sync` : '/actor/images/sync'),
   add: (data) => api.post('/actor', data),
   update: (id, data) => api.put(`/actor/${id}`, data),
   delete: (id) => api.delete(`/actor/${id}`)

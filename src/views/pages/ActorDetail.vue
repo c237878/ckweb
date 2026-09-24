@@ -2,7 +2,7 @@
   <div class="page actor-detail">
     <div v-if="loading" class="loading-block">
       <div class="skeleton head-skeleton"></div>
-      <div class="skeleton wall-skeleton"></div>
+      <div class="skeleton album-skeleton"></div>
     </div>
 
     <div v-else-if="error" class="notice notice--error">
@@ -11,43 +11,43 @@
     </div>
 
     <template v-else-if="actor">
-      <section class="panel actor-header">
-        <div class="page-header">
-          <h1 class="page-title">{{ actor.name }}</h1>
-          <button class="btn btn--sm" @click="openEditDialog">编辑</button>
+      <section class="panel actor-header" :class="{ 'actor-header--split': images.length }">
+        <div class="actor-header__text">
+          <div class="page-header">
+            <h1 class="page-title">{{ actor.name }}</h1>
+            <button class="btn btn--sm" @click="openEditDialog">编辑</button>
+          </div>
+
+          <div v-if="actor.country || actor.likeCount > 0" class="tag-row">
+            <span v-if="actor.country" class="tag tag--accent">{{ actor.country }}</span>
+            <span v-if="actor.likeCount > 0" class="tag tag--like">♥ {{ actor.likeCount }}</span>
+          </div>
+
+          <p v-if="actor.aliases?.length" class="alias-row">曾用名：{{ actor.aliases.join('、') }}</p>
+
+          <div v-if="safeLinks.length" class="tag-row">
+            <a
+              v-for="link in safeLinks"
+              :key="link.url"
+              class="tag tag--info"
+              :href="link.url"
+              target="_blank"
+              rel="noopener noreferrer"
+              :title="link.url"
+            >{{ linkLabel(link) }}</a>
+          </div>
+
+          <p v-if="actor.bio" class="bio-row">{{ decodeBio(actor.bio) }}</p>
         </div>
 
-        <div v-if="actor.country || actor.likeCount > 0" class="tag-row">
-          <span v-if="actor.country" class="tag tag--accent">{{ actor.country }}</span>
-          <span v-if="actor.likeCount > 0" class="tag tag--like">♥ {{ actor.likeCount }}</span>
-        </div>
-
-        <p v-if="actor.aliases?.length" class="alias-row">曾用名：{{ actor.aliases.join('、') }}</p>
-
-        <div v-if="safeLinks.length" class="tag-row">
-          <a
-            v-for="link in safeLinks"
-            :key="link.url"
-            class="tag tag--info"
-            :href="link.url"
-            target="_blank"
-            rel="noopener noreferrer"
-            :title="link.url"
-          >{{ linkLabel(link) }}</a>
-        </div>
-
-        <p v-if="actor.bio" class="bio-row">{{ decodeBio(actor.bio) }}</p>
-      </section>
-
-      <section v-if="posters.length || posterError">
-        <h2 class="section-title">海报墙 ({{ posters.length }})</h2>
-        <div v-if="posterError" class="notice notice--error">
-          {{ posterError }}
-          <button class="btn btn--sm" @click="loadPosters">重试</button>
-        </div>
-        <PosterWall v-else :items="posterItems" height="52vh" min-height="420px">
-          <template #caption="{ item }">{{ item.alt }}</template>
-        </PosterWall>
+        <ActorAlbum
+          :actor-id="actorId"
+          :images="images"
+          :name="actor.name"
+          :syncing="syncing"
+          empty-text="这位演员还没有照片"
+          @sync="syncImages"
+        />
       </section>
 
       <section>
@@ -101,7 +101,7 @@ import { useUiStore, errText } from '@/scripts/store/ui'
 import { MEDIA_FLAGS, linkKindLabel } from '@/scripts/constants'
 import VideoCard from '@/views/components/VideoCard.vue'
 import AddActorDialog from '@/views/components/AddActorDialog.vue'
-import PosterWall from '@/views/components/PosterWall.vue'
+import ActorAlbum from '@/views/components/ActorAlbum.vue'
 import Pagination from '@/views/components/Pagination.vue'
 import SelectList from '@/views/components/SelectList.vue'
 
@@ -111,8 +111,7 @@ const app = useAppStore()
 const ui = useUiStore()
 
 const actor = ref(null)
-const posters = ref([])
-const posterError = ref('')
+const syncing = ref(false)
 const videos = ref([])
 const page = ref(1)
 const total = ref(0)
@@ -149,13 +148,8 @@ const mediaFlagOptions = computed(() =>
 
 const actorId = computed(() => route.params.id)
 
-const posterItems = computed(() =>
-  posters.value.map((name) => ({
-    key: name,
-    src: `/api/actor/${actorId.value}/poster/${encodeURIComponent(name)}`,
-    alt: name
-  }))
-)
+// 图片清单由详情接口一次带出（来自 actor_images 表），不再单独请求
+const images = computed(() => (Array.isArray(actor.value?.images) ? actor.value.images : []))
 
 // 解码简介中可能包含的 URL 编码文本
 const decodeBio = (text) => {
@@ -232,16 +226,24 @@ const loadVideos = async () => {
   }
 }
 
-const loadPosters = async () => {
-  posterError.value = ''
+// 扫盘是显式动作：照片是人在磁盘上放的，界面上点一下才入库，
+// 详情页加载时不再为了"看看有没有图"去读挂载卷
+const syncImages = async () => {
+  if (syncing.value) return
+  syncing.value = true
   try {
-    const res = await actorApi.getPosters(route.params.id)
-    if (res.success && Array.isArray(res.data)) posters.value = res.data
-    else posters.value = []
+    const res = await actorApi.syncImages(route.params.id)
+    if (!res.success) {
+      ui.error(res.message || '同步失败')
+      return
+    }
+    ui.success(res.message || '已同步')
+    await loadActor()
   } catch (err) {
-    console.error('加载海报失败:', err)
-    posters.value = []
-    posterError.value = '海报墙加载失败，请确认后端服务可用'
+    console.error('同步演员图片失败:', err)
+    ui.error('同步失败：' + errText(err))
+  } finally {
+    syncing.value = false
   }
 }
 
@@ -254,7 +256,7 @@ const loadAll = async () => {
     error.value = message
     return
   }
-  await Promise.all([loadVideos(), loadPosters()])
+  await loadVideos()
 }
 
 onMounted(async () => {
@@ -301,16 +303,33 @@ watch(mediaAttrFilter, () => {
   border-radius: var(--r2);
 }
 
-.wall-skeleton {
-  height: 52vh;
-  min-height: 420px;
+.album-skeleton {
+  height: 420px;
   border-radius: var(--r2);
 }
 
+/* 默认单栏；只有真的拿到照片才分两栏，空相册不值得占掉半页宽 */
 .actor-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: var(--s4);
+}
+
+/* 断点与影视卡片的完全形态同一条线，避免同一页上两处各自换行 */
+@media (min-width: 900px) {
+  .actor-header--split {
+    grid-template-columns: minmax(0, 1fr) minmax(240px, 380px);
+    /* 文字通常比相册矮一截，顶对齐会在左栏留出一大块空白 */
+    align-items: center;
+  }
+}
+
+.actor-header__text {
   display: flex;
   flex-direction: column;
   gap: var(--s3);
+  min-width: 0;
 }
 
 .tag-row {

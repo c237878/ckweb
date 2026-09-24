@@ -28,13 +28,14 @@ cd ckweb && npm install && npm run dev
 | `ConnectionStrings:BackupPath` | 备份目录；不存在则跳过备份 |
 | `ServerPort` | Kestrel 监听端口，默认 5033 |
 | `Media:Roots` | 允许对外提供文件的目录白名单，默认 `["/Volumes"]` |
+| `Media:ThumbCache` | 演员缩略图的落盘目录；没配则贴着数据库文件放 `<库目录>/ckthumbs`。整个目录可安全删除，下次访问会重新生成 |
 
 ## 数据库
 
 启动时由 `ckapi/Services/DataService.cs` 负责：建表 → 按 `PRAGMA user_version` 逐级迁移 → 建索引 → `ANALYZE`。
 **`CreateBaseTables` 是"当前完整结构"的唯一权威声明**，`Migrations` 是历史库的追赶路径，两者必须保持等价（改结构时同时改两处）。全新库会直接标记为最新版本、跳过迁移。
 
-索引：`videos(ctime)`、`videos(category,ctime)`、`videos(code)`、`videos(country)`、`videos(seriesid,sort_order)`、`video_actors(actor_id)`、`video_likes(video_id,target_type)`、`video_likes(liked_at)`、`comics(ctime)`、`comic_chapters(comic_id,sort_order)`、`video_series(name)`、`actor_aliases(alias)`、`actor_links(actor_id,kind)`。
+索引：`videos(ctime)`、`videos(category,ctime)`、`videos(code)`、`videos(country)`、`videos(seriesid,sort_order)`、`video_actors(actor_id)`、`video_likes(video_id,target_type)`、`video_likes(liked_at)`、`comics(ctime)`、`comic_chapters(comic_id,sort_order)`、`video_series(name)`、`actor_aliases(alias)`、`actor_links(actor_id,kind)`、`actor_images(actor_id,is_primary,file_name)` + 部分唯一索引 `actor_images(actor_id) WHERE is_primary=1`。
 
 ### 表
 
@@ -65,7 +66,21 @@ v4 迁移把含 `http` 的简介逐条抽出（382 位演员 → 528 行，379 �
 详情页把每条渲染成一颗 `.tag.tag--info` 药丸，文案是「类型 + 主机名」（同一个类型常挂好几个站，只写类型分不清），
 `href` 只放 http(s)：前端也再挡一道，万一有人直接改库塞进 `javascript:` 也不会变成可点链接。
 前端 `LINK_KIND_OPTIONS`（`constants.js`）与后端 `Links.Kinds` 必须一一对应，改一边就要改另一边。
-> 演员照片仍是**文件墙**，不走数据库列：目录取 `system_settings.posterDir`，按 `<posterDir>/<演员ID>/*.jpg|png|webp` 枚举，经 `GET /api/actor/{id}/posters` 返回文件名。原先那个始终为空的 `avatar_path` 列已在 schema v2 删除，别再去库里找演员头像字段。
+**actor_images** — `(actor_id, file_name)` 主键，演员图片**一行一张**：`is_primary` `width` `height` `size` `mtime` `ctime`。
+图片字节仍在磁盘上（`<艳图目录>/<演员ID>/*.jpg|png|webp`），这张表存的是清单，
+为的是**打开详情页不再扫盘**：以前每次进页面都要 `Directory.GetFiles` 一次，挂载卷冷读时能挂十几秒。
+现在扫描只由界面上的「同步照片」触发（演员列表页扫全部、详情页扫一位），
+`POST /api/actor/images/sync` 与 `POST /api/actor/{id}/images/sync` 各一个。
+同步只 `stat` 不打开文件；同名文件被换掉（mtime 变了）就刷新 `size` 并清掉 `width/height`；
+磁盘上没了的行会被删掉，整个目录没了的演员也一样——但**根目录不可读时一律直接报错、一个字都不写**，
+否则卷没挂上就等于把整张表清空。每人自动选一张主图（先看 `默认/default/cover/avatar/1…` 这类命名，否则按文件名取第一张），
+部分唯一索引保证一人只有一张，界面后续可手工改。
+`width/height` 由第一次生成缩略图时顺带回填，不额外解码一次。
+> 缩略图：`GET /api/actor/{id}/thumb/{s|m}/{fileName}`，`s`=160（列表页头像）、`m`=400（详情页相册），
+> WebP q80，落在 `Media:ThumbCache` 下按 `<演员ID>/<宽度>-<原文件名>.webp` 存，
+> 比源文件旧就重生成——所以换图不需要任何"清缓存"动作。
+> **只有表里有的文件名才会被服务**（表就是白名单），未同步过的路径一律 404；解码失败的图退回原图。
+> 实测：2.0 MB 的 3024×4028 手机直出图 → 400px 缩略图 23 KB、160px 头像 6 KB；首次生成 1.5 秒（冷读+解码），之后 5 毫秒。
 
 **video_actors** — `(video_id, actor_id)` 复合主键，多对多
 **video_series** — `id` `name` `alias` `link` `country` `ctime` `utime`
@@ -110,7 +125,8 @@ v4 迁移把含 `http` 的简介逐条抽出（382 位演员 → 528 行，379 �
 `GET /stream/{id}`（支持 Range）· `GET /cover/{id}`（带 ETag + 一周强缓存）· `GET /{code}/subtitle/check` · `GET /{code}/subtitle` · `GET /{id}/recommend` · `POST /{id}/reset-file-size` · `PUT /{id}/file-info` · `PUT /{id}/media-flags` · `DELETE /{id}/file` · `POST /rename-to-code`
 
 ### /api/Actor
-`GET /` · `GET /{id}` · `POST /` · `PUT /{id}` · `DELETE /{id}` · `GET /countries` · `GET /{id}/videos` · `GET /{id}/posters` · `GET /{id}/poster/{fileName}`
+`GET /` · `GET /{id}` · `POST /` · `PUT /{id}` · `DELETE /{id}` · `GET /countries` · `GET /{id}/videos` · `POST /images/sync` · `POST /{id}/images/sync` · `GET /{id}/poster/{fileName}` · `GET /{id}/thumb/{s|m}/{fileName}`
+> 图片清单不再单独请求：`GET /{id}` 的 `data.images` 里就带着（来自 `actor_images`）。
 > `GET /{id}/videos` 支持 `page` `pageSize` `mediaAttrFlags` `hasFile`，筛选在服务端完成后再分页。
 
 ### /api/Series
@@ -311,6 +327,18 @@ src/
 ```
 与 `TaxonomyTable` 的分工：那个管全局数据源（带引用计数、改名级联、立即落库），
 这个只管"一条记录身上挂的几个值"，父组件拿到什么就存什么。
+
+### 演员相册（`views/components/ActorAlbum.vue`）
+
+详情页头部是**左文本 / 右相册**两栏（`.actor-header--split`，断点 900px 与影视卡片的完全形态同一条线）：
+一次看一张、`‹ ›` 翻页、底部 `n / 总数` + 重新同步；点图片放大看原图，Esc 关闭、焦点回到触发按钮。
+整个相册只占**一个 Tab 停靠点**（放大与翻页都在同一个按钮上，方向键就地翻页）。
+
+- 画框比例跟随图片：表里有宽高就用它，没有就用缩略图加载出来的自然尺寸，
+  所以竖图不会在框里留出两条底色边。
+- **没有照片时不占半页**：退化成一条虚线空态（"这位演员还没有照片" + 同步照片），头部回到单栏。
+- 与「艳图」的 `PosterWall` 是两套东西：那边一墙小图供浏览、随机取批、可换一批；
+  这边逐张翻看、要能放大看细节。两者的灯箱各自实现，不互相牵连。
 
 ### 输入行为（全站，写在 `scripts/utils/inputBehavior.js`）
 
