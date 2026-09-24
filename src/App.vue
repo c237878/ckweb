@@ -5,12 +5,14 @@ import AppFooter from '@/views/components/AppFooter.vue'
 import LikeCalendar from '@/views/components/LikeCalendar.vue'
 import AppOverlays from '@/views/components/AppOverlays.vue'
 import { useAppStore } from '@/scripts/store/app'
+import { setupInputBehavior } from '@/scripts/utils/inputBehavior'
 
 const app = useAppStore()
 
 onMounted(() => {
   // 站点名/分页大小等只在这里拉一次，Header/Footer 直接读 store
   app.init()
+  setupInputBehavior()
 })
 </script>
 

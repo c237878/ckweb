@@ -256,6 +256,19 @@ src/
 不要再写 `v-model.number` —— 原生 `<option>` 会把值变成字符串，`.number` 就是为补这个洞存在的，
 自绘组件直接透传 `opt.value`，不需要它。
 
+### 输入行为（全站，写在 `scripts/utils/inputBehavior.js`）
+
+`App.vue` 挂载时调一次 `setupInputBehavior()`，管两件事：
+
+1. **点 label 不再把焦点/点击转给控件**——只有点到控件本身才聚焦、才展开下拉。
+   下拉框是按钮实现的，原先点标题等于点按钮，会把列表展开出来。
+   复选框/单选/文件选择保留"点标题即选中"（`KEEP_LABEL_ACTIVATION`），那是常规用法。
+2. **给文本类输入打 `autocomplete="off"`**，不再一聚焦就弹浏览器记下的历史输入。
+   已显式写了 `autocomplete` 的元素不覆盖（如目录分类那个 datalist 输入框）。
+
+两处都收在这里而不是逐个元素写属性：全站四十多个输入框、三十多个 label，以后还会加字段，
+写在标记里一定会漏。新增输入框不需要做任何事就自动纳入。
+
 ### 系统设置页
 
 `views/pages/Settings.vue` 是「左侧标签 + 右侧单个分区卡片」的两栏结构：
