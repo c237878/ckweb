@@ -57,19 +57,29 @@ const props = defineProps({
   /** 期望的海报宽度；实际会按画布容量在 0.72×–1.5× 之间伸缩 */
   baseWidth: { type: Number, default: 150 },
   /** 换一批：父组件自增即可，同一批内部顺序稳定 */
-  seed: { type: Number, default: 0 }
+  seed: { type: Number, default: 0 },
+  /**
+   * 照片墙模式：尺寸与长宽比更多元、铺得更满、允许适度压叠，像真实贴出来的墙。
+   * 默认关（演员详情那种整齐的网格观感不变）。
+   */
+  scatter: { type: Boolean, default: false }
 })
 
 const emit = defineEmits(['shown'])
 
 const ASPECT = 1.4        // 海报竖比（高 / 宽）
 const GAP = 18            // 期望间隙
-const JITTER = 0.26       // 相对格心的位移幅度，太大就会互相盖住
 const MAX_ROTATION = 5    // 最大倾角（deg）
 const MAX_COLS = 10
 const MIN_RATIO = 0.72    // 相对 baseWidth 的最小/最大缩放
 const MAX_RATIO = 1.5
-const FILL = 0.86         // 海报占格子的比例，留出重叠与间隙的余量
+
+// 两种模式的松散程度。scatter 允许压叠的前提：位移不超过格心的 0.34、
+// 单边不超过 1.3 倍格宽，所以每张总有大半面积露在最外侧，点得到
+const LAYOUT = {
+  grid: { fill: 0.86, jitter: 0.26, size: [0.92, 1.08], aspectJitter: 0 },
+  scatter: { fill: 1, jitter: 0.34, size: [0.74, 1.3], aspectJitter: 0.16 }
+}
 
 const wallRef = ref(null)
 const lightboxRef = ref(null)
@@ -147,8 +157,9 @@ const layout = computed(() => {
   const extra = count % rows
   for (let r = 0; r < rows; r++) perRow[r] = base + (r < extra ? 1 : 0)
 
+  const mode = props.scatter ? LAYOUT.scatter : LAYOUT.grid
   const cellH = boxH / rows
-  const w = clamp(Math.min(boxW / cols, cellH / ASPECT) * FILL, 60, props.baseWidth * MAX_RATIO)
+  const w = clamp(Math.min(boxW / cols, cellH / ASPECT) * mode.fill, 60, props.baseWidth * MAX_RATIO)
 
   const out = new Array(count)
   let cursor = 0
@@ -161,12 +172,15 @@ const layout = computed(() => {
       const item = shown.value[i]
       const seed = seedOf(item, i)
 
-      const size = w * (0.92 + unit(seed, 0) * 0.16)
+      // 尺寸与长宽比各自抖一档，才有"不同规格的相片混着贴"的感觉
+      const [lo, hi] = mode.size
+      const size = w * (lo + unit(seed, 0) * (hi - lo))
+      const aspect = ASPECT * (1 + (unit(seed, 4) - 0.5) * 2 * mode.aspectJitter)
       const pw = Math.round(size)
-      const ph = Math.round(size * ASPECT)
+      const ph = Math.round(size * aspect)
 
-      const cx = (c + 0.5) * cellW + (unit(seed, 1) - 0.5) * cellW * JITTER
-      const cy = (r + 0.5) * cellH + (unit(seed, 2) - 0.5) * cellH * JITTER
+      const cx = (c + 0.5) * cellW + (unit(seed, 1) - 0.5) * cellW * mode.jitter
+      const cy = (r + 0.5) * cellH + (unit(seed, 2) - 0.5) * cellH * mode.jitter
 
       out[i] = {
         left: `${Math.round(clamp(cx - pw / 2, 0, Math.max(0, boxW - pw)))}px`,

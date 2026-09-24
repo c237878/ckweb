@@ -19,9 +19,10 @@
       v-else-if="posters.length"
       :items="posters"
       :seed="seed"
+      scatter
       height="68vh"
       min-height="460px"
-      :base-width="165"
+      :base-width="200"
       @shown="counts = $event"
     >
       <template #caption="{ item }">{{ item.alt }}</template>
