@@ -84,6 +84,12 @@ v4 迁移把含 `http` 的简介逐条抽出（382 位演员 → 528 行，379 �
 > **只有表里有的文件名才会被服务**（表就是白名单），未同步过的路径一律 404；解码失败的图退回原图。
 > 实测：2.0 MB 的 3024×4028 手机直出图 → 400px 缩略图 23 KB、160px 头像 6 KB；首次生成 1.5 秒（冷读+解码），之后 5 毫秒。
 
+**highlight_images** — `file_name` 主键 + `width` `height` `size` `mtime` `ctime`，艳图池（`<艳图目录>/default/`）的清单。
+与 `actor_images` 是同一套同步口径（`ckapi/Utils/ImageIndex.cs` 一份实现，两处调用），
+差别只在这张表没有归属列、也不需要主图标记。同步同样由界面上的「同步照片」触发，开页只读表。
+墙上的格子拉 400px 缩略图、点开灯箱才回源拿原图：实测一池 43 张 9.2 MB（平均 220 KB），
+缩略图平均 43 KB（降到 20%），一墙 14 张从约 3.0 MB 降到约 600 KB。
+
 **video_actors** — `(video_id, actor_id)` 复合主键，多对多
 **video_series** — `id` `name` `alias` `link` `country` `ctime` `utime`
 **video_likes** — `id` 自增 · `video_id` · `liked_at` · `target_type`(`video`/`comic`)。追加式记录，无去重、无用户标识
@@ -145,7 +151,7 @@ v4 迁移把含 `http` 的简介逐条抽出（382 位演员 → 528 行，379 �
 `/api/SystemSetting` `GET /` · `GET /{name}` · `POST /` · `DELETE /{id}` ；
 `/api/ScanDirectory` `GET /` · `GET /{id}` · `POST /` · `PUT /{id}` · `DELETE /{id}` · `POST /check` ；
 `/api/FriendLink` `GET /` · `POST /` · `PUT /{id}` · `DELETE /{id}` ；
-`/api/Highlights` `GET /posters` · `GET /poster/{fileName}` ；
+`/api/Highlights` `GET /posters`（读 `highlight_images`） · `POST /images/sync` · `GET /poster/{fileName}`（原图） · `GET /thumb/{s|m}/{fileName}` ；
 `/api/Upload` `POST /video` · `POST /cover`
 
 ### 响应约定
@@ -302,21 +308,20 @@ src/
 不要再写 `v-model.number` —— 原生 `<option>` 会把值变成字符串，`.number` 就是为补这个洞存在的，
 自绘组件直接透传 `opt.value`，不需要它。
 
-**PosterWall** —— 散贴照片墙（演员详情与「艳图」共用）：
+**PosterWall** —— 散贴照片墙（现在只有「艳图」在用；演员详情已换成逐张翻看的 `ActorAlbum`）：
 
 ```vue
-<!-- 艳图：照片墙模式 -->
 <PosterWall :items="posters" :seed="seed" scatter :base-width="200" height="68vh" @shown="counts = $event">
-  <template #caption="{ item }">{{ item.alt }}</template>
+  <template #caption="{ item }">{{ item.alt }} · {{ mb(item.size) }}</template>
 </PosterWall>
 ```
 
 | prop / emit | 说明 |
 | --- | --- |
-| `items` | `[{ key, src, alt }]`，`key` 必须是稳定标识（文件名）——布局种子与随机取批都取它 |
+| `items` | `[{ key, src, alt, full? }]`，`key` 必须是稳定标识（文件名）——布局种子与随机取批都取它；`src` 是墙上那张（可以是缩略图），`full` 给了灯箱看原图，不给就沿用 `src` |
 | `base-width` | 期望海报宽度，实际按画布容量在 0.72×–1.5× 间伸缩 |
 | `seed` | 自增即换一批；同一 seed 下顺序固定 |
-| `scatter` | 照片墙模式：尺寸与长宽比更多元、铺满格子、允许适度压叠；默认关（演员详情那种整齐网格）。两种模式的松散度集中在 `LAYOUT` 常量里 |
+| `scatter` | 照片墙模式：尺寸与长宽比更多元、铺满格子、允许适度压叠。两种模式的松散度集中在 `LAYOUT` 常量里 |
 | `@shown` | `{ shown, total }`，父页面用它显示"显示 N / M 张"并决定要不要给换一批按钮 |
 
 效果是"乍看乱、细看匀"的抖动网格：画布按容量等分成格子（每行张数尽量平均，不留短尾行），

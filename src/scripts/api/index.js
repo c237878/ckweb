@@ -119,7 +119,10 @@ export const actorApi = {
 
 // 艳图（照片墙）
 export const highlightApi = {
-  getPosters: () => api.get('/highlights/posters')
+  /** 清单来自 highlight_images 表，不触发扫盘 */
+  getPosters: () => api.get('/highlights/posters'),
+  /** 扫一次 <艳图目录>/default/ 入库 */
+  syncImages: () => api.post('/highlights/images/sync')
 }
 
 // 系统设置相关API

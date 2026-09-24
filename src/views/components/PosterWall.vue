@@ -26,7 +26,7 @@
       aria-modal="true"
       :aria-label="`海报预览 ${lightboxIndex + 1} / ${shown.length}`"
     >
-      <img class="lightbox__img" :src="current.src" :alt="current.alt || '海报'" />
+      <img class="lightbox__img" :src="current.full || current.src" :alt="current.alt || '海报'" />
       <figcaption v-if="$slots.caption || current.alt" class="lightbox__cap">
         <slot name="caption" :item="current" :index="lightboxIndex">{{ current.alt }}</slot>
       </figcaption>
@@ -50,7 +50,10 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
  * 因此 resize、翻页回来都不会跳位，只有换 seed 才换人。
  */
 const props = defineProps({
-  /** [{ key, src, alt }]：key 必须是稳定标识（文件名），布局种子与随机取批都靠它 */
+  /**
+   * [{ key, src, alt, full? }]：key 必须是稳定标识（文件名），布局种子与随机取批都靠它；
+   * src 是墙上那张（可以是缩略图），full 给了灯箱看原图，不给就沿用 src。
+   */
   items: { type: Array, default: () => [] },
   height: { type: String, default: '50vh' },
   minHeight: { type: String, default: '420px' },
