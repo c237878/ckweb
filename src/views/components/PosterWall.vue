@@ -39,7 +39,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 /**
- * 散贴照片墙：演员海报与「掠影」共用。
+ * 散贴照片墙：演员海报与「艳图」共用。
  *
  * 要的效果是"一面贴满照片的墙"：乍一看歪歪扭扭，细看每张之间间距又均匀。
  * 做法是抖动网格——先把画布等分成格子（每行的张数尽量平均，不留短尾行），

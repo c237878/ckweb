@@ -61,7 +61,7 @@ const navItems = [
   { to: '/actors', label: '演员' },
   { to: '/comics', label: '漫画' },
   { to: '/likes', label: '点赞' },
-  { to: '/highlights', label: '掠影' },
+  { to: '/highlights', label: '艳图' },
   { to: '/settings', label: '设置' }
 ]
 </script>

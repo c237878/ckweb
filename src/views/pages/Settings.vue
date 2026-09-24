@@ -339,7 +339,7 @@ const CATEGORY_OPTIONS = ['视频', '封面', '字幕']
 const GROUPS = [
   { id: 'site', label: '站点信息', desc: '网站名称与各列表页的分页条数。' },
   { id: 'home', label: '首页', desc: '首页取哪几个分类、每个分类显示多少条。' },
-  { id: 'media', label: '媒体路径', desc: '掠影与演员海报使用的图片目录；影片扫描目录见「扫描目录」。' },
+  { id: 'media', label: '媒体路径', desc: '艳图与演员海报使用的图片目录；影片扫描目录见「扫描目录」。' },
   { id: 'taxonomy', label: '数据源' },
   { id: 'dirs', label: '扫描目录' },
   { id: 'links', label: '友情链接' }
@@ -351,7 +351,7 @@ const settingsList = ref([
   { id: 'pageSize', group: 'site', label: '每页数量', value: '', type: 'number', min: 1, max: 100, placeholder: '默认 24', hint: '各列表页每页显示的条数' },
   { id: 'homePageCategories', group: 'home', label: '首页展示分类', value: '', placeholder: '多个分类用逗号分隔，留空显示全部', hint: '可选值见「数据源」' },
   { id: 'homePageCategoryCount', group: 'home', label: '首页分类数量', value: '', type: 'number', min: 1, max: 100, placeholder: '默认 12', hint: '每个分类/板块显示的数量，今日推荐也用这个值' },
-  { id: 'posterDir', group: 'media', label: '掠影目录', value: '', placeholder: '如: /Volumes/disk1/posters' }
+  { id: 'posterDir', group: 'media', label: '艳图目录', value: '', placeholder: '如: /Volumes/disk1/posters' }
 ])
 
 const fieldGroups = computed(() =>

@@ -263,10 +263,10 @@ src/
 不要再写 `v-model.number` —— 原生 `<option>` 会把值变成字符串，`.number` 就是为补这个洞存在的，
 自绘组件直接透传 `opt.value`，不需要它。
 
-**PosterWall** —— 散贴照片墙（演员详情与「掠影」共用）：
+**PosterWall** —— 散贴照片墙（演员详情与「艳图」共用）：
 
 ```vue
-<!-- 掠影：照片墙模式 -->
+<!-- 艳图：照片墙模式 -->
 <PosterWall :items="posters" :seed="seed" scatter :base-width="200" height="68vh" @shown="counts = $event">
   <template #caption="{ item }">{{ item.alt }}</template>
 </PosterWall>

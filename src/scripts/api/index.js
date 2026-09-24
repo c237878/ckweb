@@ -111,7 +111,7 @@ export const actorApi = {
   delete: (id) => api.delete(`/actor/${id}`)
 }
 
-// 掠影（照片墙）
+// 艳图（照片墙）
 export const highlightApi = {
   getPosters: () => api.get('/highlights/posters')
 }
