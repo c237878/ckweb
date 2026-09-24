@@ -22,7 +22,7 @@
           <span v-if="actor.likeCount > 0" class="tag tag--like">♥ {{ actor.likeCount }}</span>
         </div>
 
-        <p v-if="actor.alias" class="alias-row">别名：{{ actor.alias }}</p>
+        <p v-if="actor.aliases?.length" class="alias-row">曾用名：{{ actor.aliases.join('、') }}</p>
         <p v-if="actor.bio" class="bio-row">{{ decodeBio(actor.bio) }}</p>
       </section>
 

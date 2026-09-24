@@ -205,7 +205,7 @@
                   :title="`添加演员 ${actor.name}`"
                   @mousedown.prevent="addActor(actor)"
                 >
-{{ actor.name }}
+{{ actor.name }}<em v-if="matchedAlias(actor, searchKeyword)" class="hit-alias">{{ matchedAlias(actor, searchKeyword) }}</em>
 </li>
               </ul>
             </div>
@@ -443,11 +443,21 @@ const doUpload = async (type, directory, file) => {
 
 const actorRows = (data) => (Array.isArray(data) ? data : data?.list || [])
 
+/** 命中了哪个曾用名：姓名本身匹配时返回空，否则回显曾用名，免得搜"加藤ゆかり"出来个"松冈铃"看不懂 */
+const matchedAlias = (actor, keyword) => {
+  if (!keyword || (actor.name || '').toLowerCase().includes(keyword)) return ''
+  return (actor.aliases || []).find((a) => a.toLowerCase().includes(keyword)) || ''
+}
+
 const candidate = (actor, keyword, picked) =>
-  !picked.has(actor.id) && (actor.name || '').toLowerCase().includes(keyword)
+  !picked.has(actor.id)
+  && ((actor.name || '').toLowerCase().includes(keyword)
+    || (actor.aliases || []).some((a) => a.toLowerCase().includes(keyword)))
+
+const searchKeyword = computed(() => actorSearch.value.trim().toLowerCase())
 
 const actorCandidates = computed(() => {
-  const kw = actorSearch.value.trim().toLowerCase()
+  const kw = searchKeyword.value
   if (!kw) return []
   const picked = new Set(selectedActors.value.map((a) => a.id))
   const local = actorList.value.filter((a) => candidate(a, kw, picked))
@@ -800,5 +810,16 @@ const handleDelete = () => {
 /* 面板与候选行都走全局 .dropdown-menu / .dropdown-option，这里不再造第三份 */
 .actor-search {
   position: relative;
+}
+
+/* 命中曾用名时在姓名后面标出来，否则"搜 A 出来 B"看不懂 */
+.hit-alias {
+  font-style: normal;
+  font-size: var(--f-xs);
+  color: var(--text-faint);
+}
+
+.hit-alias::before {
+  content: ' · ';
 }
 </style>

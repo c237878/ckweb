@@ -45,8 +45,14 @@ cd ckweb && npm install && npm run dev
 **media_attr_flags（片源标记）** — `0` 未标记 · `1` 劣质 · `2` 无字幕 · `3` 完美。
 前端展示文案与配色统一在 `ckweb/src/scripts/constants.js` 的 `MEDIA_FLAGS`，不要在页面里各写一份。
 
-**actors** — `id` `name`(UNIQUE) `alias`(空格分隔的多个别名) `country` `bio` `ctime`
-> 演员照片是**文件墙**，不走数据库列：目录取 `system_settings.posterDir`，按 `<posterDir>/<演员ID>/*.jpg|png|webp` 枚举，经 `GET /api/actor/{id}/posters` 返回文件名。原先那个始终为空的 `avatar_path` 列已在 schema v2 删除，别再去库里找演员头像字段。
+**actors** — `id` `name`(UNIQUE) `country` `bio` `ctime`
+**actor_aliases** — `(actor_id, alias)` 复合主键，曾用名**一行一个**（schema v3 起）。
+旧 `actors.alias` 用空格串多个别名，既没法精确检索也分不清「志保 Shiho」是一个还是两个，
+v3 迁移按空白拆分去重后把列删掉了；清洗规则与迁移共用 `ckapi/Utils/Aliases.cs`
+（去空去重、丢掉与本人姓名相同的项、单项 ≤60 字、每人 ≤20 个）。
+检索：`/api/actor?keyword=` 会同时匹配姓名与曾用名，列表与详情都返回 `aliases: string[]`；
+新增/更新传 `aliases` 数组，整组替换。
+> 演员照片仍是**文件墙**，不走数据库列：目录取 `system_settings.posterDir`，按 `<posterDir>/<演员ID>/*.jpg|png|webp` 枚举，经 `GET /api/actor/{id}/posters` 返回文件名。原先那个始终为空的 `avatar_path` 列已在 schema v2 删除，别再去库里找演员头像字段。
 
 **video_actors** — `(video_id, actor_id)` 复合主键，多对多
 **video_series** — `id` `name` `alias` `link` `country` `ctime` `utime`
@@ -284,6 +290,14 @@ src/
 每张在自己格子里做小幅位移与倾角。**画布不滚动**——张数超过容量就随机取一批展示，
 而不是把画布拉长出滚动条。所有随机量由 `文件名哈希 + seed` 派生（不用 `Math.random()`），
 所以 resize、返回本页都不会整墙跳位，只有换 seed 才换人。
+
+**ChipListEditor** —— 字符串数组型的小标签编辑器（演员曾用名）：`v-model` 就是 `string[]`，
+回车或点「添加」入列，点 × 移除，重复值给 toast 拦下。
+```vue
+<ChipListEditor v-model="form.aliases" label="新增曾用名" hint="一行一个，检索影片时输入这些名字也能找到本人" />
+```
+与 `TaxonomyTable` 的分工：那个管全局数据源（带引用计数、改名级联、立即落库），
+这个只管"一条记录身上挂的几个值"，父组件拿到什么就存什么。
 
 ### 输入行为（全站，写在 `scripts/utils/inputBehavior.js`）
 

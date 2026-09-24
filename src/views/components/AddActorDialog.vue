@@ -21,14 +21,13 @@
         </div>
 
         <div class="field">
-          <label for="aa-alias">别名</label>
-          <input
-            id="aa-alias"
-            v-model="form.alias"
-            class="input"
-            type="text"
-            placeholder="别名（选填）"
-            maxlength="50"
+          <span class="field__label">曾用名</span>
+          <ChipListEditor
+            v-model="form.aliases"
+            label="新增曾用名"
+            placeholder="如：松岡すず"
+            empty-text="还没有曾用名"
+            hint="一行一个，检索影片时输入这些名字也能找到本人"
           />
         </div>
 
@@ -71,6 +70,7 @@ import { actorApi } from '@/scripts/api'
 import { useUiStore } from '@/scripts/store/ui'
 import Dialog from './Dialog.vue'
 import SelectList from './SelectList.vue'
+import ChipListEditor from './ChipListEditor.vue'
 import { toOptions } from '@/scripts/utils/options'
 
 const props = defineProps({
@@ -87,7 +87,7 @@ const countries = ref([])
 const form = ref({
   id: '',
   name: '',
-  alias: '',
+  aliases: [],
   country: '',
   bio: ''
 })
@@ -111,15 +111,16 @@ watch(() => props.visible, (val) => {
   if (!val) return
   loadCountries()
   const source = props.editingActor
+  // 编辑对话框从不在详情态打开，所以列表行里的 aliases 数组就是唯一来源
   form.value = source
     ? {
         id: source.id || '',
         name: source.name || '',
-        alias: source.alias || '',
+        aliases: Array.isArray(source.aliases) ? [...source.aliases] : [],
         country: source.country || '',
         bio: source.bio || ''
       }
-    : { id: '', name: '', alias: '', country: '', bio: '' }
+    : { id: '', name: '', aliases: [], country: '', bio: '' }
 })
 
 const handleSave = () => {
