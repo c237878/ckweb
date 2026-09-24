@@ -1,8 +1,8 @@
 <template>
   <div ref="wallRef" class="poster-wall" :style="{ height, minHeight }">
-    <div class="poster-plane" :style="planeStyle">
+    <div class="poster-plane">
       <button
-        v-for="(item, index) in items"
+        v-for="(item, index) in shown"
         v-show="ready"
         :key="item.key || item.src || index"
         type="button"
@@ -24,7 +24,7 @@
       tabindex="-1"
       role="dialog"
       aria-modal="true"
-      :aria-label="`海报预览 ${lightboxIndex + 1} / ${items.length}`"
+      :aria-label="`海报预览 ${lightboxIndex + 1} / ${shown.length}`"
     >
       <img class="lightbox__img" :src="current.src" :alt="current.alt || '海报'" />
       <figcaption v-if="$slots.caption || current.alt" class="lightbox__cap">
@@ -40,24 +40,36 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 /**
  * 散贴海报墙：演员海报与「精彩瞬间」共用。
- * 原先两个页面各写了一份同样的 CONFIG + 抖动布局 + 悬停 + 灯箱，
- * 且布局用 Math.random() 取值、每次 resize 重算，海报会整体跳位。
- * 这里把随机量改成「文件名哈希派生」的稳定值：位置随容器缩放，但同一张海报
- * 的抖动比例、尺寸、倾角在 resize / 刷新后保持不变。
+ *
+ * 要的效果是"一面贴满照片的墙"：乍一看歪歪扭扭，细看每张之间间距又均匀。
+ * 做法是抖动网格——先把画布等分成格子（每行的张数尽量平均，不留短尾行），
+ * 每张在自己的格子里做小幅位移 + 小幅倾角，所以既不散乱也不会挤成一坨。
+ *
+ * 画布不滚动：格子尺寸由画布反推，张数超出容量就随机取一批展示（换 seed 即换一批）。
+ * 随机量全部由「文件名哈希 + seed」派生而不是 Math.random()，
+ * 因此 resize、翻页回来都不会跳位，只有换 seed 才换人。
  */
 const props = defineProps({
-  /** [{ key, src, alt }]：key 必须是稳定标识（文件名），布局种子取它 */
+  /** [{ key, src, alt }]：key 必须是稳定标识（文件名），布局种子与随机取批都靠它 */
   items: { type: Array, default: () => [] },
   height: { type: String, default: '50vh' },
   minHeight: { type: String, default: '420px' },
-  baseWidth: { type: Number, default: 150 }
+  /** 期望的海报宽度；实际会按画布容量在 0.72×–1.5× 之间伸缩 */
+  baseWidth: { type: Number, default: 150 },
+  /** 换一批：父组件自增即可，同一批内部顺序稳定 */
+  seed: { type: Number, default: 0 }
 })
 
-const ASPECT = 1.4       // 海报竖比
-const JITTER = 0.35      // 相对格心的抖动幅度
-const GAP = 18           // 期望间隙
-const MAX_ROTATION = 5   // 最大倾角（deg）
-const MAX_COLS = 8       // 宽屏上别拉成一整行
+const emit = defineEmits(['shown'])
+
+const ASPECT = 1.4        // 海报竖比（高 / 宽）
+const GAP = 18            // 期望间隙
+const JITTER = 0.26       // 相对格心的位移幅度，太大就会互相盖住
+const MAX_ROTATION = 5    // 最大倾角（deg）
+const MAX_COLS = 10
+const MIN_RATIO = 0.72    // 相对 baseWidth 的最小/最大缩放
+const MAX_RATIO = 1.5
+const FILL = 0.86         // 海报占格子的比例，留出重叠与间隙的余量
 
 const wallRef = ref(null)
 const lightboxRef = ref(null)
@@ -83,63 +95,103 @@ const unit = (seed, slot) => {
   return ((x ^ (x >>> 15)) >>> 0) / 0x100000000
 }
 
-const seedOf = (item, index) =>
-  hashKey(String(item.key ?? item.src ?? index))
+const seedOf = (item, index) => hashKey(String(item.key ?? item.src ?? index))
 
-const layout = computed(() => {
-  const count = props.items.length
-  const { width: boxW, height: boxH } = box.value
-  if (!count || boxW <= 0 || boxH <= 0) return { planeHeight: 0, styles: [] }
+const clamp = (n, lo, hi) => Math.min(Math.max(n, lo), hi)
 
-  let cols = Math.floor(boxW / (props.baseWidth + GAP))
-  cols = Math.max(2, Math.min(cols, MAX_COLS))
-  const rows = Math.ceil(count / cols)
-  // 海报多了就按行高把画布拉长（外层滚动），而不是叠成一坨
-  const planeHeight = Math.max(boxH, Math.round(rows * (props.baseWidth * ASPECT + GAP)))
-
-  const stepX = boxW / cols
-  const stepY = planeHeight / rows
-  const styles = new Array(count)
-
-  props.items.forEach((item, i) => {
-    const seed = seedOf(item, i)
-    const scale = 0.92 + unit(seed, 0) * 0.16
-    const w = Math.round(props.baseWidth * scale)
-    const h = Math.round(w * ASPECT)
-
-    const col = i % cols
-    const row = Math.floor(i / cols)
-    const jitterX = (unit(seed, 1) - 0.5) * stepX * JITTER
-    const jitterY = (unit(seed, 2) - 0.5) * stepY * JITTER
-    const x = Math.min(Math.max(col * stepX + jitterX, 0), Math.max(0, boxW - w))
-    const y = Math.min(Math.max(row * stepY + jitterY, 0), Math.max(0, planeHeight - h))
-    const rotation = (unit(seed, 3) - 0.5) * MAX_ROTATION * 2
-
-    styles[i] = {
-      left: `${Math.round(x)}px`,
-      top: `${Math.round(y)}px`,
-      width: `${w}px`,
-      height: `${h}px`,
-      // 倾角交给 CSS 变量，悬停时在样式表里覆盖 transform，省掉 JS 悬停态
-      '--rot': `${rotation.toFixed(2)}deg`
-    }
-  })
-
-  return { planeHeight, styles }
+/** 画布装得下几张：按可接受的最小海报宽度算 */
+const capacity = computed(() => {
+  const { width, height } = box.value
+  const minW = props.baseWidth * MIN_RATIO
+  const minH = minW * ASPECT
+  if (width <= 0 || height <= 0) return Infinity
+  const cols = clamp(Math.floor((width + GAP) / (minW + GAP)), 2, MAX_COLS)
+  const rows = Math.max(1, Math.floor((height + GAP) / (minH + GAP)))
+  return cols * rows
 })
 
-const planeStyle = computed(() =>
-  layout.value.planeHeight ? { height: `${layout.value.planeHeight}px` } : {}
+/**
+ * 一个由 seed 决定的固定顺序，取前 N 张展示。
+ * 画布变大变小时只是从同一个顺序里多取/少取，不会整墙重排。
+ */
+const ordered = computed(() => {
+  const slot = 8 + (props.seed % 997)
+  return props.items
+    .map((item, i) => ({ item, i }))
+    .sort((a, b) => unit(seedOf(a.item, a.i), slot) - unit(seedOf(b.item, b.i), slot))
+    .map((e) => e.item)
+})
+
+const shown = computed(() => ordered.value.slice(0, Math.min(ordered.value.length, capacity.value)))
+
+watch(
+  () => [shown.value.length, props.items.length],
+  () => emit('shown', { shown: shown.value.length, total: props.items.length }),
+  { immediate: true }
 )
+
+const layout = computed(() => {
+  const count = shown.value.length
+  const { width: boxW, height: boxH } = box.value
+  if (!count || boxW <= 0 || boxH <= 0) return []
+
+  // 列数：先按"面积均分"求一个理想宽度，再回推列数，最后夹到合理区间
+  const ideal = Math.sqrt((boxW * boxH) / (count * ASPECT))
+  let cols = clamp(Math.round(boxW / clamp(ideal, props.baseWidth * MIN_RATIO, props.baseWidth * MAX_RATIO)), 1, MAX_COLS)
+  cols = Math.min(cols, count)
+
+  const rows = Math.ceil(count / cols)
+  // 每行张数尽量平均（20 张 3 行 → 7/7/6），否则尾行稀稀拉拉，整墙看着偏
+  const perRow = new Array(rows)
+  const base = Math.floor(count / rows)
+  const extra = count % rows
+  for (let r = 0; r < rows; r++) perRow[r] = base + (r < extra ? 1 : 0)
+
+  const cellH = boxH / rows
+  const w = clamp(Math.min(boxW / cols, cellH / ASPECT) * FILL, 60, props.baseWidth * MAX_RATIO)
+
+  const out = new Array(count)
+  let cursor = 0
+
+  for (let r = 0; r < rows; r++) {
+    const n = perRow[r]
+    const cellW = boxW / n
+    for (let c = 0; c < n; c++) {
+      const i = cursor++
+      const item = shown.value[i]
+      const seed = seedOf(item, i)
+
+      const size = w * (0.92 + unit(seed, 0) * 0.16)
+      const pw = Math.round(size)
+      const ph = Math.round(size * ASPECT)
+
+      const cx = (c + 0.5) * cellW + (unit(seed, 1) - 0.5) * cellW * JITTER
+      const cy = (r + 0.5) * cellH + (unit(seed, 2) - 0.5) * cellH * JITTER
+
+      out[i] = {
+        left: `${Math.round(clamp(cx - pw / 2, 0, Math.max(0, boxW - pw)))}px`,
+        top: `${Math.round(clamp(cy - ph / 2, 0, Math.max(0, boxH - ph)))}px`,
+        width: `${pw}px`,
+        height: `${ph}px`,
+        // 倾角与叠放次序都交给 CSS 变量，悬停在样式表里覆盖 transform
+        '--rot': `${((unit(seed, 3) - 0.5) * MAX_ROTATION * 2).toFixed(2)}deg`,
+        '--z': String(1 + Math.floor(unit(seed, 5) * 12))
+      }
+    }
+  }
+
+  return out
+})
+
 // 第一次量到尺寸前不露面，避免海报在没有坐标的瞬间糊在左上角
-const ready = computed(() => layout.value.planeHeight > 0)
-const styles = computed(() => layout.value.styles)
+const ready = computed(() => layout.value.length > 0)
+const styles = computed(() => layout.value)
 const current = computed(() =>
-  lightboxIndex.value === null ? null : props.items[lightboxIndex.value] ?? null
+  lightboxIndex.value === null ? null : shown.value[lightboxIndex.value] ?? null
 )
 
 const openLightbox = (index) => {
-  if (!props.items[index]) return
+  if (!shown.value[index]) return
   lastFocused = document.activeElement
   lightboxIndex.value = index
   nextTick(() => lightboxRef.value?.focus({ preventScroll: true }))
@@ -152,13 +204,10 @@ const closeLightbox = () => {
   lastFocused = null
 }
 
-// 换演员 / 切筛选后当前索引可能越界
-watch(
-  () => props.items,
-  () => {
-    if (lightboxIndex.value !== null && !props.items[lightboxIndex.value]) closeLightbox()
-  }
-)
+// 换一批 / 换演员后当前索引可能越界
+watch(shown, (list) => {
+  if (lightboxIndex.value !== null && !list[lightboxIndex.value]) closeLightbox()
+})
 
 const onKeydown = (event) => {
   if (event.key === 'Escape') closeLightbox()
@@ -190,7 +239,8 @@ onBeforeUnmount(() => {
 <style scoped>
 .poster-wall {
   position: relative;
-  overflow: auto;
+  /* 画布不滚动：装不下就少贴几张（见 script 里的 capacity） */
+  overflow: hidden;
   padding: var(--s5);
   background: var(--bg-elev);
   border: 1px solid var(--border);
@@ -198,8 +248,8 @@ onBeforeUnmount(() => {
 }
 
 .poster-plane {
-  position: relative;
-  height: 100%;
+  position: absolute;
+  inset: var(--s5);
 }
 
 .poster-item {
@@ -210,15 +260,17 @@ onBeforeUnmount(() => {
   border: 1px solid var(--border);
   border-radius: var(--r1);
   box-shadow: var(--shadow-2);
+  /* 叠放次序由哈希派生，才有"随手贴上去"的前后压叠感 */
+  z-index: var(--z, 1);
   transform: rotate(var(--rot, 0deg));
   transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
   cursor: zoom-in;
 }
 
-/* 放大并摆正，同时抬到相邻海报之上 */
+/* 放大并摆正，同时抬到所有海报之上 */
 .poster-item:hover,
 .poster-item:focus-visible {
-  z-index: 2;
+  z-index: 30;
   box-shadow: var(--shadow-3);
   transform: scale(1.12) rotate(0deg);
 }

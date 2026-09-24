@@ -263,6 +263,26 @@ src/
 不要再写 `v-model.number` —— 原生 `<option>` 会把值变成字符串，`.number` 就是为补这个洞存在的，
 自绘组件直接透传 `opt.value`，不需要它。
 
+**PosterWall** —— 散贴海报墙（演员详情与「精彩瞬间」共用）：
+
+```vue
+<PosterWall :items="posters" :seed="seed" :base-width="165" height="68vh" @shown="counts = $event">
+  <template #caption="{ item }">{{ item.alt }}</template>
+</PosterWall>
+```
+
+| prop / emit | 说明 |
+| --- | --- |
+| `items` | `[{ key, src, alt }]`，`key` 必须是稳定标识（文件名）——布局种子与随机取批都取它 |
+| `base-width` | 期望海报宽度，实际按画布容量在 0.72×–1.5× 间伸缩 |
+| `seed` | 自增即换一批；同一 seed 下顺序固定 |
+| `@shown` | `{ shown, total }`，父页面用它显示"显示 N / M 张"并决定要不要给换一批按钮 |
+
+效果是"乍看乱、细看匀"的抖动网格：画布按容量等分成格子（每行张数尽量平均，不留短尾行），
+每张在自己格子里做小幅位移与倾角。**画布不滚动**——张数超过容量就随机取一批展示，
+而不是把画布拉长出滚动条。所有随机量由 `文件名哈希 + seed` 派生（不用 `Math.random()`），
+所以 resize、返回本页都不会整墙跳位，只有换 seed 才换人。
+
 ### 输入行为（全站，写在 `scripts/utils/inputBehavior.js`）
 
 `App.vue` 挂载时调一次 `setupInputBehavior()`，管两件事：

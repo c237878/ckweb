@@ -2,7 +2,10 @@
   <div class="page highlights">
     <div class="page-header">
       <h1 class="page-title">精彩瞬间</h1>
-      <span v-if="posters.length" class="tag tag--accent">{{ posters.length }} 张</span>
+      <div v-if="posters.length" class="header-actions">
+        <span class="tag tag--accent">{{ countLabel }}</span>
+        <button v-if="canShuffle" class="btn btn--sm" @click="seed++">换一批</button>
+      </div>
     </div>
 
     <div v-if="loading" class="skeleton wall-skeleton" aria-busy="true" aria-label="加载中"></div>
@@ -12,7 +15,15 @@
       <button class="btn btn--sm" @click="loadPosters">重试</button>
     </div>
 
-    <PosterWall v-else-if="posters.length" :items="posters" height="68vh" min-height="460px" :base-width="165">
+    <PosterWall
+      v-else-if="posters.length"
+      :items="posters"
+      :seed="seed"
+      height="68vh"
+      min-height="460px"
+      :base-width="165"
+      @shown="counts = $event"
+    >
       <template #caption="{ item }">{{ item.alt }}</template>
     </PosterWall>
 
@@ -25,7 +36,7 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { highlightApi } from '@/scripts/api'
 import PosterWall from '@/views/components/PosterWall.vue'
 
@@ -33,6 +44,17 @@ const posters = ref([])
 const loading = ref(true)
 const error = ref('')
 const emptyHint = ref('暂无精彩瞬间')
+
+// 画布不滚动，装不下就由 PosterWall 随机取一批；自增 seed 即换一批
+const seed = ref(0)
+const counts = ref({ shown: 0, total: 0 })
+
+const canShuffle = computed(() => counts.value.shown < counts.value.total)
+const countLabel = computed(() =>
+  canShuffle.value
+    ? `显示 ${counts.value.shown} / ${counts.value.total} 张`
+    : `${counts.value.total} 张`
+)
 
 const loadPosters = async () => {
   loading.value = true
