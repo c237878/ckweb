@@ -100,7 +100,8 @@ v4 迁移把含 `http` 的简介逐条抽出（382 位演员 → 528 行，379 �
 
 ## 备份
 
-`SQLiteHelper.BackupDatabase()` 用 SQLite 原生在线备份接口，每天一份（`<库名>_yyyy-MM-dd.db`），同名文件已存在则跳过。启动迁移前先做一次快照。
+`SQLiteHelper.BackupDatabase()` 用 SQLite 原生在线备份接口，每天一份（`<库名>_yyyy-MM-dd.db`），同名文件已存在则跳过。启动迁移前先做一次快照（`_pre-migration`）。
+合并演员前也做一次（`_pre-merge`，**不覆盖**已有的那份）：合并是全站唯一的不可撤销写操作，留一份"今天动手之前"的状态比留 N 份中间态有用。
 注意：**不是**每次写操作都备份 —— 早期实现如此，批量写入会退化成 N 次全库拷贝。
 
 ## API 一览
@@ -127,7 +128,7 @@ v4 迁移把含 `http` 的简介逐条抽出（382 位演员 → 528 行，379 �
 `GET /stream/{id}`（支持 Range）· `GET /cover/{id}`（带 ETag + 一周强缓存）· `GET /{code}/subtitle/check` · `GET /{code}/subtitle` · `GET /{id}/recommend` · `POST /{id}/reset-file-size` · `PUT /{id}/file-info` · `PUT /{id}/media-flags` · `DELETE /{id}/file` · `POST /rename-to-code`
 
 ### /api/Actor
-`GET /` · `GET /{id}` · `POST /` · `PUT /{id}` · `DELETE /{id}` · `GET /countries` · `GET /{id}/videos` · `POST /images/sync` · `POST /{id}/images/sync` · `PUT /{id}/image/primary` · `GET /{id}/poster/{fileName}` · `GET /{id}/thumb/{s|m}/{fileName}`
+`GET /` · `GET /{id}` · `POST /` · `PUT /{id}` · `DELETE /{id}` · `GET /countries` · `GET /{id}/videos` · `POST /images/sync` · `POST /{id}/images/sync` · `PUT /{id}/image/primary` · `GET /{id}/poster/{fileName}` · `GET /{id}/thumb/{s|m}/{fileName}` · `GET /duplicates` · `POST /merge`
 > 图片清单不再单独请求：`GET /{id}` 的 `data.images` 里就带着（来自 `actor_images`）。
 > 列表每行带 `avatar`（主图文件名，没有照片则为 null）——脸只出现在演员列表页这一处。
 > `GET /{id}/videos` 支持 `page` `pageSize` `mediaAttrFlags` `hasFile`，筛选在服务端完成后再分页。
@@ -345,6 +346,24 @@ src/
 - **没有照片时不占半页**：退化成一条虚线空态（"这位演员还没有照片" + 同步照片），头部回到单栏。
 - 与「艳图」的 `PosterWall` 是两套东西：那边一墙小图供浏览、随机取批、可换一批；
   这边逐张翻看、要能放大看细节。两者的灯箱各自实现，不互相牵连。
+
+### 重复演员合并（`views/components/ActorMergeDialog.vue`）
+
+演员列表页工具栏的「查重」打开一张候选表，一行一组，两个按钮决定**留谁**（留下来的是哪个艺名，
+直接影响以后搜不搜得到人，所以方向必须当场选，不给默认值）。
+
+`GET /api/actor/duplicates` 给两类线索，强的排前面：
+**本名互指**（一人的本名恰好挂在对方的曾用名里）与**共享曾用名**（弱）。
+实测 1612 位演员里 22 组候选、9 组是本名互指 —— 后面那批基本是繁简/新旧艺名同一人
+（藤森里穗↔藤森里穂、长濑凉子↔長瀬涼子、沙月惠奈↔沙月恵奈）。
+但共享曾用名**不等于**同一人：数据里就有把第三个女优的名字同时挂到两人名下的脏行，
+所以界面只摆证据，不做自动合并，也不给"忽略此组"（误报留着不会误伤）。
+
+`POST /api/actor/merge {from, to}` 一次做完：影片关系改挂（`INSERT OR IGNORE` 后再删，两人共用的片自然合流）、
+曾用名整组搬过去**并把旧艺名也留成一条曾用名**、外链走 `Utils.Links.Normalize` 统一去重、
+目标缺的地区/简介用来源的补上（已有的不覆盖）、来源连同子表删掉。全程一个事务。
+**来源名下还有照片时直接拒绝**：图片按 `<艳图目录>/<演员ID>/` 定位，只把行改挂过去会得到一批 404，
+磁盘目录得由人先挪 —— 宁可让界面说清楚，也不悄悄留下看不见的图。
 
 ### 输入行为（全站，写在 `scripts/utils/inputBehavior.js`）
 

@@ -108,6 +108,10 @@ export const actorApi = {
   syncImages: (id) => api.post(id ? `/actor/${id}/images/sync` : '/actor/images/sync'),
   /** 指定列表页那张脸用哪张图 */
   setPrimaryImage: (id, fileName) => api.put(`/actor/${id}/image/primary`, { fileName }),
+  /** 疑似重复演员候选（按线索强度排序） */
+  duplicates: () => api.get('/actor/duplicates'),
+  /** 把 from 并入 to，to 是留下来的名字 */
+  mergeActors: (from, to) => api.post('/actor/merge', { from, to }),
   add: (data) => api.post('/actor', data),
   update: (id, data) => api.put(`/actor/${id}`, data),
   delete: (id) => api.delete(`/actor/${id}`)

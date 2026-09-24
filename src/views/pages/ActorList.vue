@@ -15,6 +15,9 @@
           >
             {{ syncing ? '同步中…' : '同步照片' }}
           </button>
+          <button class="btn btn--sm" title="列出共享曾用名或本名互指的演员，逐组决定要不要合并" @click="showMerge = true">
+            查重
+          </button>
         </template>
 
         <template v-else-if="mode === 'select'">
@@ -93,6 +96,8 @@
       @cancel="handleCancel"
       @delete="handleDelete"
     />
+
+    <ActorMergeDialog :visible="showMerge" @cancel="showMerge = false" @merged="loadActors" />
   </div>
 </template>
 
@@ -104,6 +109,7 @@ import { useUiStore, errText } from '@/scripts/store/ui'
 import { SORT_OPTIONS } from '@/scripts/constants'
 import { debounce } from '@/scripts/utils/debounce'
 import AddActorDialog from '@/views/components/AddActorDialog.vue'
+import ActorMergeDialog from '@/views/components/ActorMergeDialog.vue'
 import ActorCard from '@/views/components/ActorCard.vue'
 import Pagination from '@/views/components/Pagination.vue'
 import SelectList from '@/views/components/SelectList.vue'
@@ -125,6 +131,7 @@ const showDialog = ref(false)
 const editingActor = ref(null)
 const selectedIds = ref([])
 const syncing = ref(false)
+const showMerge = ref(false)
 
 const filters = ref({ country: '', sortBy: '' })
 
