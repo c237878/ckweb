@@ -391,6 +391,12 @@ section {
   box-shadow: var(--shadow-2);
 }
 
+/* 下方放不下时朝上翻，由 utils/dropdownFit.js 量出来后再加这个类 */
+.dropdown-menu.is-above {
+  top: auto;
+  bottom: calc(100% + 4px);
+}
+
 .dropdown-option {
   display: flex;
   align-items: center;
@@ -563,7 +569,8 @@ section {
   height: auto;   /* 多行必须随内容长，定高只适用于单行控件 */
   min-height: 88px;
   padding-block: var(--ctl-pad-x-sm);
-  resize: vertical;
+  /* 不给拖：这两个框都在对话框里，拖拽改高会把对话框撑出视口，右下角那个把手也没有说明作用 */
+  resize: none;
   line-height: 1.6;
 }
 

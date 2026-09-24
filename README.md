@@ -252,6 +252,13 @@ src/
 两者都 emit `update:modelValue`（配合 `v-model`）与 `change`（值真正变化时），
 都支持键盘上下/Enter/Esc、点击外部收起。ComboBox 额外有清除按钮。
 
+**面板浮层统一走 `.dropdown-menu` + `.dropdown-option`**，不要再抄第三份（演员候选曾经是独立的
+`.suggest`，已并进来）。面板高度不写死在场景里：`scripts/utils/dropdownFit.js` 的
+`autoFitDropdown(menu, anchor)` 在展开时量一次——沿祖先求可视范围（滚动容器会裁剪绝对定位后代，
+对话框的 `.dialog__body` 就是），向下放不下就压高度、上方更宽松就加 `.is-above` 朝上翻，
+并且**向下取整到整行**（宁可少露一行也不切半行），滚动/改窗时跟随重算，收起时还原。
+新加浮层控件时调这一个函数即可，别在 CSS 里为某个场景另设 `max-height`。
+
 **数字值注意**：`options` 里放真正的数字（`{ value: 0, label: '连载中' }`），
 不要再写 `v-model.number` —— 原生 `<option>` 会把值变成字符串，`.number` 就是为补这个洞存在的，
 自绘组件直接透传 `opt.value`，不需要它。

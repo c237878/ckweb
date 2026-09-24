@@ -185,7 +185,7 @@
                 </button>
               </span>
             </div>
-            <div class="actor-search">
+            <div ref="actorSearchEl" class="actor-search">
               <input
                 id="av-actor-search"
                 v-model="actorSearch"
@@ -195,10 +195,18 @@
                 autocomplete="off"
                 @input="onActorSearchInput"
               />
-              <ul v-if="actorCandidates.length" class="suggest">
-                <li v-for="actor in actorCandidates" :key="actor.id" class="suggest__item">
-                  <button type="button" @mousedown.prevent="addActor(actor)">{{ actor.name }}</button>
-                </li>
+              <ul v-if="actorCandidates.length" ref="suggestEl" class="dropdown-menu" role="listbox">
+                <li
+                  v-for="actor in actorCandidates"
+                  :key="actor.id"
+                  class="dropdown-option"
+                  role="option"
+                  :aria-selected="false"
+                  :title="`添加演员 ${actor.name}`"
+                  @mousedown.prevent="addActor(actor)"
+                >
+{{ actor.name }}
+</li>
               </ul>
             </div>
           </div>
@@ -220,11 +228,12 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch, onUnmounted } from 'vue'
 import { videoApi, actorApi, scanDirectoryApi, uploadApi } from '@/scripts/api'
 import { useUiStore, errText } from '@/scripts/store/ui'
 import { formatSize } from '@/scripts/utils/format'
 import { debounce } from '@/scripts/utils/debounce'
+import { autoFitDropdown } from '@/scripts/utils/dropdownFit'
 import Dialog from './Dialog.vue'
 import ComboBox from './ComboBox.vue'
 import SelectList from './SelectList.vue'
@@ -446,6 +455,28 @@ const actorCandidates = computed(() => {
   if (local.length || actorList.value.length < ACTOR_FETCH_SIZE) return local.slice(0, SUGGEST_LIMIT)
   return remoteActors.value.filter((a) => candidate(a, kw, picked)).slice(0, SUGGEST_LIMIT)
 })
+
+// 候选面板和下拉框一样会被 .dialog__body 裁掉，用同一套自适应
+const actorSearchEl = ref(null)
+const suggestEl = ref(null)
+let stopSuggestFit = null
+
+watch(
+  () => actorCandidates.value.length,
+  (count) => {
+    if (!count) {
+      stopSuggestFit?.()
+      stopSuggestFit = null
+      return
+    }
+    nextTick(() => {
+      stopSuggestFit?.()
+      stopSuggestFit = autoFitDropdown(suggestEl.value, actorSearchEl.value)
+    })
+  }
+)
+
+onUnmounted(() => stopSuggestFit?.())
 
 // 本地筛不出来（列表被 500 条截断）才退回服务端，并且停顿后再查，不再每敲一个字打一次接口
 const searchRemoteActors = debounce(async (kw) => {
@@ -766,38 +797,8 @@ const handleDelete = () => {
   color: var(--danger);
 }
 
+/* 面板与候选行都走全局 .dropdown-menu / .dropdown-option，这里不再造第三份 */
 .actor-search {
   position: relative;
-}
-
-.suggest {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
-  z-index: 30;
-  list-style: none;
-  padding: 4px;
-  max-height: 220px;
-  overflow-y: auto;
-  background: var(--bg-elev);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--r1);
-  box-shadow: var(--shadow-2);
-}
-
-.suggest__item button {
-  display: block;
-  width: 100%;
-  text-align: left;
-  padding: 6px 9px;
-  border-radius: var(--r1);
-  font-size: var(--f-md);
-  color: var(--text-dim);
-}
-
-.suggest__item button:hover {
-  background: var(--bg-hover);
-  color: var(--text);
 }
 </style>

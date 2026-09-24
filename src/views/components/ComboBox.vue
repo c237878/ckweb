@@ -28,7 +28,7 @@
 &times;
 </button>
 
-    <ul v-if="open" class="dropdown-menu" role="listbox">
+    <ul v-if="open" ref="menuEl" class="dropdown-menu" role="listbox">
       <li
         v-if="allLabel"
         class="dropdown-option"
@@ -57,7 +57,8 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onUnmounted } from 'vue'
+import { autoFitDropdown } from '@/scripts/utils/dropdownFit'
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
@@ -76,6 +77,24 @@ const open = ref(false)
 const text = ref('')
 const highlight = ref(-1)
 const inputEl = ref(null)
+const root = ref(null)
+const menuEl = ref(null)
+// 面板展开期间的自适应跟随，收起时要把监听摘掉
+let stopFit = null
+
+watch(open, (expanded) => {
+  if (!expanded) {
+    stopFit?.()
+    stopFit = null
+    return
+  }
+  nextTick(() => {
+    stopFit?.()
+    stopFit = autoFitDropdown(menuEl.value, root.value)
+  })
+})
+
+onUnmounted(() => stopFit?.())
 
 const selected = computed(() =>
   props.options.find((o) => o.id === props.modelValue) || null

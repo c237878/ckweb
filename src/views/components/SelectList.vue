@@ -20,6 +20,7 @@
     <ul
       v-if="open"
       :id="listboxId"
+      ref="listEl"
       class="dropdown-menu"
       role="listbox"
       :aria-labelledby="label ? triggerId : undefined"
@@ -43,7 +44,8 @@
 </template>
 
 <script setup>
-import { computed, ref, onUnmounted, useId } from 'vue'
+import { computed, nextTick, onUnmounted, ref, useId } from 'vue'
+import { autoFitDropdown } from '@/scripts/utils/dropdownFit'
 
 const props = defineProps({
   modelValue: { type: [String, Number], default: '' },
@@ -68,6 +70,9 @@ const open = ref(false)
 const highlight = ref(-1)
 const root = ref(null)
 const triggerEl = ref(null)
+const listEl = ref(null)
+// 面板展开期间的自适应跟随，收起时要把监听摘掉
+let stopFit = null
 
 const items = computed(() => {
   const normalized = props.options.map((o) =>
@@ -95,12 +100,18 @@ const openMenu = () => {
   highlight.value = selectedIndex()
   open.value = true
   document.addEventListener('mousedown', onOutside, true)
+  nextTick(() => {
+    stopFit?.()
+    stopFit = autoFitDropdown(listEl.value, root.value)
+  })
 }
 
 const closeMenu = () => {
   open.value = false
   highlight.value = -1
   document.removeEventListener('mousedown', onOutside, true)
+  stopFit?.()
+  stopFit = null
 }
 
 // 面板是 button 的兄弟节点，点在组件外才收，点在内由选项自己的 mousedown 处理
@@ -108,7 +119,10 @@ function onOutside(event) {
   if (root.value && !root.value.contains(event.target)) closeMenu()
 }
 
-onUnmounted(() => document.removeEventListener('mousedown', onOutside, true))
+onUnmounted(() => {
+  document.removeEventListener('mousedown', onOutside, true)
+  stopFit?.()
+})
 
 const toggle = () => (open.value ? closeMenu() : openMenu())
 
