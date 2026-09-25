@@ -69,6 +69,8 @@ const handleClick = () => {
   width: 60px;
   height: 60px;
   object-fit: cover;
+  /* 取景与详情页相册的圆完全一致，否则同一个人在两处是两张脸 */
+  object-position: var(--avatar-focus);
   border: 1px solid var(--border);
   border-radius: 50%;
   background: var(--bg-elev-2);

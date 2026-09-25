@@ -1,9 +1,21 @@
 <template>
   <div v-if="!count" class="album album--empty">
     <span class="album__empty-text">{{ emptyText }}</span>
-    <button type="button" class="btn btn--sm" :disabled="syncing" @click="sync">
-      {{ syncing ? '同步中…' : '同步照片' }}
-    </button>
+    <div class="album__actions">
+      <!-- 没照片的时候最需要抓的恰恰就是它，所以两个按钮都得在空态里出现 -->
+      <button
+        type="button"
+        class="btn btn--sm"
+        :disabled="fetching"
+        title="按姓名与曾用名去 av-wiki 的档案页找头像：只有唯一命中、且名字对得上才抓，拿不准就跳过"
+        @click="emit('fetch-avatar')"
+      >
+        {{ fetching ? '抓取中…' : '抓头像' }}
+      </button>
+      <button type="button" class="btn btn--sm" :disabled="syncing" @click="sync">
+        {{ syncing ? '同步中…' : '同步照片' }}
+      </button>
+    </div>
   </div>
 
   <div v-else class="album">
@@ -330,9 +342,9 @@ watch(() => props.actorId, () => {
   pointer-events: none;
 }
 
-/* 圆里要看到的是脸：竖构图的照片裁中间会只剩腰，所以取上三分 */
+/* 圆里要看到的是脸：取景位置与列表页那颗圆头像共用 --avatar-focus */
 .album__card.is-current .album__img {
-  object-position: center 18%;
+  object-position: var(--avatar-focus);
 }
 
 .album__nav {
