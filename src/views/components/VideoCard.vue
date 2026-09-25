@@ -41,18 +41,27 @@
            卡片窄时只显示其中一部分，见文末 .pill--wide -->
       <div class="pills">
         <span
-          v-if="video.mediaAttrFlags > 0"
-          class="tag pill pill--flag"
-          :class="mediaFlagClass(video.mediaAttrFlags)"
-        >{{ mediaFlagText(video.mediaAttrFlags) }}</span>
+          v-if="subtitleText(video.subtitleState)"
+          class="tag pill pill--subtitle"
+          :class="subtitleClass(video.subtitleState)"
+          :title="subtitleText(video.subtitleState, true)"
+        >{{ subtitleText(video.subtitleState) }}</span>
 
+        <span
+          v-if="watermarkText(video.watermarkState)"
+          class="tag pill pill--watermark"
+          :class="watermarkClass(video.watermarkState)"
+          :title="watermarkText(video.watermarkState, true)"
+        >{{ watermarkText(video.watermarkState) }}</span>
+
+        <!-- 分辨率与体积并成一颗：两个说的都是"这个文件有多大清楚"，分两行太挤 -->
         <button
           type="button"
           class="tag pill pill--size"
           :title="copied ? '已复制番号' : '点击复制番号；无文件时顺带重扫路径'"
           @click.stop="copyCode"
         >
-{{ copied ? '已复制' : (video.fileSize ? formatSize(video.fileSize) : '无文件') }}
+{{ sizeText }}
 </button>
         <span v-if="video.likeCount > 0" class="tag tag--like pill pill--likes">♥ {{ video.likeCount }}</span>
         <span v-if="video.country" class="tag tag--accent pill pill--wide pill--country">{{ video.country }}</span>
@@ -85,7 +94,7 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { formatSize } from '@/scripts/utils/format'
-import { mediaFlagText, mediaFlagClass } from '@/scripts/constants'
+import { subtitleText, subtitleClass, watermarkText, watermarkClass, resolutionText } from '@/scripts/constants'
 import { videoApi } from '@/scripts/api'
 import { useUiStore, errText } from '@/scripts/store/ui'
 
@@ -118,6 +127,14 @@ const onCoverLoad = (event) => {
 }
 
 const coverUrl = computed(() => videoApi.getCoverUrl(props.video.id))
+
+// 「1080p 1.4GB」/「1.4GB」（没扫过分辨率）/「无文件」；复制成功时让位给反馈
+const sizeText = computed(() => {
+  if (copied.value) return '已复制'
+  if (!video.value.fileSize) return '无文件'
+  const res = resolutionText(video.value)
+  return res ? `${res} ${formatSize(video.value.fileSize)}` : formatSize(video.value.fileSize)
+})
 
 // 后端把演员拼成 "id|name,id|name" 一个字符串下发，这里拆开
 const actorList = computed(() => {

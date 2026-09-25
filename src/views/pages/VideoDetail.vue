@@ -28,16 +28,45 @@
                         <span v-if="likeCount > 0" class="tag tag--like">♥ {{ likeCount }}</span>
                         <span class="tag tag--muted">{{ video.fileSize?formatSize(video.fileSize):'无文件' }}</span>
                     </div>
+                    <!-- 片源拆成两维分开标：一行一维，再点一次当前值就是清掉这一维的结论 -->
                     <div class="info-row-media">
-                        <span class="media-label">片源：</span>
-                        <template v-if="video.mediaAttrFlags > 0">
-                            <span class="tag" :class="mediaFlagClass(video.mediaAttrFlags)">{{ mediaFlagText(video.mediaAttrFlags, true) }}</span>
-                        </template>
-                        <template v-else>
-                            <button type="button" class="tag media-option media-1" @click="setMediaFlags(1)">劣质片源</button>
-                            <button type="button" class="tag media-option media-2" @click="setMediaFlags(2)">无字幕</button>
-                            <button type="button" class="tag media-option media-3" @click="setMediaFlags(3)">完美片源</button>
-                        </template>
+                        <span class="media-label">字幕：</span>
+                        <button
+                            v-for="opt in SUBTITLE_OPTIONS"
+                            :key="opt.value"
+                            type="button"
+                            class="tag media-option"
+                            :class="[subtitleClass(opt.value), { 'is-on': video.subtitleState === opt.value }]"
+                            :title="SUBTITLE_STATES[opt.value]?.long"
+                            :aria-pressed="video.subtitleState === opt.value"
+                            @click="markSource('subtitle', opt.value)"
+                        >{{ opt.label }}</button>
+                    </div>
+                    <div class="info-row-media">
+                        <span class="media-label">广告水印：</span>
+                        <button
+                            v-for="opt in WATERMARK_OPTIONS"
+                            :key="opt.value"
+                            type="button"
+                            class="tag media-option"
+                            :class="[watermarkClass(opt.value), { 'is-on': video.watermarkState === opt.value }]"
+                            :title="WATERMARK_STATES[opt.value]?.long"
+                            :aria-pressed="video.watermarkState === opt.value"
+                            @click="markSource('watermark', opt.value)"
+                        >{{ opt.label }}</button>
+                    </div>
+                    <div class="info-row-media">
+                        <span class="media-label">分辨率：</span>
+                        <span v-if="video.resH" class="tag tag--info">{{ video.resW }}×{{ video.resH }}</span>
+                        <span v-else class="media-unknown">未扫描</span>
+                        <button
+                            type="button"
+                            class="tag media-option"
+                            :disabled="scanning"
+                            title="读视频文件的容器头拿宽高，顺带看看有没有字幕（不依赖 ffmpeg，也不改文件）"
+                            @click="scanThis"
+                        >{{ scanning ? '扫描中…' : '扫描' }}</button>
+                        <span v-if="video.scanTime" class="media-unknown">扫描于 {{ video.scanTime }}</span>
                     </div>
                     <div class="info-row3" v-if="video.seriesName">
                         <span>系列：</span>
@@ -117,7 +146,10 @@ import { useUiStore, errText } from '@/scripts/store/ui'
 import AddVideoDialog from '@/views/components/AddVideoDialog.vue'
 import VideoCard from '@/views/components/VideoCard.vue'
 import { formatSize } from '@/scripts/utils/format'
-import { mediaFlagText, mediaFlagClass } from '@/scripts/constants'
+import {
+    SUBTITLE_STATES, WATERMARK_STATES, SUBTITLE_OPTIONS, WATERMARK_OPTIONS,
+    subtitleClass, watermarkClass
+} from '@/scripts/constants'
 import { loadCkplayer } from '@/scripts/utils/ckplayer'
 
 const route = useRoute()
@@ -222,19 +254,52 @@ const speedTipVisible = ref(false)
 const currentSpeed = ref(1)
 let speedTipTimer = null
 
-const setMediaFlags = async (flags) => {
+const marking = ref(false)
+// 点当前选中的那颗等于清掉这一维（回到未标记），所以不额外做"清除"按钮
+const markSource = async (dim, value) => {
     if (!video.value?.id) return
+    const key = dim === 'subtitle' ? 'subtitleState' : 'watermarkState'
+    const next = video.value[key] === value ? 'unknown' : value
+    if (marking.value) return
+    marking.value = true
     try {
-        const res = await videoApi.updateMediaFlags(video.value.id, flags)
+        const res = await videoApi.updateSource(video.value.id, { [dim]: next })
         if (res.success) {
-            video.value.mediaAttrFlags = flags
-            ui.success('已设置片源')
+            video.value[key] = res.data[key]
+            video.value.watched = res.data.watched
+            ui.success(next === 'unknown' ? '已清掉这一维' : '已记录')
         } else {
-            ui.error('设置失败：' + errText(res, '未知错误'))
+            ui.error('保存失败：' + errText(res, '未知错误'))
         }
     } catch (error) {
-        console.error('设置片源失败:', error)
-        ui.error('设置失败：' + errText(error))
+        console.error('保存片源标记失败:', error)
+        ui.error('保存失败：' + errText(error))
+    } finally {
+        marking.value = false
+    }
+}
+
+const scanning = ref(false)
+const scanThis = async () => {
+    if (!video.value?.id || scanning.value) return
+    scanning.value = true
+    try {
+        const res = await videoApi.scanOne(video.value.id)
+        if (!res.success) {
+            ui.warn(res.message || '没扫出来')
+            return
+        }
+        video.value.resW = res.data.resW
+        video.value.resH = res.data.resH
+        video.value.subtitleState = res.data.subtitleState
+        video.value.watermarkState = res.data.watermarkState
+        video.value.scanTime = new Date().toLocaleString('zh-CN', { hour12: false })
+        ui.success(res.message)
+    } catch (error) {
+        console.error('扫描失败:', error)
+        ui.error('扫描失败：' + errText(error))
+    } finally {
+        scanning.value = false
     }
 }
 let volumeTipTimer = null
@@ -524,7 +589,12 @@ const resetFileSize = async () => {
             if (res.data?.filePath !== undefined) video.value.file_path = res.data.filePath
             if (res.data?.fileSize !== undefined) video.value.fileSize = res.data.fileSize
             if (res.data?.coverPath !== undefined) video.value.cover_path = res.data.coverPath
-            video.value.mediaAttrFlags = 0
+            video.value.subtitleState = 'unknown'
+            video.value.watermarkState = 'unknown'
+            video.value.watched = false
+            video.value.resW = 0
+            video.value.resH = 0
+            video.value.scanTime = null
             ui.success('已重置')
         } else {
             ui.error('重置失败：' + errText(res, '未知错误'))
@@ -806,10 +876,18 @@ const handleLike = async () => {
     cursor: pointer;
 }
 
-/* 描边由全局 a.tag/button.tag:hover 的 currentColor 负责，这里只改色与底 */
-.media-option.media-1:hover { color: var(--danger); background: var(--danger-soft); }
-.media-option.media-2:hover { color: var(--accent); background: var(--accent-soft); }
-.media-option.media-3:hover { color: var(--success); background: var(--success-soft); }
+/* 当前结论那颗：描边取自己的文字色（有语气的 tag--* 会带出色来），再加一圈同色内描边，
+   这样"选中的是哪颗"不只有颜色一个线索 */
+.media-option.is-on {
+    border-color: currentColor;
+    box-shadow: inset 0 0 0 1px currentColor;
+    font-weight: 600;
+}
+
+.media-unknown {
+    color: var(--text-faint);
+    font-size: var(--f-xs);
+}
 
 /* ==================== 右侧面板 ==================== */
 

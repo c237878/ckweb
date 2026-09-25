@@ -50,10 +50,24 @@
           <h2 class="section-title">系列影片 ({{ total }})</h2>
           <div class="media-filter">
             <SelectList
-              v-model="mediaAttrFilter"
-              :options="mediaFlagOptions"
-              all-label="全部片源"
-              label="按片源筛选影片"
+              v-model="sourceFilter.subtitle"
+              :options="SUBTITLE_OPTIONS"
+              all-label="全部字幕"
+              label="按字幕情况筛选影片"
+              :disabled="videosLoading"
+            />
+            <SelectList
+              v-model="sourceFilter.watermark"
+              :options="WATERMARK_OPTIONS"
+              all-label="全部水印"
+              label="按广告水印筛选影片"
+              :disabled="videosLoading"
+            />
+            <SelectList
+              v-model="sourceFilter.resolution"
+              :options="RESOLUTION_OPTIONS"
+              all-label="全部分辨率"
+              label="按分辨率筛选影片"
               :disabled="videosLoading"
             />
           </div>
@@ -84,8 +98,8 @@
         </div>
 
         <div v-else class="empty">
-          <p>{{ mediaAttrFilter ? '没有该片源的影片' : '该系列暂无影片' }}</p>
-          <button v-if="mediaAttrFilter" class="btn btn--sm" @click="mediaAttrFilter = ''">清除筛选</button>
+          <p>{{ hasSourceFilter ? '没有符合这个片源条件的影片' : '该系列暂无影片' }}</p>
+          <button v-if="hasSourceFilter" class="btn btn--sm" @click="clearSourceFilter">清除筛选</button>
         </div>
 
         <Pagination
@@ -114,7 +128,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { seriesApi } from '@/scripts/api'
 import { useAppStore } from '@/scripts/store/app'
 import { useUiStore, errText } from '@/scripts/store/ui'
-import { MEDIA_FLAGS } from '@/scripts/constants'
+import { SUBTITLE_OPTIONS, WATERMARK_OPTIONS, RESOLUTION_OPTIONS } from '@/scripts/constants'
 import VideoCard from '@/views/components/VideoCard.vue'
 import AddSeriesDialog from '@/views/components/AddSeriesDialog.vue'
 import Pagination from '@/views/components/Pagination.vue'
@@ -135,7 +149,10 @@ const error = ref('')
 const videosLoading = ref(false)
 const videosError = ref('')
 
-const mediaAttrFilter = ref('')
+// 片源三维筛选（都下沉到后端，"未标记"是一个真实筛选值而不是不排除）
+const sourceFilter = ref({ subtitle: '', watermark: '', resolution: '' })
+const hasSourceFilter = computed(() => Object.values(sourceFilter.value).some((v) => v !== ''))
+const clearSourceFilter = () => { sourceFilter.value = { subtitle: '', watermark: '', resolution: '' } }
 const showEditDialog = ref(false)
 
 // 排序相关
@@ -145,14 +162,6 @@ const dragOverIndex = ref(null)
 const savingSort = ref(false)
 
 const pageSize = computed(() => app.pageSize)
-
-// 片源筛选下沉到后端；'0'（未标记）是一个真实筛选值而不是"不排除"
-const mediaFlagOptions = computed(() =>
-  Object.entries(MEDIA_FLAGS).map(([value, flag]) => ({
-    value,
-    label: value === '0' ? '未设置' : flag.short || flag.long
-  }))
-)
 
 
 const openEditDialog = () => {
@@ -205,7 +214,10 @@ const loadVideos = async () => {
   videosError.value = ''
   try {
     const params = { page: page.value, pageSize: pageSize.value }
-    if (mediaAttrFilter.value !== '') params.mediaAttrFlags = parseInt(mediaAttrFilter.value)
+    const { subtitle, watermark, resolution } = sourceFilter.value
+    if (subtitle) params.subtitle = subtitle
+    if (watermark) params.watermark = watermark
+    if (resolution) params.resolution = resolution
     const res = await seriesApi.getVideos(route.params.id, params)
     if (res.success) {
       videos.value = res.data || []
@@ -263,7 +275,7 @@ const startSort = async () => {
   pageBeforeSort = page.value
   sorting.value = true
   // 排序是对整个系列重编号，带着筛选进来会只提交一部分，先清掉
-  mediaAttrFilter.value = ''
+  clearSourceFilter()
   videosLoading.value = true
   videosError.value = ''
   try {
@@ -371,19 +383,23 @@ watch(
     if (!newId) return
     series.value = null
     page.value = 1
-    mediaAttrFilter.value = ''
+    clearSourceFilter()
     sorting.value = false
     loadAll()
   }
 )
 
-// 筛选是服务端行为，改动后回到第一页重新取
-watch(mediaAttrFilter, () => {
-  // 切系列时 loadAll 自己会取影片；排序模式整系列重载也不该被筛选打断
-  if (loading.value || sorting.value) return
-  page.value = 1
-  loadVideos()
-})
+// 筛选是服务端行为，改动后回到第一页重新取（三维存在一个对象里，要 deep 才看得到里面变了）
+watch(
+  sourceFilter,
+  () => {
+    // 切系列时 loadAll 自己会取影片；排序模式整系列重载也不该被筛选打断
+    if (loading.value || sorting.value) return
+    page.value = 1
+    loadVideos()
+  },
+  { deep: true }
+)
 </script>
 
 <style scoped>
@@ -460,6 +476,15 @@ watch(mediaAttrFilter, () => {
   align-items: center;
   justify-content: space-between;
   gap: var(--s3);
+  flex-wrap: wrap;
+}
+
+/* 三维筛选横排在标题右侧，放不下就换行（不套 .filters 那个带底色的框，这里已经在板块头里） */
+.media-filter {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--s2);
   flex-wrap: wrap;
 }
 

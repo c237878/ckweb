@@ -88,8 +88,14 @@ export const videoApi = {
   getAutoCode: () => api.get('/video/autocode'),
   like: (id) => api.post(`/video/${id}/like`),
   resetFileSize: (id) => api.post(`/video/${id}/reset-file-size`),
-  updateMediaFlags: (id, flags) => api.put(`/video/${id}/media-flags`, { flags }),
-  deleteVideoFile: (id) => api.delete(`/video/${id}/file`),
+  /** 片源两维：dim = 'subtitle' | 'watermark'，一次只改一维 */
+  updateSource: (id, patch) => api.put(`/video/${id}/source`, patch),
+  /** 读这条影片的文件头，拿分辨率并顺带看有没有字幕 */
+  scanOne: (id) => api.post(`/video/${id}/scan`),
+  /** 全站扫描：任务在服务端后台跑，force=true 连量过的一起重扫 */
+  startScanAll: (force = false) => api.post('/video/scan/all', null, { params: { force } }),
+  scanStatus: () => api.get('/video/scan/status'),
+  stopScanAll: () => api.delete('/video/scan/all'),  deleteVideoFile: (id) => api.delete(`/video/${id}/file`),
   updateFileInfo: (id, data) => api.put(`/video/${id}/file-info`, data),
   getLikeStats: (year, month) => api.get('/video/likes/stats', { params: { year, month } }),
   getDailyRecommend: (count, refresh = false) => api.get('/video/daily-recommend', { params: { count, refresh } }),

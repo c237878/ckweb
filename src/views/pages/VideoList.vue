@@ -4,6 +4,14 @@
       <h1 class="page-title">影片列表</h1>
       <div class="header-actions">
         <template v-if="mode === 'browse'">
+          <button
+            class="btn btn--sm"
+            :class="{ 'btn--ghost': scanRunning }"
+            :title="scanRunning ? '正在读的那一个会读完，然后停下' : '读视频文件的容器头量分辨率，顺带把没标过的字幕补上（不装 ffmpeg，也不改文件）'"
+            @click="scanRunning ? stopScan() : startScan()"
+          >
+            {{ scanRunning ? '停止扫描' : '扫描片源' }}
+          </button>
           <button class="btn btn--sm" :disabled="renaming" @click="checkAndRename">
             {{ renaming ? '检查中...' : '校验文件名' }}
           </button>
@@ -30,6 +38,9 @@
       </div>
     </div>
 
+    <!-- 只在任务真的在跑时出现，跑完收到结果提示就收起（服务端在跑，离开页面不影响） -->
+    <JobBar v-if="scanRunning" :text="scanText" :percent="scan.percent" />
+
     <div class="filters">
       <SelectList
         v-model="filters.country"
@@ -53,10 +64,24 @@
         @change="applyFilter"
       />
       <SelectList
-        v-model="filters.mediaAttrFlags"
-        :options="mediaFlagOptions"
-        all-label="全部片源"
-        label="按片源筛选"
+        v-model="filters.subtitle"
+        :options="SUBTITLE_OPTIONS"
+        all-label="全部字幕"
+        label="按字幕情况筛选"
+        @change="applyFilter"
+      />
+      <SelectList
+        v-model="filters.watermark"
+        :options="WATERMARK_OPTIONS"
+        all-label="全部水印"
+        label="按广告水印筛选"
+        @change="applyFilter"
+      />
+      <SelectList
+        v-model="filters.resolution"
+        :options="RESOLUTION_OPTIONS"
+        all-label="全部分辨率"
+        label="按分辨率筛选"
         @change="applyFilter"
       />
       <ComboBox
@@ -150,14 +175,15 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue'
 import { videoApi } from '@/scripts/api'
 import { useAppStore } from '@/scripts/store/app'
 import { useUiStore, errText } from '@/scripts/store/ui'
-import { MEDIA_FLAGS, SORT_OPTIONS } from '@/scripts/constants'
+import { SORT_OPTIONS, SUBTITLE_OPTIONS, WATERMARK_OPTIONS, RESOLUTION_OPTIONS } from '@/scripts/constants'
 import { debounce } from '@/scripts/utils/debounce'
 import VideoCard from '@/views/components/VideoCard.vue'
 import AddVideoDialog from '@/views/components/AddVideoDialog.vue'
+import JobBar from '@/views/components/JobBar.vue'
 import Pagination from '@/views/components/Pagination.vue'
 import ComboBox from '@/views/components/ComboBox.vue'
 import SelectList from '@/views/components/SelectList.vue'
@@ -194,17 +220,12 @@ const filters = ref({
   seriesId: '',
   keyword: '',
   downloaded: '',
-  mediaAttrFlags: ''
+  subtitle: '',
+  watermark: '',
+  resolution: ''
 })
 
 const pageSize = computed(() => app.pageSize)
-
-// 0 是"未标记"，不作为筛选项（"全部片源"已覆盖）
-const mediaFlagOptions = computed(() =>
-  Object.entries(MEDIA_FLAGS)
-    .filter(([value]) => value !== '0')
-    .map(([value, flag]) => ({ value, label: flag.long }))
-)
 
 const hasActiveFilter = computed(() =>
   Object.values(filters.value).some((v) => v !== '' && v !== null)
@@ -231,6 +252,8 @@ onMounted(async () => {
 
   await app.init()
   await Promise.all([loadMeta(), loadVideos()])
+  // 刷新页面或换台电脑进来时，正在跑的扫描要看得见
+  pollScan()
 })
 
 const loadMeta = async () => {
@@ -257,7 +280,9 @@ const loadVideos = async () => {
     if (filters.value.keyword) params.keyword = filters.value.keyword
     if (filters.value.downloaded === 'yes') params.hasFile = true
     else if (filters.value.downloaded === 'no') params.hasFile = false
-    if (filters.value.mediaAttrFlags !== '') params.mediaAttrFlags = parseInt(filters.value.mediaAttrFlags)
+    if (filters.value.subtitle) params.subtitle = filters.value.subtitle
+    if (filters.value.watermark) params.watermark = filters.value.watermark
+    if (filters.value.resolution) params.resolution = filters.value.resolution
     if (filters.value.sortBy) params.sortBy = filters.value.sortBy
 
     const res = await videoApi.getList(params)
@@ -316,7 +341,10 @@ const handleSelectVideo = (videoId) => {
 }
 
 const handleReset = () => {
-  filters.value = { country: '', category: '', seriesId: '', keyword: '', downloaded: '', mediaAttrFlags: '', sortBy: '' }
+  filters.value = {
+    country: '', category: '', seriesId: '', keyword: '', downloaded: '',
+    subtitle: '', watermark: '', resolution: '', sortBy: ''
+  }
   applyFilter()
 }
 
@@ -324,6 +352,86 @@ const openAdd = () => {
   editingVideo.value = null
   showAddDialog.value = true
 }
+
+// 扫描任务在服务端后台跑，这里只是看它：启动 → 每 2 秒轮一次进度 → 结束后收一条提示。
+// 离开页面只摘掉轮询，不打断任务——全库是十分钟级的活，关浏览器不该把它带走。
+const scan = ref(null)
+let scanTimer = null
+let scanWatching = false
+
+const scanRunning = computed(() => !!scan.value?.running)
+const fmtEta = (sec) => (sec >= 60 ? `约剩 ${Math.round(sec / 60)} 分钟` : `约剩 ${sec} 秒`)
+const scanText = computed(() => {
+  const s = scan.value
+  if (!s) return ''
+  if (!s.total) return '正在清点要扫的影片…'
+  const tail = s.etaSeconds ? ` · ${fmtEta(s.etaSeconds)}` : ''
+  return `扫描${s.what} · 已读 ${s.processed} / ${s.total} · 量到 ${s.ok} 个 · 补上字幕 ${s.subtitle} 个${tail}`
+})
+
+const stopScanPoll = () => {
+  if (scanTimer) {
+    clearInterval(scanTimer)
+    scanTimer = null
+  }
+}
+
+const pollScan = async () => {
+  let res
+  try {
+    res = await videoApi.scanStatus()
+  } catch {
+    return // 轮询失败下一轮再来，不值得弹错误
+  }
+  if (!res.success) return
+
+  if (res.data.running) {
+    scan.value = res.data
+    scanWatching = true
+    return
+  }
+
+  // 不在跑了：条子立刻收起，结果改由一条提示承载
+  const s = res.data
+  scan.value = null
+  if (scanWatching) {
+    scanWatching = false
+    stopScanPoll()
+    ui[s.note ? 'warn' : 'info'](
+      `扫描结束：读 ${s.processed} 个，量到 ${s.ok} 个，读不出 ${s.missed} 个，补上字幕 ${s.subtitle} 个${s.note ? ` · ${s.note}` : ''}`
+    )
+    loadVideos()
+  }
+}
+
+const startScan = async () => {
+  try {
+    const res = await videoApi.startScanAll()
+    if (!res.success) {
+      ui.warn(res.message || '没能启动')
+      return
+    }
+    ui.info(res.message)
+    scanWatching = true
+    scan.value = res.data
+    scanTimer = setInterval(pollScan, 2000)
+  } catch (err) {
+    console.error('启动扫描失败:', err)
+    ui.error('启动失败：' + errText(err))
+  }
+}
+
+const stopScan = async () => {
+  try {
+    const res = await videoApi.stopScanAll()
+    ui.info(res.message || '已请求停止')
+  } catch (err) {
+    ui.error('停止失败：' + errText(err))
+  }
+}
+
+// 只摘轮询：任务本身在服务端，不该被页面卸载带走
+onBeforeUnmount(stopScanPoll)
 
 const baseName = (path) => (path || '').split('/').pop()
 

@@ -40,11 +40,27 @@ cd ckweb && npm install && npm run dev
 ### 表
 
 **videos** — 影片
-`id` `name` `category`(单一分类文本) `code`(番号) `country` `seriesid`→video_series `file_path` `file_size` `cover_path`(**磁盘绝对路径，不是 Base64**) `media_attr_flags` `sort_order` `ctime`
+`id` `name` `category`(单一分类文本) `code`(番号) `country` `seriesid`→video_series `file_path` `file_size` `cover_path`(**磁盘绝对路径，不是 Base64**) `subtitle_state` `watermark_state` `watched` `res_w` `res_h` `scan_time` `sort_order` `ctime`
 > 入库时间就是 `ctime`。接口里的 `addedAt` 字段也取自 `ctime`，但前端目前没有任何地方渲染它。
 
-**media_attr_flags（片源标记）** — `0` 未标记 · `1` 劣质 · `2` 无字幕 · `3` 完美。
-前端展示文案与配色统一在 `ckweb/src/scripts/constants.js` 的 `MEDIA_FLAGS`，不要在页面里各写一份。
+**片源两维（schema v6 起）** — 原先 `media_attr_flags` 一格要同时表达"字幕在不在"和"画面有没有广告"，
+两头话都说不清，也筛不准。v6 拆成两个独立维度，取值口径后端在 `ckapi/Utils/SourceStates.cs`、
+前端在 `ckweb/src/scripts/constants.js`（`SUBTITLE_STATES` / `WATERMARK_STATES`），两边必须一一对应，
+文案与配色只这一份，页面里不要再各抄一遍。
+
+| 维度 | 取值 |
+| --- | --- |
+| `subtitle_state` 字幕 | `unknown` 未标记 · `none` 无字幕版（发行版本就没字幕） · `missing` 缺字幕（这片有字幕，这份没带上） · `has` 有字幕 |
+| `watermark_state` 广告水印 | `unknown` 未标记 · `none` 无广告（画面干净） · `light` 角标水印（不影响观看） · `heavy` 满屏广告（影响观看） |
+| `res_w` / `res_h` / `scan_time` | 扫描出来的显示宽高与测量时间，见下节「片源扫描」 |
+
+v6 的值映射只搬确定说得通的：`2 无字幕`→`missing`（旧长文案就是"缺少字幕文件"）、
+`3 完美`→`has`；`1 劣质`（300 条）在新口径里没有对应维度——它说的是清晰度，
+而清晰度这次由扫描客观量出来，所以两维都留 `unknown`。
+**旧代码里"非 0 就是看过"这个暗号搬到了 `watched` 列**（迁移时把 2066 条已标记的置 1）：
+今日推荐与首页排序都靠它挑"没看过"的，不能拿两个状态反推——
+字幕和分辨率是扫描自动填的，一扫完全站都会变成"有结论"，推荐池当场就空了。
+`PUT /api/video/{id}/source` 只在人工给出结论时动 `watched`，扫描永远不动。
 
 **actors** — `id` `name`(UNIQUE) `country` `bio` `birthdate` `ctime`
 > `birthdate` 是 ISO 文本，只收 `YYYY` / `YYYY-MM` / `YYYY-MM-DD` 三种写法（`NormalizeBirthdate` 卡死），
@@ -118,7 +134,7 @@ v4 迁移把含 `http` 的简介逐条抽出（382 位演员 → 528 行，379 �
 ### /api/Video
 | 方法 | 路由 | 说明 |
 |---|---|---|
-| GET | `/api/Video/list` | 分页列表，支持 `category` `country` `keyword` `seriesId` `hasFile` `mediaAttrFlags` `prioritizeUnrated` `sortBy` |
+| GET | `/api/Video/list` | 分页列表，支持 `category` `country` `keyword` `seriesId` `hasFile` `subtitle` `watermark` `resolution` `prioritizeUnrated` `sortBy` |
 | GET | `/api/Video/{id}` | 详情（含 actors、likeCount） |
 | POST | `/api/Video/add` | 新增 |
 | PUT | `/api/Video/{id}` | 更新（番号变更会连带重命名磁盘文件） |
@@ -134,13 +150,18 @@ v4 迁移把含 `http` 的简介逐条抽出（382 位演员 → 528 行，379 �
 | GET | `/api/Video/likes/stats` | 点赞日历 + 近 12 个月统计 |
 
 ### /api/video（流媒体与文件）
-`GET /stream/{id}`（支持 Range）· `GET /cover/{id}`（带 ETag + 一周强缓存）· `GET /{code}/subtitle/check` · `GET /{code}/subtitle` · `GET /{id}/recommend` · `POST /{id}/reset-file-size` · `PUT /{id}/file-info` · `PUT /{id}/media-flags` · `DELETE /{id}/file` · `POST /rename-to-code`
+`GET /stream/{id}`（支持 Range）· `GET /cover/{id}`（带 ETag + 一周强缓存）· `GET /{code}/subtitle/check` · `GET /{code}/subtitle` · `GET /{id}/recommend` · `POST /{id}/reset-file-size` · `PUT /{id}/file-info` · `DELETE /{id}/file` · `POST /rename-to-code`
+
+片源两维与扫描（`Controllers/VideoSourceController.cs`）：
+`PUT /{id}/source`（body `{"subtitle":…,"watermark":…}`，只改传了的那一维，取值见 `SourceStates`）·
+`POST /{id}/scan`（单条重扫）· `POST /scan/all?force=`（启动全站扫描）· `GET /scan/status` · `DELETE /scan/all`
+> `POST /{id}/reset-file-size` 会连带把两维、`watched` 与分辨率一起清空——换了文件等于这条没结论了。
 
 ### /api/Actor
 `GET /` · `GET /{id}` · `POST /` · `PUT /{id}` · `DELETE /{id}` · `GET /countries` · `GET /{id}/videos` · `POST /images/sync` · `POST /{id}/images/sync` · `PUT /{id}/image/primary` · `POST /{id}/avatar/fetch` · `POST /{id}/profile/fetch` · `POST /scrape/fetch` · `GET /scrape/status` · `DELETE /scrape/fetch` · `GET /{id}/poster/{fileName}` · `GET /{id}/thumb/{s|m}/{fileName}` · `GET /duplicates` · `POST /merge`
 > 图片清单不再单独请求：`GET /{id}` 的 `data.images` 里就带着（来自 `actor_images`）。
 > 列表每行带 `avatar`（主图文件名，没有照片则为 null）——脸只出现在演员列表页这一处。
-> `GET /{id}/videos` 支持 `page` `pageSize` `mediaAttrFlags` `hasFile`，筛选在服务端完成后再分页。
+> `GET /{id}/videos` 支持 `page` `pageSize` `subtitle` `watermark` `resolution` `hasFile`，筛选在服务端完成后再分页。
 
 ### /api/Series
 `GET /` · `GET /{id}` · `POST /` · `PUT /{id}` · `DELETE /{id}` · `GET /countries` · `GET /{id}/videos` · `POST /{id}/sort`
@@ -170,7 +191,7 @@ src/
   scripts/
     api/index.js         axios 实例与各模块 API
     store/app.js         pinia：站点名/分页大小/主题
-    constants.js         MEDIA_FLAGS / SORT_OPTIONS
+    constants.js         SUBTITLE_STATES / WATERMARK_STATES / RESOLUTION_OPTIONS / SORT_OPTIONS
     utils/               format / debounce / filterPersist / ckplayer(按需加载)
   plugins/router.js      懒加载路由 + 404 + scrollBehavior
   views/pages/           12 个页面
@@ -232,8 +253,12 @@ src/
 
 | 形态 | 显示内容 | 触发条件 |
 | --- | --- | --- |
-| 迷你 | 片源标记、文件大小、点赞数 | 默认 |
+| 迷你 | 字幕、广告水印、分辨率+文件大小、点赞数 | 默认 |
 | 完全 | 再加 地区、分类、所属系列、演员 | 视口 ≥900px **且** 这张卡片本身 ≥200px |
+
+> 分辨率与体积并成一颗（`1080p 3.4 GB`）：两个说的都是"这个文件清楚多大"，分两颗会把迷你形态挤满。
+> 两维里凡是"未标记"的那一维**不画胶囊**（`subtitleClass()` 对 `unknown` 返回空串，模板 `v-if` 直接不出），
+> 所以没标过的卡片不会因为拆成两维就多出两颗空胶囊。
 
 ```css
 @media (min-width: 900px) { @container (min-width: 200px) { .pill--wide { display: inline-flex; } } }
@@ -402,6 +427,39 @@ JSON 接口，不去解析网页排版。抓回来的是事实字段（日期、
   每次 `Start` 换一个新源、并把它的局部引用传给循环体。
 - 每抓成一位写一行日志（演员 ID、我们的名字、抓了什么、档案名与 slug）：批量跑的时候，
   这是唯一能回看"这些数据是从哪个档案抓来的"的地方。
+
+### 片源扫描：分辨率与字幕（`ckapi/Utils/MediaProbe.cs` + `Services/SourceScanner.cs`）
+
+4798 条影片手动填分辨率不现实，也不需要装 ffmpeg——**直接读 MP4 的盒（box）结构**就够了：
+
+- 元数据都在 `moov` 里。这批文件（都是 `.mp4`，放在 SMB 共享上）的 `moov` 普遍排在 `mdat` 之后、
+  贴着文件尾，所以**从文件头按 size 跳着读盒头**就能定位它，不必猜"读尾部 4MB"这种启发式。
+- 定位到 `moov` 之后也只读需要的三小块：每条 trak 的 `tkhd`（显示宽高）、`mdia/hdlr`（这条是什么轨）、
+  视频轨的 `stsd` 首条目（编码宽高 + fourcc）。`AUTOCODE` 那批 `moov` 有 12MB，整块读进内存纯属浪费。
+- 宽高取 `tkhd` 的**显示值**而不是 `stsd` 的编码值：`607×1080` 这种非方形像素的片子编码是 `1080×1080`，
+  但看到的确是 1080 行。`tkhd` 是 16.16 定点数，**四舍五入**再取整（直接右移会把 607.99 报成 607）。
+- `hdlr` 认得出的字幕轨（`subp` / `sbtl` / `text` / `cla3`）算内嵌软字幕；
+  再看字幕目录（`scan_directories` 里 `category='字幕'`）有没有同番号的文件。两条任中其一即"有字幕"。
+- **为什么不靠文件名**：`/Volumes/av/021014-540.mp4` 里那个 `540` 是序号，当分辨率读会把一批 720p 标成 540p；
+  实测 4798 条里只有 2 条文件名真含分辨率字样。
+
+写库的规矩（`SourceScanner`）：分辨率任何时候覆盖（换了片源就该跟着变）；
+`subtitle_state` **只在 `unknown` 与 `missing` 时被填成 `has`** —— 人工判过 `none`（发行版本就没字幕）的不动，
+机器只能证明"这里有字幕"，证明不了"这片子本来就没有"。**扫描永远不动 `watched`**，
+否则自动填完字段，今日推荐就没有"没看过"的片可推了。
+
+- 探测与写库分两步：文件在共享盘上，一次小读一个来回（实测 0.1~0.5 秒），所以**并发只放在探测**
+  （6 路），写库回到单线程、一批 24 条一个事务——SQLite 连接不是线程安全的。
+- 全站扫描是**服务端后台任务**（`Services/SourceScanJob.cs`），与头像抓取同一套：
+  `POST /scan/all` 启动并立刻返回、`GET /scan/status` 给进度、`DELETE /scan/all` 请求停止，
+  影片列表页工具栏「扫描片源」→ 变成「停止扫描」，进度条用抽出来的 `views/components/JobBar.vue`
+  （演员列表的抓取进度条同一份样式，不再各写一遍 CSS）。
+  实测全库 3884 个文件跑完 934 秒（约 15 分钟），量到 3874、读不出 7、顺带补上字幕 37。
+- 那 7 个读不出来的**不是解析器漏了**：查过字节，`AUTOCODE-468` 开头就不是合法盒，
+  `ALDN-352` 只有 `ftyp/free/mdat` 且 `mdat` 到文件尾（**没有 moov**，等于没下完），
+  `SORA-354` 的 `mdat` 声明长度比文件本身还大。这类统一报"文件不在，或读不出元数据"。
+- `force=true`（全站重扫）只在后端与接口文档里留着，界面不摆按钮：换过文件的正常走法是在详情页
+  点「重置」清掉这一条，它就成了「未扫描」，下一次「扫描片源」自然把它带上（分辨率筛选里也有「未扫描」一档方便清点）。
 
 ### 重复演员合并（`views/components/ActorMergeDialog.vue`）
 

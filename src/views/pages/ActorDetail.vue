@@ -61,10 +61,22 @@
           <h2 class="section-title">参演影片 ({{ total }})</h2>
           <div class="media-filter">
             <SelectList
-              v-model="mediaAttrFilter"
-              :options="mediaFlagOptions"
-              all-label="全部片源"
-              label="按片源筛选影片"
+              v-model="sourceFilter.subtitle"
+              :options="SUBTITLE_OPTIONS"
+              all-label="全部字幕"
+              label="按字幕情况筛选影片"
+            />
+            <SelectList
+              v-model="sourceFilter.watermark"
+              :options="WATERMARK_OPTIONS"
+              all-label="全部水印"
+              label="按广告水印筛选影片"
+            />
+            <SelectList
+              v-model="sourceFilter.resolution"
+              :options="RESOLUTION_OPTIONS"
+              all-label="全部分辨率"
+              label="按分辨率筛选影片"
             />
           </div>
         </div>
@@ -80,8 +92,8 @@
         </div>
 
         <div v-else class="empty">
-          <p>{{ mediaAttrFilter ? '没有该片源的影片' : '该演员暂无影片' }}</p>
-          <button v-if="mediaAttrFilter" class="btn btn--sm" @click="mediaAttrFilter = ''">清除筛选</button>
+          <p>{{ hasSourceFilter ? '没有符合这个片源条件的影片' : '该演员暂无影片' }}</p>
+          <button v-if="hasSourceFilter" class="btn btn--sm" @click="clearSourceFilter">清除筛选</button>
         </div>
 
         <Pagination v-model:page="page" :page-size="pageSize" :total="total" @change="loadVideos" />
@@ -104,7 +116,9 @@ import { useRoute, useRouter } from 'vue-router'
 import { actorApi } from '@/scripts/api'
 import { useAppStore } from '@/scripts/store/app'
 import { useUiStore, errText } from '@/scripts/store/ui'
-import { MEDIA_FLAGS, linkKindLabel } from '@/scripts/constants'
+import {
+  SUBTITLE_OPTIONS, WATERMARK_OPTIONS, RESOLUTION_OPTIONS, linkKindLabel
+} from '@/scripts/constants'
 import VideoCard from '@/views/components/VideoCard.vue'
 import AddActorDialog from '@/views/components/AddActorDialog.vue'
 import ActorAlbum from '@/views/components/ActorAlbum.vue'
@@ -128,7 +142,10 @@ const error = ref('')
 const videosLoading = ref(false)
 const videosError = ref('')
 
-const mediaAttrFilter = ref('')
+// 片源三维筛选（都下沉到后端，所以"未标记"是一个真实筛选值而不是排除）
+const sourceFilter = ref({ subtitle: '', watermark: '', resolution: '' })
+const hasSourceFilter = computed(() => Object.values(sourceFilter.value).some((v) => v !== ''))
+const clearSourceFilter = () => { sourceFilter.value = { subtitle: '', watermark: '', resolution: '' } }
 const showEditDialog = ref(false)
 
 const pageSize = computed(() => app.pageSize)
@@ -144,14 +161,6 @@ const linkLabel = (link) => {
   const host = (link.url.match(/^https?:\/\/([^/]+)/i)?.[1] || '').replace(/^www\./i, '')
   return host ? `${linkKindLabel(link.kind)} ${host}` : linkKindLabel(link.kind)
 }
-
-// 片源筛选下沉到后端，所以 '0'（未标记）是一个真实的筛选值而不是"排除"
-const mediaFlagOptions = computed(() =>
-  Object.entries(MEDIA_FLAGS).map(([value, flag]) => ({
-    value,
-    label: value === '0' ? '未设置' : flag.short || flag.long
-  }))
-)
 
 const actorId = computed(() => route.params.id)
 
@@ -217,7 +226,10 @@ const loadVideos = async () => {
   videosError.value = ''
   try {
     const params = { page: page.value, pageSize: pageSize.value }
-    if (mediaAttrFilter.value !== '') params.mediaAttrFlags = parseInt(mediaAttrFilter.value)
+    const { subtitle, watermark, resolution } = sourceFilter.value
+    if (subtitle) params.subtitle = subtitle
+    if (watermark) params.watermark = watermark
+    if (resolution) params.resolution = resolution
     const res = await actorApi.getVideos(route.params.id, params)
     if (res.success) {
       videos.value = res.data || []
@@ -315,18 +327,22 @@ watch(
     if (!newId) return
     actor.value = null
     page.value = 1
-    mediaAttrFilter.value = ''
+    clearSourceFilter()
     loadAll()
   }
 )
 
-// 筛选是服务端行为，改动后回到第一页重新取
-watch(mediaAttrFilter, () => {
-  // 切换演员时 loadAll 会自己取影片，别抢它
-  if (loading.value) return
-  page.value = 1
-  loadVideos()
-})
+// 筛选是服务端行为，改动后回到第一页重新取（三维存在一个对象里，要 deep 才看得到里面变了）
+watch(
+  sourceFilter,
+  () => {
+    // 切换演员时 loadAll 会自己取影片，别抢它
+    if (loading.value) return
+    page.value = 1
+    loadVideos()
+  },
+  { deep: true }
+)
 </script>
 
 <style scoped>
@@ -400,6 +416,15 @@ watch(mediaAttrFilter, () => {
   align-items: center;
   justify-content: space-between;
   gap: var(--s3);
+  flex-wrap: wrap;
+}
+
+/* 三维筛选横排在标题右侧，放不下就换行（不套 .filters 那个带底色的框，这里已经在板块头里） */
+.media-filter {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--s2);
   flex-wrap: wrap;
 }
 

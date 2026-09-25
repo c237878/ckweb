@@ -1,22 +1,74 @@
 /**
  * 全站共享的枚举与展示文案。
- * 片源标记（media_attr_flags）此前在 5 处各写一份，文本与配色互不一致。
+ * 片源两维的取值口径在后端 Utils/SourceStates.cs，两边必须一一对应；
+ * 文案与配色只在这里写一份，页面里不要再各抄一遍。
  */
 
-export const MEDIA_FLAGS = {
-  0: { short: '', long: '未标记', tone: 'muted' },
-  1: { short: '劣质', long: '片源质量较差', tone: 'danger' },
-  2: { short: '无字幕', long: '缺少字幕文件', tone: 'warn' },
-  3: { short: '完美', long: '片源完整且有字幕', tone: 'success' }
+/**
+ * 字幕情况。原先"字幕在不在"和"画面有没有广告"挤在一个 media_attr_flags 里，
+ * 结果一格话说不清、也筛不准，现在拆成两维各自独立。
+ *
+ * pill = 卡片上的胶囊文案（未标不显示，所以是空串）
+ * label = 筛选与标记按钮上的文案
+ * long = 详情页与悬停提示里的完整说法
+ */
+export const SUBTITLE_STATES = {
+  unknown: { pill: '', label: '未标记', long: '字幕情况还没标', tone: 'muted' },
+  none: { pill: '无字幕版', label: '无字幕版', long: '发行版本就没字幕', tone: 'muted' },
+  missing: { pill: '缺字幕', label: '缺字幕', long: '这片有字幕，这份没带上', tone: 'warn' },
+  has: { pill: '有字幕', label: '有字幕', long: '字幕齐全（内嵌或同目录）', tone: 'success' }
 }
 
-export const mediaFlagText = (flags, long = false) => {
-  const entry = MEDIA_FLAGS[flags]
+/** 广告水印 */
+export const WATERMARK_STATES = {
+  unknown: { pill: '', label: '未标记', long: '广告水印还没标', tone: 'muted' },
+  none: { pill: '无广告', label: '无广告', long: '画面干净，没有台标和广告', tone: 'success' },
+  light: { pill: '角标水印', label: '角标水印', long: '角落有台标或小水印，不影响观看', tone: 'warn' },
+  heavy: { pill: '满屏广告', label: '满屏广告', long: '片头广告、滚动或满屏水印，影响观看', tone: 'danger' }
+}
+
+const stateText = (states, state, long) => {
+  const entry = states[state]
   if (!entry) return ''
-  return long ? entry.long : entry.short
+  return long ? entry.long : entry.pill
 }
 
-export const mediaFlagClass = (flags) => (flags ? `tag--${MEDIA_FLAGS[flags]?.tone ?? 'muted'}` : '')
+const stateClass = (states, state) => {
+  const entry = states[state]
+  // 没有文案的（两维的"未标记"）不给胶囊类名，页面上就不画这一颗
+  return entry && entry.pill ? `tag--${entry.tone}` : ''
+}
+
+export const subtitleText = (state, long = false) => stateText(SUBTITLE_STATES, state, long)
+export const subtitleClass = (state) => stateClass(SUBTITLE_STATES, state)
+export const watermarkText = (state, long = false) => stateText(WATERMARK_STATES, state, long)
+export const watermarkClass = (state) => stateClass(WATERMARK_STATES, state)
+
+const toOptions = (states) =>
+  Object.entries(states)
+    // 筛选与标记都从"有结论的"排起，未标记放最后：它是兜底项，不是常见目标
+    .sort((a, b) => (a[0] === 'unknown' ? 1 : b[0] === 'unknown' ? -1 : 0))
+    .map(([value, s]) => ({ value, label: s.label }))
+
+export const SUBTITLE_OPTIONS = toOptions(SUBTITLE_STATES)
+export const WATERMARK_OPTIONS = toOptions(WATERMARK_STATES)
+
+/** 分辨率档位，与后端 Utils/SourceStates.cs 的 Resolutions 键一一对应 */
+export const RESOLUTION_OPTIONS = [
+  { value: '2160', label: '4K 及以上' },
+  { value: '1080', label: '1080p' },
+  { value: '720', label: '720p' },
+  { value: '480', label: '480p' },
+  { value: 'sd', label: '480p 以下' },
+  { value: 'unscanned', label: '未扫描' }
+]
+
+/**
+ * 卡片上的分辨率文案。按显示高（行数）报，所以 607×1080 这种非方形像素的片报 1080p；
+ * 具体宽高在详情页原样给，这里只负责一眼能比出清晰度。
+ */
+export const resolutionText = (video) =>
+  video && video.resH ? `${video.resH}p` : ''
 
 /** 列表排序选项，各列表页共用 */
 export const SORT_OPTIONS = {

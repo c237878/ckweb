@@ -58,22 +58,7 @@
     </div>
 
     <!-- 只在任务真的在跑时占位：平时这条不存在，跑完收到结果提示后就收起 -->
-    <div v-if="grabRunning" class="grab-bar">
-      <div class="grab-bar__meta">
-        <span class="grab-bar__text">{{ grabText }}</span>
-        <span class="grab-bar__pct">{{ grab.percent }}%</span>
-      </div>
-      <div
-        class="grab-bar__track"
-        role="progressbar"
-        :aria-valuenow="grab.percent"
-        aria-valuemin="0"
-        aria-valuemax="100"
-        :aria-label="grabText"
-      >
-        <span class="grab-bar__fill" :style="{ width: `${grab.percent}%` }"></span>
-      </div>
-    </div>
+    <JobBar v-if="grabRunning" :text="grabText" :percent="grab.percent" />
 
     <div class="filters">
       <SelectList
@@ -148,6 +133,7 @@ import { debounce } from '@/scripts/utils/debounce'
 import AddActorDialog from '@/views/components/AddActorDialog.vue'
 import ActorMergeDialog from '@/views/components/ActorMergeDialog.vue'
 import ActorCard from '@/views/components/ActorCard.vue'
+import JobBar from '@/views/components/JobBar.vue'
 import Pagination from '@/views/components/Pagination.vue'
 import SelectList from '@/views/components/SelectList.vue'
 import { loadFilterState, saveFilterState } from '@/scripts/utils/filterPersist'
@@ -479,45 +465,4 @@ const handleDelete = async (id) => {
   border-radius: var(--r2);
 }
 
-/* 抓取进度：条 + 一行说明，占位很轻，跑完就撤 */
-.grab-bar {
-  display: flex;
-  flex-direction: column;
-  gap: var(--s2);
-  padding: var(--s3);
-  background: var(--bg-elev);
-  border: 1px solid var(--border);
-  border-radius: var(--r2);
-}
-
-.grab-bar__meta {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--s3);
-  font-size: var(--f-sm);
-  color: var(--text-dim);
-  font-variant-numeric: tabular-nums;
-}
-
-.grab-bar__pct {
-  color: var(--accent);
-  font-weight: 600;
-}
-
-.grab-bar__track {
-  height: 6px;
-  overflow: hidden;
-  border-radius: var(--rp);
-  background: var(--bg-elev-2);
-}
-
-.grab-bar__fill {
-  display: block;
-  height: 100%;
-  border-radius: var(--rp);
-  background: var(--accent);
-  /* 进度是每 2 秒跳一次，补个过渡让它看着是连续走的 */
-  transition: width 900ms linear;
-}
 </style>
