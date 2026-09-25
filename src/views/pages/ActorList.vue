@@ -46,8 +46,8 @@
       </div>
     </div>
 
-    <!-- 全站抓取是小时级的活，进度条常驻：条上给百分比、已查/总数、抓到几张和预计剩余 -->
-    <div v-if="grab" class="grab-bar">
+    <!-- 只在任务真的在跑时占位：平时这条不存在，跑完收到结果提示后就收起 -->
+    <div v-if="grabRunning" class="grab-bar">
       <div class="grab-bar__meta">
         <span class="grab-bar__text">{{ grabText }}</span>
         <span class="grab-bar__pct">{{ grab.percent }}%</span>
@@ -309,10 +309,9 @@ const fmtEta = (sec) => (sec >= 60 ? `约剩 ${Math.round(sec / 60)} 分钟` : `
 const grabText = computed(() => {
   const s = grab.value
   if (!s) return ''
-  if (!s.total) return s.running ? '正在清点要抓的演员…' : '还没有抓取记录'
-  const tail = s.running && s.etaSeconds ? ` · ${fmtEta(s.etaSeconds)}` : ''
-  const note = !s.running && s.note ? ` · ${s.note}` : ''
-  return `已查 ${s.processed} / ${s.total} · 抓到 ${s.fetched} 张${tail}${note}`
+  if (!s.total) return '正在清点要抓的演员…'
+  const tail = s.etaSeconds ? ` · ${fmtEta(s.etaSeconds)}` : ''
+  return `已查 ${s.processed} / ${s.total} · 抓到 ${s.fetched} 张${tail}`
 })
 
 const stopGrabPoll = () => {
@@ -331,15 +330,19 @@ const pollGrab = async () => {
   }
   if (!res.success) return
 
-  grab.value = res.data
   if (res.data.running) {
+    grab.value = res.data
     grabWatching = true
     return
   }
+
+  // 不在跑了：条子立刻收起，结果改由一条提示承载（含"站点无响应"这类中止原因）
+  const s = res.data
+  grab.value = null
   if (grabWatching) {
     grabWatching = false
     stopGrabPoll()
-    ui.info(`头像抓取结束：查 ${res.data.processed} 位，抓到 ${res.data.fetched} 张`)
+    ui[s.note ? 'warn' : 'info'](`头像抓取结束：查 ${s.processed} 位，抓到 ${s.fetched} 张${s.note ? ` · ${s.note}` : ''}`)
     loadActors()
   }
 }
