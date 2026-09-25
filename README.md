@@ -40,7 +40,7 @@ cd ckweb && npm install && npm run dev
 ### 表
 
 **videos** — 影片
-`id` `name` `category`(单一分类文本) `code`(番号) `country` `seriesid`→video_series `file_path` `file_size` `cover_path`(**磁盘绝对路径，不是 Base64**) `subtitle_state` `watermark_state` `watched` `res_w` `res_h` `scan_time` `sort_order` `ctime`
+`id` `name` `category`(单一分类文本) `code`(番号) `country` `seriesid`→video_series `file_path` `file_size` `cover_path`(**磁盘绝对路径，不是 Base64**) `subtitle_state` `watermark_state` `res_w` `res_h` `scan_time` `sort_order` `ctime`
 > 入库时间就是 `ctime`。接口里的 `addedAt` 字段也取自 `ctime`，但前端目前没有任何地方渲染它。
 
 **片源两维（schema v6 起）** — 原先 `media_attr_flags` 一格要同时表达"字幕在不在"和"画面有没有广告"，
@@ -57,10 +57,12 @@ cd ckweb && npm install && npm run dev
 v6 的值映射只搬确定说得通的：`2 无字幕`→`missing`（旧长文案就是"缺少字幕文件"）、
 `3 完美`→`has`；`1 劣质`（300 条）在新口径里没有对应维度——它说的是清晰度，
 而清晰度这次由扫描客观量出来，所以两维都留 `unknown`。
-**旧代码里"非 0 就是看过"这个暗号搬到了 `watched` 列**（迁移时把 2066 条已标记的置 1）：
-今日推荐与首页排序都靠它挑"没看过"的，不能拿两个状态反推——
-分辨率是扫描自动填的，将来字幕那一维一旦被自动填，全站就会统统变成"有结论"，推荐池当场就空了。
-`PUT /api/video/{id}/source` 只在人工给出结论时动 `watched`，扫描永远不动。
+
+**"没看过"不存列，直接推**：`subtitle_state` 与 `watermark_state` 都还是 `unknown` 就算没给过结论
+（`Utils.SourceStates.Unrated` 是那条件的唯一出处，今日推荐与首页排序都用它）。
+v6 一度建过 `watched` 列来存这件事，v7 删了——前提是**扫描只写分辨率、不写这两个状态**；
+哪天让自动途径去填字幕，这个口径会当场失效（全站都成"有结论"，推荐池清空）。
+代价是那 300 条旧「劣质」两维都是 unknown，从此按没看过算，会重新进今日推荐。
 
 **actors** — `id` `name`(UNIQUE) `country` `bio` `birthdate` `ctime`
 > `birthdate` 是 ISO 文本，只收 `YYYY` / `YYYY-MM` / `YYYY-MM-DD` 三种写法（`NormalizeBirthdate` 卡死），
@@ -155,7 +157,7 @@ v4 迁移把含 `http` 的简介逐条抽出（382 位演员 → 528 行，379 �
 片源两维与扫描（`Controllers/VideoSourceController.cs`）：
 `PUT /{id}/source`（body `{"subtitle":…,"watermark":…}`，只改传了的那一维，取值见 `SourceStates`）·
 `POST /{id}/scan`（单条重扫）· `POST /scan/all?force=`（启动全站扫描）· `GET /scan/status` · `DELETE /scan/all`
-> `POST /{id}/reset-file-size` 会连带把两维、`watched` 与分辨率一起清空——换了文件等于这条没结论了。
+> `POST /{id}/reset-file-size` 会连带把两维与分辨率一起清空——换了文件等于这条没结论了。
 
 ### /api/Actor
 `GET /` · `GET /{id}` · `POST /` · `PUT /{id}` · `DELETE /{id}` · `GET /countries` · `GET /{id}/videos` · `POST /images/sync` · `POST /{id}/images/sync` · `PUT /{id}/image/primary` · `POST /{id}/avatar/fetch` · `POST /{id}/profile/fetch` · `POST /scrape/fetch` · `GET /scrape/status` · `DELETE /scrape/fetch` · `GET /{id}/poster/{fileName}` · `GET /{id}/thumb/{s|m}/{fileName}` · `GET /duplicates` · `POST /merge`
@@ -447,7 +449,8 @@ JSON 接口，不去解析网页排版。抓回来的是事实字段（日期、
 **扫描只写 `res_w` / `res_h` / `scan_time`，别的列一概不碰**：字幕与广告水印两维由人在界面上给结论。
 （早先扫描会顺带把"容器里有字幕轨 / 字幕目录里有同番号文件"填成 `has`，撤掉了——
 有字幕轨不等于那份字幕能用，没有也不等于"这片子本来就没字幕"，这一维真正在问的是"要不要去补"。）
-同理**扫描永远不动 `watched`**，否则自动填字段会把今日推荐的"没看过"池子清空。
+同理**扫描不能碰这两个状态**：界面上"没看过"就是两维都没标（见上文的 `Unrated`），
+自动填了字幕，今日推荐就没有"没看过"的片可推了。
 
 - 探测与写库分两步：文件在共享盘上，一次小读一个来回（实测 0.1~0.5 秒），所以**并发只放在探测**
   （6 路），写库回到单线程、一批 24 条一个事务——SQLite 连接不是线程安全的。

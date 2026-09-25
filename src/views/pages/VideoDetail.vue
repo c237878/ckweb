@@ -266,7 +266,6 @@ const markSource = async (dim, value) => {
         const res = await videoApi.updateSource(video.value.id, { [dim]: next })
         if (res.success) {
             video.value[key] = res.data[key]
-            video.value.watched = res.data.watched
             ui.success(next === 'unknown' ? '已清掉这一维' : '已记录')
         } else {
             ui.error('保存失败：' + errText(res, '未知错误'))
@@ -590,7 +589,6 @@ const resetFileSize = async () => {
             if (res.data?.coverPath !== undefined) video.value.cover_path = res.data.coverPath
             video.value.subtitleState = 'unknown'
             video.value.watermarkState = 'unknown'
-            video.value.watched = false
             video.value.resW = 0
             video.value.resH = 0
             video.value.scanTime = null
