@@ -47,6 +47,7 @@
           :name="actor.name"
           :syncing="syncing"
           :fetching="fetching"
+          :scrapeable="actor.scrapeable !== false"
           empty-text="这位演员还没有照片"
           @sync="syncImages"
           @set-primary="setPrimary"

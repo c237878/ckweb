@@ -3,24 +3,26 @@
     <span class="album__empty-text">{{ emptyText }}</span>
     <div class="album__actions">
       <!-- 没照片的时候最需要抓的恰恰是这两个按钮，所以空态里也要给全 -->
-      <button
-        type="button"
-        class="btn btn--sm"
-        :disabled="fetching"
-        title="按姓名与曾用名去 av-wiki 的档案页找头像：只有唯一命中、且名字对得上才抓，拿不准就跳过"
-        @click="emit('fetch-avatar')"
-      >
-        {{ fetching ? '抓取中…' : '抓头像' }}
-      </button>
-      <button
-        type="button"
-        class="btn btn--sm"
-        :disabled="fetching"
-        title="从 av-wiki 的档案页取出生日期与简介；已经填过的不覆盖"
-        @click="emit('fetch-profile')"
-      >
-        {{ fetching ? '抓取中…' : '抓资料' }}
-      </button>
+      <template v-if="scrapeable">
+        <button
+          type="button"
+          class="btn btn--sm"
+          :disabled="fetching"
+          title="按姓名与曾用名去 av-wiki 的档案页找头像：只有唯一命中、且名字对得上才抓，拿不准就跳过"
+          @click="emit('fetch-avatar')"
+        >
+          {{ fetching ? '抓取中…' : '抓头像' }}
+        </button>
+        <button
+          type="button"
+          class="btn btn--sm"
+          :disabled="fetching"
+          title="从 av-wiki 的档案页取出生日期与简介；已经填过的不覆盖"
+          @click="emit('fetch-profile')"
+        >
+          {{ fetching ? '抓取中…' : '抓资料' }}
+        </button>
+      </template>
       <button type="button" class="btn btn--sm" :disabled="syncing" @click="sync">
         {{ syncing ? '同步中…' : '同步照片' }}
       </button>
@@ -96,24 +98,26 @@
         >
           设为头像
         </button>
-        <button
-          type="button"
-          class="btn btn--sm btn--ghost"
-          :disabled="fetching"
-          title="按姓名与曾用名去 av-wiki 的档案页找头像：只有唯一命中、且名字对得上才抓，拿不准就跳过"
-          @click="emit('fetch-avatar')"
-        >
-          {{ fetching ? '抓取中…' : '抓头像' }}
-        </button>
-        <button
-          type="button"
-          class="btn btn--sm btn--ghost"
-          :disabled="fetching"
-          title="从 av-wiki 的档案页取出生日期与简介；已经填过的不覆盖"
-          @click="emit('fetch-profile')"
-        >
-          {{ fetching ? '抓取中…' : '抓资料' }}
-        </button>
+        <template v-if="scrapeable">
+          <button
+            type="button"
+            class="btn btn--sm btn--ghost"
+            :disabled="fetching"
+            title="按姓名与曾用名去 av-wiki 的档案页找头像：只有唯一命中、且名字对得上才抓，拿不准就跳过"
+            @click="emit('fetch-avatar')"
+          >
+            {{ fetching ? '抓取中…' : '抓头像' }}
+          </button>
+          <button
+            type="button"
+            class="btn btn--sm btn--ghost"
+            :disabled="fetching"
+            title="从 av-wiki 的档案页取出生日期与简介；已经填过的不覆盖"
+            @click="emit('fetch-profile')"
+          >
+            {{ fetching ? '抓取中…' : '抓资料' }}
+          </button>
+        </template>
         <button type="button" class="btn btn--sm btn--ghost" :disabled="syncing" @click="sync">
           {{ syncing ? '同步中…' : '重新同步' }}
         </button>
@@ -179,7 +183,9 @@ const props = defineProps({
   name: { type: String, default: '' },
   emptyText: { type: String, default: '还没有照片' },
   syncing: { type: Boolean, default: false },
-  fetching: { type: Boolean, default: false }
+  fetching: { type: Boolean, default: false },
+  /** av-wiki 只收日本 AV 女优；非日本片源或名下没有 av 片的，抓取按钮直接不出现 */
+  scrapeable: { type: Boolean, default: true }
 })
 
 const emit = defineEmits(['sync', 'set-primary', 'fetch-avatar', 'fetch-profile'])
