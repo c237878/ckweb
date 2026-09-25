@@ -90,7 +90,7 @@ export const videoApi = {
   resetFileSize: (id) => api.post(`/video/${id}/reset-file-size`),
   /** 片源两维：dim = 'subtitle' | 'watermark'，一次只改一维 */
   updateSource: (id, patch) => api.put(`/video/${id}/source`, patch),
-  /** 读这条影片的文件头，拿分辨率并顺带看有没有字幕 */
+  /** 读这条影片的文件头量分辨率（字幕与广告水印不参与扫描，由人工标） */
   scanOne: (id) => api.post(`/video/${id}/scan`),
   /** 全站扫描：任务在服务端后台跑，force=true 连量过的一起重扫 */
   startScanAll: (force = false) => api.post('/video/scan/all', null, { params: { force } }),

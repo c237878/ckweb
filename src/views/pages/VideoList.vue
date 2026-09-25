@@ -7,7 +7,7 @@
           <button
             class="btn btn--sm"
             :class="{ 'btn--ghost': scanRunning }"
-            :title="scanRunning ? '正在读的那一个会读完，然后停下' : '读视频文件的容器头量分辨率，顺带把没标过的字幕补上（不装 ffmpeg，也不改文件）'"
+            :title="scanRunning ? '正在读的那一个会读完，然后停下' : '逐个读视频文件的容器头量分辨率（只读文件，不改文件；字幕和广告水印由你自己标）'"
             @click="scanRunning ? stopScan() : startScan()"
           >
             {{ scanRunning ? '停止扫描' : '扫描片源' }}
@@ -366,7 +366,7 @@ const scanText = computed(() => {
   if (!s) return ''
   if (!s.total) return '正在清点要扫的影片…'
   const tail = s.etaSeconds ? ` · ${fmtEta(s.etaSeconds)}` : ''
-  return `扫描${s.what} · 已读 ${s.processed} / ${s.total} · 量到 ${s.ok} 个 · 补上字幕 ${s.subtitle} 个${tail}`
+  return `扫描${s.what} · 已读 ${s.processed} / ${s.total} · 量到 ${s.ok} 个 · 读不出 ${s.missed} 个${tail}`
 })
 
 const stopScanPoll = () => {
@@ -398,7 +398,7 @@ const pollScan = async () => {
     scanWatching = false
     stopScanPoll()
     ui[s.note ? 'warn' : 'info'](
-      `扫描结束：读 ${s.processed} 个，量到 ${s.ok} 个，读不出 ${s.missed} 个，补上字幕 ${s.subtitle} 个${s.note ? ` · ${s.note}` : ''}`
+      `扫描结束：读 ${s.processed} 个，量到 ${s.ok} 个，读不出 ${s.missed} 个${s.note ? ` · ${s.note}` : ''}`
     )
     loadVideos()
   }

@@ -63,7 +63,7 @@
                             type="button"
                             class="tag media-option"
                             :disabled="scanning"
-                            title="读视频文件的容器头拿宽高，顺带看看有没有字幕（不依赖 ffmpeg，也不改文件）"
+                            title="读这个视频文件的容器头量宽高（只读文件，不改文件；字幕和广告水印由你自己标）"
                             @click="scanThis"
                         >{{ scanning ? '扫描中…' : '扫描' }}</button>
                         <span v-if="video.scanTime" class="media-unknown">扫描于 {{ video.scanTime }}</span>
@@ -289,10 +289,9 @@ const scanThis = async () => {
             ui.warn(res.message || '没扫出来')
             return
         }
+        // 扫描只回分辨率：字幕与广告水印两维不碰，那是人工结论
         video.value.resW = res.data.resW
         video.value.resH = res.data.resH
-        video.value.subtitleState = res.data.subtitleState
-        video.value.watermarkState = res.data.watermarkState
         video.value.scanTime = new Date().toLocaleString('zh-CN', { hour12: false })
         ui.success(res.message)
     } catch (error) {
