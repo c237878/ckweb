@@ -17,11 +17,11 @@
           </button>
           <button
             class="btn btn--sm"
-            :class="{ 'btn--ghost': grabbing }"
-            :title="grabbing ? '再点一次停下来' : '按姓名与曾用名去 av-wiki 找头像，只有唯一命中且名字对得上才抓；查重候选里的演员会跳过'"
-            @click="grabAvatars"
+            :class="{ 'btn--ghost': grabRunning }"
+            :title="grabRunning ? '正在处理的那一位会做完，然后停下' : '按姓名与曾用名去 av-wiki 找头像：只有唯一命中、且名字对得上才抓；查重候选里的演员会跳过'"
+            @click="grabRunning ? stopGrab() : startGrab()"
           >
-            {{ grabbing ? grabLabel || '抓取中…' : '抓取头像' }}
+            {{ grabRunning ? '停止抓取' : '抓取头像' }}
           </button>
           <button class="btn btn--sm" title="列出共享曾用名或本名互指的演员，逐组决定要不要合并" @click="showMerge = true">
             查重
@@ -43,6 +43,24 @@
           <span class="mode-hint">点一张卡片进入编辑</span>
           <button class="btn btn--sm btn--ghost" @click="exitMode">退出编辑</button>
         </template>
+      </div>
+    </div>
+
+    <!-- 全站抓取是小时级的活，进度条常驻：条上给百分比、已查/总数、抓到几张和预计剩余 -->
+    <div v-if="grab" class="grab-bar">
+      <div class="grab-bar__meta">
+        <span class="grab-bar__text">{{ grabText }}</span>
+        <span class="grab-bar__pct">{{ grab.percent }}%</span>
+      </div>
+      <div
+        class="grab-bar__track"
+        role="progressbar"
+        :aria-valuenow="grab.percent"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        :aria-label="grabText"
+      >
+        <span class="grab-bar__fill" :style="{ width: `${grab.percent}%` }"></span>
       </div>
     </div>
 
@@ -169,7 +187,13 @@ onMounted(async () => {
   // 旧版排序值是驼峰（likeCount），换成 constants 里的小写值，避免下拉框对不上
   if (filters.value.sortBy) filters.value.sortBy = String(filters.value.sortBy).toLowerCase()
   await Promise.all([loadCountries(), loadActors()])
+  // 任务可能在别的页面甚至上次会话里就被启动过，进来先问一次进度
+  await pollGrab()
+  if (grab.value?.running) startGrabPoll()
 })
+
+// 离开页面只摘轮询：抓取任务在服务端跑，不该被一次跳转带走
+onBeforeUnmount(() => stopGrabPoll())
 
 const loadCountries = async () => {
   try {
@@ -274,50 +298,82 @@ const handleSyncImages = async () => {
   }
 }
 
-// 抓取是长活：站端要一个个查、还要节流，所以后端每次只处理一批，
-// 这里循环调用直到 remaining 归零；中途想停就再点一次按钮
-const grabbing = ref(false)
-const grabLabel = ref('')
-let grabAbort = false
-// 离开本页就把循环停掉：请求是人发起的，页面都没了还在替它轮询没道理
-let grabLeft = false
-onBeforeUnmount(() => { grabLeft = true })
+// 抓取任务在服务端后台跑，这里只是看它：启动 → 每 2 秒轮一次进度 → 结束后收条。
+// 离开页面只摘掉轮询，不打断任务——那是小时级的活，关浏览器不该把它带走。
+const grab = ref(null)
+let grabTimer = null
+let grabWatching = false
 
-const grabAvatars = async () => {
-  if (grabbing.value) {
-    grabAbort = true
+const grabRunning = computed(() => !!grab.value?.running)
+const fmtEta = (sec) => (sec >= 60 ? `约剩 ${Math.round(sec / 60)} 分钟` : `约剩 ${sec} 秒`)
+const grabText = computed(() => {
+  const s = grab.value
+  if (!s) return ''
+  if (!s.total) return s.running ? '正在清点要抓的演员…' : '还没有抓取记录'
+  const tail = s.running && s.etaSeconds ? ` · ${fmtEta(s.etaSeconds)}` : ''
+  const note = !s.running && s.note ? ` · ${s.note}` : ''
+  return `已查 ${s.processed} / ${s.total} · 抓到 ${s.fetched} 张${tail}${note}`
+})
+
+const stopGrabPoll = () => {
+  if (grabTimer) {
+    clearInterval(grabTimer)
+    grabTimer = null
+  }
+}
+
+const pollGrab = async () => {
+  let res
+  try {
+    res = await actorApi.avatarFetchStatus()
+  } catch {
+    return // 轮询失败下一轮再来，不值得弹错误
+  }
+  if (!res.success) return
+
+  grab.value = res.data
+  if (res.data.running) {
+    grabWatching = true
     return
   }
-  grabbing.value = true
-  grabAbort = false
-  grabLeft = false
-  let fetched = 0
-  let checked = 0
+  if (grabWatching) {
+    grabWatching = false
+    stopGrabPoll()
+    ui.info(`头像抓取结束：查 ${res.data.processed} 位，抓到 ${res.data.fetched} 张`)
+    loadActors()
+  }
+}
+
+const startGrabPoll = () => {
+  stopGrabPoll()
+  grabTimer = setInterval(pollGrab, 2000)
+}
+
+const startGrab = async () => {
   try {
-    while (!grabAbort && !grabLeft) {
-      const res = await actorApi.fetchAvatars(40)
-      if (!res.success) {
-        ui.error(res.message || '抓取失败')
-        break
-      }
-      checked += res.data.processed
-      fetched += res.data.fetched
-      grabLabel.value = `已抓 ${fetched} / 查 ${checked}${res.data.remaining ? ` · 剩 ${res.data.remaining}` : ''}`
-      if (!res.data.remaining || res.data.stopped) {
-        if (res.data.stopped) ui.warn(res.message)
-        break
-      }
+    const res = await actorApi.startAvatarFetch()
+    if (!res.success) {
+      ui.warn(res.message || '没能启动')
+      return
     }
-    if (grabAbort) ui.info(`已中止：查到 ${checked} 位，抓到 ${fetched} 张头像`)
-    else if (checked) ui.success(`查到 ${checked} 位，抓到 ${fetched} 张头像`)
-    await loadActors()
+    ui.info(res.message)
+    grabWatching = true
+    grab.value = res.data
+    startGrabPoll()
   } catch (err) {
-    console.error('批量抓取头像失败:', err)
-    ui.error('抓取失败：' + errText(err))
-  } finally {
-    grabbing.value = false
-    grabLabel.value = ''
-    grabAbort = false
+    console.error('启动头像抓取失败:', err)
+    ui.error('启动失败：' + errText(err))
+  }
+}
+
+const stopGrab = async () => {
+  try {
+    const res = await actorApi.stopAvatarFetch()
+    if (!res.success) ui.warn(res.message || '当前没有在跑的任务')
+    else ui.info(res.message)
+  } catch (err) {
+    console.error('停止头像抓取失败:', err)
+    ui.error('停止失败：' + errText(err))
   }
 }
 
@@ -407,5 +463,47 @@ const handleDelete = async (id) => {
 .row-skeleton {
   height: calc(var(--s5) + var(--s4));
   border-radius: var(--r2);
+}
+
+/* 抓取进度：条 + 一行说明，占位很轻，跑完就撤 */
+.grab-bar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  padding: var(--s3);
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--r2);
+}
+
+.grab-bar__meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s3);
+  font-size: var(--f-sm);
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.grab-bar__pct {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.grab-bar__track {
+  height: 6px;
+  overflow: hidden;
+  border-radius: var(--rp);
+  background: var(--bg-elev-2);
+}
+
+.grab-bar__fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--rp);
+  background: var(--accent);
+  /* 进度是每 2 秒跳一次，补个过渡让它看着是连续走的 */
+  transition: width 900ms linear;
 }
 </style>

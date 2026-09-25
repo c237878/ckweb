@@ -134,7 +134,7 @@ v4 迁移把含 `http` 的简介逐条抽出（382 位演员 → 528 行，379 �
 `GET /stream/{id}`（支持 Range）· `GET /cover/{id}`（带 ETag + 一周强缓存）· `GET /{code}/subtitle/check` · `GET /{code}/subtitle` · `GET /{id}/recommend` · `POST /{id}/reset-file-size` · `PUT /{id}/file-info` · `PUT /{id}/media-flags` · `DELETE /{id}/file` · `POST /rename-to-code`
 
 ### /api/Actor
-`GET /` · `GET /{id}` · `POST /` · `PUT /{id}` · `DELETE /{id}` · `GET /countries` · `GET /{id}/videos` · `POST /images/sync` · `POST /{id}/images/sync` · `PUT /{id}/image/primary` · `POST /{id}/avatar/fetch` · `POST /avatars/fetch?limit=40` · `GET /{id}/poster/{fileName}` · `GET /{id}/thumb/{s|m}/{fileName}` · `GET /duplicates` · `POST /merge`
+`GET /` · `GET /{id}` · `POST /` · `PUT /{id}` · `DELETE /{id}` · `GET /countries` · `GET /{id}/videos` · `POST /images/sync` · `POST /{id}/images/sync` · `PUT /{id}/image/primary` · `POST /{id}/avatar/fetch` · `POST /avatars/fetch` · `GET /avatars/fetch/status` · `DELETE /avatars/fetch` · `GET /{id}/poster/{fileName}` · `GET /{id}/thumb/{s|m}/{fileName}` · `GET /duplicates` · `POST /merge`
 > 图片清单不再单独请求：`GET /{id}` 的 `data.images` 里就带着（来自 `actor_images`）。
 > 列表每行带 `avatar`（主图文件名，没有照片则为 null）——脸只出现在演员列表页这一处。
 > `GET /{id}/videos` 支持 `page` `pageSize` `mediaAttrFlags` `hasFile`，筛选在服务端完成后再分页。
@@ -372,8 +372,16 @@ src/
 - 落盘文件名固定 `默认.<ext>`：`ImageIndex` 补选主图时第一个就认它，不用额外置位。
 - 已有照片的演员不动手；**还在查重候选里的一律跳过**（先合并再抓，免得同一张脸在两个名字下各存一份）。
 - 站间节流 300ms；连续 3 次站点失败就中止本轮，不跟限流硬碰。
-- 批量接口按每次 40 位分批，前端循环调用到 `remaining` 归零；中途可停，离开页面自动停。
-  实测约 1~5 秒/位，全库是小时级的活，跑一半随时可以停。
+- 全站抓取是**服务端后台任务**（`Services/AvatarJob.cs`）：`POST /avatars/fetch` 启动并立刻返回，
+  `GET /avatars/fetch/status` 给进度（processed / total / fetched / percent / etaSeconds / note），
+  `DELETE /avatars/fetch` 请求停止。列表页点一下就有进度条，每 2 秒轮一次；
+  **离开页面、关浏览器都不影响它继续跑**，回来还能看到进度。
+  进程内单例、同一时刻只跑一个（这活儿是往别人站点上问话，并行没意义）；
+  重启后端会丢进度，但已抓到的文件与表里的行都在，重跑会自动跳过有照片的人。
+- 进度条上的 ETA 用"已跑出来的平均速度"估，样本不足 3 位时不给数，免得开局乱跳。
+- 一个坑留档：`CancellationTokenSource` 一旦 `Cancel` 就不可复用，
+  做成 `readonly` 字段会让"停止过一次之后再也启动不起来"（第二次任务在第一圈就退出）。
+  每次 `Start` 换一个新源、并把它的局部引用传给循环体。
 - 每抓成一张写一行日志（演员 ID、我们的名字、档案名与 slug）：批量跑的时候，
   这是唯一能回看"这张脸是从哪个档案抓来的"的地方。
 

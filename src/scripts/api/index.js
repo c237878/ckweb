@@ -110,8 +110,10 @@ export const actorApi = {
   setPrimaryImage: (id, fileName) => api.put(`/actor/${id}/image/primary`, { fileName }),
   /** 给一位演员从 av-wiki 抓头像（拿不准就什么都不做，返回里会说明原因） */
   fetchAvatar: (id) => api.post(`/actor/${id}/avatar/fetch`),
-  /** 批量抓：一次只处理 limit 位还没有照片的演员，反复调用直到 remaining 归零 */
-  fetchAvatars: (limit = 40) => api.post('/actor/avatars/fetch', null, { params: { limit } }),
+  /** 全站抓取：任务在服务端后台跑，这里只负责启动 / 看进度 / 停止 */
+  startAvatarFetch: () => api.post('/actor/avatars/fetch'),
+  avatarFetchStatus: () => api.get('/actor/avatars/fetch/status'),
+  stopAvatarFetch: () => api.delete('/actor/avatars/fetch'),
   /** 疑似重复演员候选（按线索强度排序） */
   duplicates: () => api.get('/actor/duplicates'),
   /** 把 from 并入 to，to 是留下来的名字 */
