@@ -184,7 +184,7 @@ const props = defineProps({
   emptyText: { type: String, default: '还没有照片' },
   syncing: { type: Boolean, default: false },
   fetching: { type: Boolean, default: false },
-  /** av-wiki 只收日本 AV 女优；非日本片源或名下没有 av 片的，抓取按钮直接不出现 */
+  /** av-wiki 只收日本女优；国家不是日本的人，抓取按钮直接不出现 */
   scrapeable: { type: Boolean, default: true }
 })
 
