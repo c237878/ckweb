@@ -64,11 +64,15 @@ export const RESOLUTION_OPTIONS = [
 ]
 
 /**
- * 卡片上的分辨率文案。按显示高（行数）报，所以 607×1080 这种非方形像素的片报 1080p；
- * 具体宽高在详情页原样给，这里只负责一眼能比出清晰度。
+ * 卡片上的分辨率文案：按**短边**报。横屏的短边就是高度，所以横屏与"按行数"完全等价；
+ * 竖屏 720×1280 报 720p 而不是 1280p，与手机视频的通行叫法一致。
+ * 具体宽高在详情页原样给（720×1280），这里只负责一眼能比出清晰度。
  */
-export const resolutionText = (video) =>
-  video && video.resH ? `${video.resH}p` : ''
+export const resolutionText = (video) => {
+  if (!video || !video.resH) return ''
+  const short = video.resW ? Math.min(video.resW, video.resH) : video.resH
+  return `${short}p`
+}
 
 /** 列表排序选项，各列表页共用 */
 export const SORT_OPTIONS = {
