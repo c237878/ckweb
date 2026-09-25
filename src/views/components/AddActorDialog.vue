@@ -79,6 +79,20 @@
         </div>
 
         <div class="field">
+          <label for="aa-birthdate">出生日期</label>
+          <input
+            id="aa-birthdate"
+            v-model.trim="form.birthdate"
+            class="input"
+            type="text"
+            inputmode="numeric"
+            maxlength="10"
+            placeholder="1987-05-16"
+          />
+          <span class="hint">只收 年 / 年-月 / 年-月-日 三种写法，其余按没填处理；「抓资料」会自动带出来</span>
+        </div>
+
+        <div class="field">
           <label for="aa-bio">简介</label>
           <textarea
             id="aa-bio"
@@ -133,10 +147,11 @@ const form = ref({
   aliases: [],
   links: [],
   country: '',
-  bio: ''
+  bio: '',
+  birthdate: ''
 })
 
-const blankForm = () => ({ id: '', name: '', aliases: [], links: [], country: '', bio: '' })
+const blankForm = () => ({ id: '', name: '', aliases: [], links: [], country: '', bio: '', birthdate: '' })
 
 const addLink = () => {
   // 空串是"自动归类"：新行一律留空，让后端按域名判型，判不到才算 other
@@ -174,7 +189,8 @@ watch(() => props.visible, (val) => {
         aliases: Array.isArray(source.aliases) ? [...source.aliases] : [],
         links: Array.isArray(source.links) ? source.links.map((l) => ({ ...l })) : [],
         country: source.country || '',
-        bio: source.bio || ''
+        bio: source.bio || '',
+        birthdate: source.birthdate || ''
       }
     : blankForm()
 })

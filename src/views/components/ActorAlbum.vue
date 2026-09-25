@@ -2,7 +2,7 @@
   <div v-if="!count" class="album album--empty">
     <span class="album__empty-text">{{ emptyText }}</span>
     <div class="album__actions">
-      <!-- 没照片的时候最需要抓的恰恰就是它，所以两个按钮都得在空态里出现 -->
+      <!-- 没照片的时候最需要抓的恰恰是这两个按钮，所以空态里也要给全 -->
       <button
         type="button"
         class="btn btn--sm"
@@ -11,6 +11,15 @@
         @click="emit('fetch-avatar')"
       >
         {{ fetching ? '抓取中…' : '抓头像' }}
+      </button>
+      <button
+        type="button"
+        class="btn btn--sm"
+        :disabled="fetching"
+        title="从 av-wiki 的档案页取出生日期与简介；已经填过的不覆盖"
+        @click="emit('fetch-profile')"
+      >
+        {{ fetching ? '抓取中…' : '抓资料' }}
       </button>
       <button type="button" class="btn btn--sm" :disabled="syncing" @click="sync">
         {{ syncing ? '同步中…' : '同步照片' }}
@@ -96,6 +105,15 @@
         >
           {{ fetching ? '抓取中…' : '抓头像' }}
         </button>
+        <button
+          type="button"
+          class="btn btn--sm btn--ghost"
+          :disabled="fetching"
+          title="从 av-wiki 的档案页取出生日期与简介；已经填过的不覆盖"
+          @click="emit('fetch-profile')"
+        >
+          {{ fetching ? '抓取中…' : '抓资料' }}
+        </button>
         <button type="button" class="btn btn--sm btn--ghost" :disabled="syncing" @click="sync">
           {{ syncing ? '同步中…' : '重新同步' }}
         </button>
@@ -164,7 +182,7 @@ const props = defineProps({
   fetching: { type: Boolean, default: false }
 })
 
-const emit = defineEmits(['sync', 'set-primary', 'fetch-avatar'])
+const emit = defineEmits(['sync', 'set-primary', 'fetch-avatar', 'fetch-profile'])
 
 // 扇面上摆 ±3 张。再多留几格缓冲是为了让卡片有"滑进来"的落点而不是凭空出现；
 // 几百张图全建节点没意义，所以按窗口切片

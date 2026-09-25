@@ -108,12 +108,14 @@ export const actorApi = {
   syncImages: (id) => api.post(id ? `/actor/${id}/images/sync` : '/actor/images/sync'),
   /** 指定列表页那张脸用哪张图 */
   setPrimaryImage: (id, fileName) => api.put(`/actor/${id}/image/primary`, { fileName }),
-  /** 给一位演员从 av-wiki 抓头像（拿不准就什么都不做，返回里会说明原因） */
+  /** 给一位演员从 av-wiki 抓头像（只补头像，拿不准就什么都不做，返回里会说明原因） */
   fetchAvatar: (id) => api.post(`/actor/${id}/avatar/fetch`),
-  /** 全站抓取：任务在服务端后台跑，这里只负责启动 / 看进度 / 停止 */
-  startAvatarFetch: () => api.post('/actor/avatars/fetch'),
-  avatarFetchStatus: () => api.get('/actor/avatars/fetch/status'),
-  stopAvatarFetch: () => api.delete('/actor/avatars/fetch'),
+  /** 给一位演员抓资料：出生日期与简介，只填当前空着的字段 */
+  fetchProfile: (id) => api.post(`/actor/${id}/profile/fetch`),
+  /** 全站抓取：任务在服务端后台跑，what = avatar | profile | all */
+  startScrape: (what = 'all') => api.post('/actor/scrape/fetch', { what }),
+  scrapeStatus: () => api.get('/actor/scrape/status'),
+  stopScrape: () => api.delete('/actor/scrape/fetch'),
   /** 疑似重复演员候选（按线索强度排序） */
   duplicates: () => api.get('/actor/duplicates'),
   /** 把 from 并入 to，to 是留下来的名字 */

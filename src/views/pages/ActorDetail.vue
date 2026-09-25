@@ -18,9 +18,10 @@
             <button class="btn btn--sm" @click="openEditDialog">编辑</button>
           </div>
 
-          <div v-if="actor.country || actor.likeCount > 0" class="tag-row">
+          <div v-if="actor.country || actor.likeCount > 0 || actor.birthdate" class="tag-row">
             <span v-if="actor.country" class="tag tag--accent">{{ actor.country }}</span>
             <span v-if="actor.likeCount > 0" class="tag tag--like">♥ {{ actor.likeCount }}</span>
+            <span v-if="actor.birthdate" class="tag" :title="`出生日期 ${actor.birthdate}`">生日 {{ actor.birthdate }}</span>
           </div>
 
           <p v-if="actor.aliases?.length" class="alias-row">曾用名：{{ actor.aliases.join('、') }}</p>
@@ -50,6 +51,7 @@
           @sync="syncImages"
           @set-primary="setPrimary"
           @fetch-avatar="fetchAvatar"
+          @fetch-profile="fetchProfile"
         />
       </section>
 
@@ -269,21 +271,24 @@ const setPrimary = async (fileName) => {
 
 // 抓不到是常态（站上没有档案、或名字对不上），所以原因用同一条 toast 说清楚，
 // 不要静默失败让人以为按钮坏了
-const fetchAvatar = async () => {
+const scrape = async (fn, fallback) => {
   if (fetching.value) return
   fetching.value = true
   try {
-    const res = await actorApi.fetchAvatar(route.params.id)
-    if (res.success) ui.success(res.message || '已抓到头像')
-    else ui.warn(res.message || '没抓到')
+    const res = await fn(route.params.id)
+    if (res.success) ui.success(res.message || '已抓取')
+    else ui.warn(res.message || fallback)
     await loadActor()
   } catch (err) {
-    console.error('抓取头像失败:', err)
+    console.error('抓取演员信息失败:', err)
     ui.error('抓取失败：' + errText(err))
   } finally {
     fetching.value = false
   }
 }
+
+const fetchAvatar = () => scrape(actorApi.fetchAvatar, '没抓到')
+const fetchProfile = () => scrape(actorApi.fetchProfile, '没抓到资料')
 
 const loadAll = async () => {
   loading.value = true

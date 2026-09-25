@@ -46,7 +46,10 @@ cd ckweb && npm install && npm run dev
 **media_attr_flags（片源标记）** — `0` 未标记 · `1` 劣质 · `2` 无字幕 · `3` 完美。
 前端展示文案与配色统一在 `ckweb/src/scripts/constants.js` 的 `MEDIA_FLAGS`，不要在页面里各写一份。
 
-**actors** — `id` `name`(UNIQUE) `country` `bio` `ctime`
+**actors** — `id` `name`(UNIQUE) `country` `bio` `birthdate` `ctime`
+> `birthdate` 是 ISO 文本，只收 `YYYY` / `YYYY-MM` / `YYYY-MM-DD` 三种写法（`NormalizeBirthdate` 卡死），
+> 其余一律存 NULL。站上只给到年月时就存 `1988-05`，**不补成 01 号**——补出来的是假数据。
+> 所以这一列不能配 `<input type="date">`（它表达不了"只有年月"），编辑框用文本输入。
 **actor_aliases** — `(actor_id, alias)` 复合主键，曾用名**一行一个**（schema v3 起）。
 旧 `actors.alias` 用空格串多个别名，既没法精确检索也分不清「志保 Shiho」是一个还是两个，
 v3 迁移按空白拆分去重后把列删掉了；清洗规则与迁移共用 `ckapi/Utils/Aliases.cs`
@@ -134,7 +137,7 @@ v4 迁移把含 `http` 的简介逐条抽出（382 位演员 → 528 行，379 �
 `GET /stream/{id}`（支持 Range）· `GET /cover/{id}`（带 ETag + 一周强缓存）· `GET /{code}/subtitle/check` · `GET /{code}/subtitle` · `GET /{id}/recommend` · `POST /{id}/reset-file-size` · `PUT /{id}/file-info` · `PUT /{id}/media-flags` · `DELETE /{id}/file` · `POST /rename-to-code`
 
 ### /api/Actor
-`GET /` · `GET /{id}` · `POST /` · `PUT /{id}` · `DELETE /{id}` · `GET /countries` · `GET /{id}/videos` · `POST /images/sync` · `POST /{id}/images/sync` · `PUT /{id}/image/primary` · `POST /{id}/avatar/fetch` · `POST /avatars/fetch` · `GET /avatars/fetch/status` · `DELETE /avatars/fetch` · `GET /{id}/poster/{fileName}` · `GET /{id}/thumb/{s|m}/{fileName}` · `GET /duplicates` · `POST /merge`
+`GET /` · `GET /{id}` · `POST /` · `PUT /{id}` · `DELETE /{id}` · `GET /countries` · `GET /{id}/videos` · `POST /images/sync` · `POST /{id}/images/sync` · `PUT /{id}/image/primary` · `POST /{id}/avatar/fetch` · `POST /{id}/profile/fetch` · `POST /scrape/fetch` · `GET /scrape/status` · `DELETE /scrape/fetch` · `GET /{id}/poster/{fileName}` · `GET /{id}/thumb/{s|m}/{fileName}` · `GET /duplicates` · `POST /merge`
 > 图片清单不再单独请求：`GET /{id}` 的 `data.images` 里就带着（来自 `actor_images`）。
 > 列表每行带 `avatar`（主图文件名，没有照片则为 null）——脸只出现在演员列表页这一处。
 > `GET /{id}/videos` 支持 `page` `pageSize` `mediaAttrFlags` `hasFile`，筛选在服务端完成后再分页。
@@ -351,39 +354,46 @@ src/
   方向键翻页、Esc 关灯箱、关闭后焦点落回原处。
 - **当前看的是哪张按文件名记，不按序号**：设为主图后后端会把那张挪到数组最前，
   记序号的话翻页会跳去别的图片。
-- 底部三个动作：「设为头像」（当前这张不是主图时才出现，主图带一枚"头像"徽章）、
-  「抓头像」（见下节）、「重新同步」。
-- **没有照片时不占半页**：退化成一条虚线空态（"这位演员还没有照片" + 同步照片），头部回到单栏。
+- 底部四个动作：「设为头像」（当前这张不是主图时才出现，主图带一枚"头像"徽章）、
+  「抓头像」「抓资料」（见下节）、「重新同步」。
+- **没有照片时不占半页**：退化成一条虚线空态（"这位演员还没有照片" + 抓头像 / 抓资料 / 同步照片），头部回到单栏。
 - 与「艳图」的 `PosterWall` 是两套东西：那边一墙小图供浏览、随机取批、可换一批；
   这边逐张翻看、要能放大看细节。两者的灯箱各自实现，不互相牵连。
 
-### av-wiki 头像抓取（`ckapi/Utils/AvWiki.cs`）
+### av-wiki 抓取：头像与资料（`ckapi/Utils/AvWiki.cs` + `Services/ActorScraper.cs`）
 
-站上每个女优是一个 WordPress tag，档案块（`AV女優名` / `別名義` / 头像直链 / SNS）就挂在 tag 的
-`description` 里，所以走 `/wp-json/wp/v2/tags` 这个 JSON 接口，不去解析网页排版。
+站上每个女优是一个 WordPress tag，档案块（`AV女優名` / `別名義` / `生年月日` / 头像直链 / SNS，
+以及档案块之前那段出道叙述）就挂在 tag 的 `description` 里，所以走 `/wp-json/wp/v2/tags` 这个
+JSON 接口，不去解析网页排版。抓回来的是事实字段（日期、姓名集合）与站点自己写的一段简介。
 
-**认错人比抓不到严重得多**：一张别人的脸会长期挂在演员列表上，而且没人会去核对。
+**认错人比抓不到严重得多**：一张别人的脸、一段安错人的简介，都会长期挂在库里而没人去核对。
 "确定"的口径写死在 `AvWiki.Certify`：命中结果里**恰好一个**档案的名字集合
-与我们库里的姓名/曾用名对得上（交集项 ≥2 字）才算数；零个、多个、没有头像一律跳过并给出原因。
+与我们库里的姓名/曾用名对得上（交集项 ≥2 字）才算数；零个、多个、没有可抓字段一律跳过并给出原因。
 查询顺序：库里已有的 av-wiki 档案链接（自己的数据已经指向它）→ 含假名的曾用名（最接近站上的写法）
 → 其余曾用名 → 本名，每人最多问 5 次。繁简字形不同就是不同的人，**不做繁简归一**——
 归一就把「泽/沢」这类差异抹平了，那正是查重风险所在。
 
-- 落盘文件名固定 `默认.<ext>`：`ImageIndex` 补选主图时第一个就认它，不用额外置位。
-- 已有照片的演员不动手；**还在查重候选里的一律跳过**（先合并再抓，免得同一张脸在两个名字下各存一份）。
+一次查档、按需落多项，`Want` 掩码决定这次要什么（`avatar` / `profile` / `all`）：
+
+- **头像**：落盘文件名固定 `默认.<ext>`（`ImageIndex` 补选主图时第一个就认它）；已有照片的人不动手。
+- **资料**：只填当前空着的字段 —— `birthdate = COALESCE(birthdate, ?)`、`bio = COALESCE(NULLIF(TRIM(bio),''), ?)`。
+  人写过的简介绝不覆盖；简介超 400 字就截到最近的整句。
+- **还在查重候选里的一律跳过**（先合并再抓，免得同一张脸、同一段简介在两个名字下各存一份）。
 - 站间节流 300ms；连续 3 次站点失败就中止本轮，不跟限流硬碰。
-- 全站抓取是**服务端后台任务**（`Services/AvatarJob.cs`）：`POST /avatars/fetch` 启动并立刻返回，
-  `GET /avatars/fetch/status` 给进度（processed / total / fetched / percent / etaSeconds / note），
-  `DELETE /avatars/fetch` 请求停止。列表页点一下就有进度条，每 2 秒轮一次；
-  **离开页面、关浏览器都不影响它继续跑**，回来还能看到进度。
-  进程内单例、同一时刻只跑一个（这活儿是往别人站点上问话，并行没意义）；
-  重启后端会丢进度，但已抓到的文件与表里的行都在，重跑会自动跳过有照片的人。
-- 进度条上的 ETA 用"已跑出来的平均速度"估，样本不足 3 位时不给数，免得开局乱跳。
+- 全站抓取是**服务端后台任务**（`Services/ScrapeJob.cs`）：`POST /scrape/fetch {what}` 启动并立刻返回，
+  `GET /scrape/status` 给进度（processed / total / hit / percent / etaSeconds / what / whatKey / note），
+  `DELETE /scrape/fetch` 请求停止。列表页「抓取头像」「抓取资料」两个入口共用这一个任务：
+  同一时刻只跑一种，另一种自动禁用，在跑的那种变成「停止抓取」。
+  每 2 秒轮一次，**离开页面、关浏览器都不影响它继续跑**，回来还能看到进度。
+  进程内单例（这活儿是往别人站点上问话，并行没意义）；重启后端只丢进度不丢成果，
+  已抓的文件与已填的字段都在，重跑会自动跳过填好的人。
+- 进度条只在任务运行时存在，跑完即收起、结果改由一条提示承载；ETA 用已跑出的平均速度估，
+  样本不足 3 位不给数，免得开局乱跳。界面判断"在跑哪种"用 `whatKey`，不去比对中文标签。
 - 一个坑留档：`CancellationTokenSource` 一旦 `Cancel` 就不可复用，
   做成 `readonly` 字段会让"停止过一次之后再也启动不起来"（第二次任务在第一圈就退出）。
   每次 `Start` 换一个新源、并把它的局部引用传给循环体。
-- 每抓成一张写一行日志（演员 ID、我们的名字、档案名与 slug）：批量跑的时候，
-  这是唯一能回看"这张脸是从哪个档案抓来的"的地方。
+- 每抓成一位写一行日志（演员 ID、我们的名字、抓了什么、档案名与 slug）：批量跑的时候，
+  这是唯一能回看"这些数据是从哪个档案抓来的"的地方。
 
 ### 重复演员合并（`views/components/ActorMergeDialog.vue`）
 

@@ -15,13 +15,24 @@
           >
             {{ syncing ? '同步中…' : '同步照片' }}
           </button>
+          <!-- 两个入口共用同一个后台任务：同一时刻只允许一个在跑，谁在跑谁变「停止」 -->
           <button
             class="btn btn--sm"
             :class="{ 'btn--ghost': grabRunning }"
+            :disabled="grabRunning && grab.whatKey !== 'avatar'"
             :title="grabRunning ? '正在处理的那一位会做完，然后停下' : '按姓名与曾用名去 av-wiki 找头像：只有唯一命中、且名字对得上才抓；查重候选里的演员会跳过'"
-            @click="grabRunning ? stopGrab() : startGrab()"
+            @click="grabRunning ? stopGrab() : startGrab('avatar')"
           >
-            {{ grabRunning ? '停止抓取' : '抓取头像' }}
+            {{ grabRunning && grab.whatKey === 'avatar' ? '停止抓取' : '抓取头像' }}
+          </button>
+          <button
+            class="btn btn--sm"
+            :class="{ 'btn--ghost': grabRunning }"
+            :disabled="grabRunning && grab.whatKey !== 'profile'"
+            title="从 av-wiki 的档案页取出生日期与简介：只填当前空着的字段，你写过的简介不会被覆盖"
+            @click="grabRunning ? stopGrab() : startGrab('profile')"
+          >
+            {{ grabRunning && grab.whatKey === 'profile' ? '停止抓取' : '抓取资料' }}
           </button>
           <button class="btn btn--sm" title="列出共享曾用名或本名互指的演员，逐组决定要不要合并" @click="showMerge = true">
             查重
@@ -311,7 +322,7 @@ const grabText = computed(() => {
   if (!s) return ''
   if (!s.total) return '正在清点要抓的演员…'
   const tail = s.etaSeconds ? ` · ${fmtEta(s.etaSeconds)}` : ''
-  return `已查 ${s.processed} / ${s.total} · 抓到 ${s.fetched} 张${tail}`
+  return `${s.what || '抓取'} · 已查 ${s.processed} / ${s.total} · 有收获 ${s.hit} 位${tail}`
 })
 
 const stopGrabPoll = () => {
@@ -324,7 +335,7 @@ const stopGrabPoll = () => {
 const pollGrab = async () => {
   let res
   try {
-    res = await actorApi.avatarFetchStatus()
+    res = await actorApi.scrapeStatus()
   } catch {
     return // 轮询失败下一轮再来，不值得弹错误
   }
@@ -342,7 +353,7 @@ const pollGrab = async () => {
   if (grabWatching) {
     grabWatching = false
     stopGrabPoll()
-    ui[s.note ? 'warn' : 'info'](`头像抓取结束：查 ${s.processed} 位，抓到 ${s.fetched} 张${s.note ? ` · ${s.note}` : ''}`)
+    ui[s.note ? 'warn' : 'info'](`抓取结束（${s.what}）：查 ${s.processed} 位，有收获 ${s.hit} 位${s.note ? ` · ${s.note}` : ''}`)
     loadActors()
   }
 }
@@ -352,9 +363,9 @@ const startGrabPoll = () => {
   grabTimer = setInterval(pollGrab, 2000)
 }
 
-const startGrab = async () => {
+const startGrab = async (what) => {
   try {
-    const res = await actorApi.startAvatarFetch()
+    const res = await actorApi.startScrape(what)
     if (!res.success) {
       ui.warn(res.message || '没能启动')
       return
@@ -371,7 +382,7 @@ const startGrab = async () => {
 
 const stopGrab = async () => {
   try {
-    const res = await actorApi.stopAvatarFetch()
+    const res = await actorApi.stopScrape()
     if (!res.success) ui.warn(res.message || '当前没有在跑的任务')
     else ui.info(res.message)
   } catch (err) {
