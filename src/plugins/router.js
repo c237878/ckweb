@@ -9,6 +9,7 @@ const ActorDetail = () => import('@/views/pages/ActorDetail.vue')
 const SeriesList = () => import('@/views/pages/SeriesList.vue')
 const SeriesDetail = () => import('@/views/pages/SeriesDetail.vue')
 const Settings = () => import('@/views/pages/Settings.vue')
+const MetaLists = () => import('@/views/pages/MetaLists.vue')
 const Highlights = () => import('@/views/pages/Highlights.vue')
 const ComicList = () => import('@/views/pages/ComicList.vue')
 const ComicDetail = () => import('@/views/pages/ComicDetail.vue')
@@ -70,6 +71,11 @@ const routes = [
     path: '/likes',
     name: 'LikeList',
     component: LikeList
+  },
+  {
+    path: '/metadata',
+    name: 'MetaLists',
+    component: MetaLists
   },
   {
     path: '/settings',

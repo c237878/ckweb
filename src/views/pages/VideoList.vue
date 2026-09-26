@@ -84,6 +84,20 @@
         label="按分辨率筛选"
         @change="applyFilter"
       />
+      <SelectList
+        v-model="filters.studio"
+        :options="studioOptions"
+        all-label="全部片商"
+        label="按片商筛选"
+        @change="applyFilter"
+      />
+      <SelectList
+        v-model="filters.tag"
+        :options="tagOptions"
+        all-label="全部标签"
+        label="按题材标签筛选"
+        @change="applyFilter"
+      />
       <ComboBox
         v-model="filters.seriesId"
         :options="seriesList"
@@ -176,7 +190,7 @@
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue'
-import { videoApi } from '@/scripts/api'
+import { videoApi, studioApi, tagApi } from '@/scripts/api'
 import { useAppStore } from '@/scripts/store/app'
 import { useUiStore, errText } from '@/scripts/store/ui'
 import { SORT_OPTIONS, SUBTITLE_OPTIONS, WATERMARK_OPTIONS, RESOLUTION_OPTIONS } from '@/scripts/constants'
@@ -222,8 +236,14 @@ const filters = ref({
   downloaded: '',
   subtitle: '',
   watermark: '',
-  resolution: ''
+  resolution: '',
+  studio: '',
+  tag: ''
 })
+
+// 词表下拉：一次拉全（几百项），值用 id——名字会改，id 不会
+const studioOptions = ref([])
+const tagOptions = ref([])
 
 const pageSize = computed(() => app.pageSize)
 
@@ -251,10 +271,24 @@ onMounted(async () => {
   if (saved?.page) page.value = saved.page
 
   await app.init()
-  await Promise.all([loadMeta(), loadVideos()])
+  await Promise.all([loadMeta(), loadVocab(), loadVideos()])
   // 刷新页面或换台电脑进来时，正在跑的扫描要看得见
   pollScan()
 })
+
+const loadVocab = async () => {
+  try {
+    const [s, t] = await Promise.all([
+      studioApi.getList({ pageSize: 500 }),
+      tagApi.getList({ pageSize: 500 })
+    ])
+    if (s.success) studioOptions.value = (s.data || []).map((x) => ({ value: x.id, label: `${x.name} (${x.videoCount})` }))
+    if (t.success) tagOptions.value = (t.data || []).map((x) => ({ value: x.id, label: `${x.name} (${x.videoCount})` }))
+  } catch (err) {
+    // 词表拉不到只是少两个下拉，不该挡住列表
+    console.error('加载词表失败:', err)
+  }
+}
 
 const loadMeta = async () => {
   try {
@@ -283,6 +317,8 @@ const loadVideos = async () => {
     if (filters.value.subtitle) params.subtitle = filters.value.subtitle
     if (filters.value.watermark) params.watermark = filters.value.watermark
     if (filters.value.resolution) params.resolution = filters.value.resolution
+    if (filters.value.studio) params.studio = filters.value.studio
+    if (filters.value.tag) params.tag = filters.value.tag
     if (filters.value.sortBy) params.sortBy = filters.value.sortBy
 
     const res = await videoApi.getList(params)
@@ -343,7 +379,7 @@ const handleSelectVideo = (videoId) => {
 const handleReset = () => {
   filters.value = {
     country: '', category: '', seriesId: '', keyword: '', downloaded: '',
-    subtitle: '', watermark: '', resolution: '', sortBy: ''
+    subtitle: '', watermark: '', resolution: '', studio: '', tag: '', sortBy: ''
   }
   applyFilter()
 }

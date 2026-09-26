@@ -68,6 +68,69 @@
                         >{{ scanning ? '扫描中…' : '扫描' }}</button>
                         <span v-if="video.scanTime" class="media-unknown">扫描于 {{ video.scanTime }}</span>
                     </div>
+                    <!-- 元数据四行：原名/发行日期直接输入即存，片商与标签用同一个 TokenPicker -->
+                    <div class="info-row-media">
+                        <span class="media-label">原名：</span>
+                        <input
+                            v-model="metaDraft.originalName"
+                            class="input meta-input"
+                            placeholder="日文原名"
+                            @change="saveMeta"
+                        />
+                        <span class="media-label">发行：</span>
+                        <input
+                            v-model="metaDraft.releaseDate"
+                            class="input meta-input meta-input--date"
+                            placeholder="2024-03-15"
+                            @change="saveMeta"
+                        />
+                    </div>
+                    <div class="info-row-media">
+                        <span class="media-label">片商：</span>
+                        <TokenPicker
+                            v-model="studioPicked"
+                            :options="studioOptions"
+                            placeholder="输入片商名"
+                            @change="saveStudios"
+                        />
+                    </div>
+                    <div class="info-row-media">
+                        <span class="media-label">标签：</span>
+                        <TokenPicker
+                            v-model="tagPicked"
+                            :options="tagOptions"
+                            placeholder="输入题材标签"
+                            chip-class="tag--info"
+                            @change="saveTags"
+                        />
+                    </div>
+                    <!-- 合辑导航：一部片是几部片子剪在一起时，从这里跳别部，不用回列表搜 -->
+                    <div v-for="g in groups" :key="g.id" class="info-row-media">
+                        <span class="media-label">合辑：</span>
+                        <router-link
+                            v-for="p in g.peers"
+                            :key="p.id"
+                            class="tag group-peer"
+                            :class="{ 'is-current': p.id === video.id }"
+                            :to="`/video/${p.id}`"
+                        >{{ p.code || p.name }}</router-link>
+                        <button type="button" class="tag media-option" @click="leaveGroup(g.id)">移出本组</button>
+                    </div>
+                    <div class="info-row-media">
+                        <span class="media-label">关联：</span>
+                        <template v-if="joining">
+                            <input
+                                v-model="groupName"
+                                class="input meta-input"
+                                placeholder="合辑名，回车加入"
+                                @keyup.enter="joinGroup"
+                                @keyup.esc="joining = false"
+                            />
+                            <button type="button" class="tag media-option" @click="joinGroup">加入</button>
+                            <button type="button" class="tag media-option" @click="joining = false">取消</button>
+                        </template>
+                        <button v-else type="button" class="tag media-option" @click="joining = true">加入合辑…</button>
+                    </div>
                     <div class="info-row3" v-if="video.seriesName">
                         <span>系列：</span>
                         <a :key="video.seriesId" class="actor-link" @click="goToSeries(video.seriesId)">{{ video.seriesName }}</a>
@@ -150,6 +213,8 @@ import {
     SUBTITLE_STATES, WATERMARK_STATES, SUBTITLE_OPTIONS, WATERMARK_OPTIONS,
     subtitleClass, watermarkClass
 } from '@/scripts/constants'
+import { studioApi, tagApi } from '@/scripts/api'
+import TokenPicker from '@/views/components/TokenPicker.vue'
 import { loadCkplayer } from '@/scripts/utils/ckplayer'
 
 const route = useRoute()
@@ -279,6 +344,97 @@ const markSource = async (dim, value) => {
 }
 
 const scanning = ref(false)
+
+// ---------------------------------------------------------------- 元数据：原名 / 发行日期 / 片商 / 标签 / 合辑
+
+const metaDraft = ref({ originalName: '', releaseDate: '' })
+const studioPicked = ref([])
+const tagPicked = ref([])
+const studioOptions = ref([])
+const tagOptions = ref([])
+const groups = ref([])
+
+/**
+ * 详情回来的一次性状态灌进三个可编辑控件。
+ * 只在加载时调用，不做双向绑定：绑了的话用户改到一半、后台刷新会把半截输入冲掉。
+ */
+const applyMeta = (v) => {
+    metaDraft.value = { originalName: v.originalName || '', releaseDate: v.releaseDate || '' }
+    studioPicked.value = (v.studios || []).map((s) => ({ id: s.id, name: s.name }))
+    tagPicked.value = (v.tags || []).map((t) => ({ id: t.id, name: t.name }))
+    groups.value = v.groups || []
+}
+
+/** 词表整个拉到前端过滤：片商几百、标签几百，比每敲一个字问一次后端便宜 */
+const loadVocab = async () => {
+    try {
+        const [s, t] = await Promise.all([
+            studioApi.getList({ pageSize: 500 }),
+            tagApi.getList({ pageSize: 500 })
+        ])
+        if (s.success) studioOptions.value = s.data || []
+        if (t.success) tagOptions.value = t.data || []
+    } catch (err) {
+        console.error('加载词表失败:', err)
+    }
+}
+
+const saveMeta = async () => {
+    try {
+        const res = await videoApi.setMeta(video.value.id, {
+            originalName: metaDraft.value.originalName,
+            releaseDate: metaDraft.value.releaseDate
+        })
+        if (!res.success) return ui.error(res.message || '没保存')
+        video.value.originalName = res.data?.originalName ?? metaDraft.value.originalName.trim()
+        video.value.releaseDate = res.data?.releaseDate ?? metaDraft.value.releaseDate.trim()
+        ui.success('已保存')
+    } catch (err) { ui.error('保存失败：' + errText(err)) }
+}
+
+const saveStudios = async (list) => {
+    try {
+        const res = await videoApi.setStudios(video.value.id, list.map((x) => ({ id: x.id, name: x.name })))
+        if (!res.success) { ui.error(res.message || '没保存'); return }
+        await loadVideo()
+        await loadVocab()   // 新建的片商要能马上被下次输入补全到
+        ui.success(res.message)
+    } catch (err) { ui.error('保存失败：' + errText(err)) }
+}
+
+const saveTags = async (list) => {
+    try {
+        const res = await videoApi.setTags(video.value.id, list.map((x) => x.name))
+        if (!res.success) { ui.error(res.message || '没保存'); return }
+        await loadVideo()
+        await loadVocab()
+        ui.success(res.message)
+    } catch (err) { ui.error('保存失败：' + errText(err)) }
+}
+
+// 合辑名用行内输入，不用 window.prompt：prompt 是系统浅色框，而且没法校验
+const joining = ref(false)
+const groupName = ref('')
+
+const joinGroup = async () => {
+    const name = groupName.value.trim()
+    if (!name) return
+    joining.value = false
+    groupName.value = ''
+    try {
+        const res = await videoApi.joinGroup(video.value.id, { name })
+        if (res.success) { await loadVideo(); ui.success(res.message) } else ui.error(res.message || '没成功')
+    } catch (err) { ui.error('没成功：' + errText(err)) }
+}
+
+const leaveGroup = async (groupId) => {
+    const go = await ui.confirm({ title: '移出合辑', message: '只是把本片从这个合辑里摘出来，合辑和里面的其他影片都不动。', confirmLabel: '移出' })
+    if (!go) return
+    try {
+        const res = await videoApi.leaveGroup(video.value.id, groupId)
+        if (res.success) { await loadVideo(); ui.success(res.message) } else ui.error(res.message || '没成功')
+    } catch (err) { ui.error('没成功：' + errText(err)) }
+}
 const scanThis = async () => {
     if (!video.value?.id || scanning.value) return
     scanning.value = true
@@ -507,6 +663,7 @@ const loadVideo = async () => {
             video.value = res.data.video || res.data
             actors.value = res.data.actors || []
             likeCount.value = res.data.likeCount || 0
+            applyMeta(video.value)
 
             // 初始化 ckplayer
             nextTick(async () => {
@@ -884,6 +1041,29 @@ const handleLike = async () => {
 .media-unknown {
     color: var(--text-faint);
     font-size: var(--f-xs);
+}
+
+/* 元数据行里的输入框：矮到和胶囊同高，不然一行里两个高度打架 */
+.meta-input {
+    width: 260px;
+    height: var(--ctl-h-xs);
+    font-size: var(--f-xs);
+}
+
+.meta-input--date {
+    width: 112px;
+}
+
+/* 合辑导航：当前这部高亮，其余可点跳转 */
+.group-peer {
+    cursor: pointer;
+}
+
+.group-peer.is-current {
+    border-color: currentColor;
+    color: var(--accent);
+    font-weight: 600;
+    pointer-events: none;
 }
 
 /* ==================== 右侧面板 ==================== */

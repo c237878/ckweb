@@ -102,6 +102,43 @@ export const videoApi = {
   getRecentlyLiked: (count) => api.get('/video/recently-liked', { params: { count } }),
   getTopLiked: (count) => api.get('/video/top-liked', { params: { count } }),
   renameToCode: () => api.post('/video/rename-to-code'),
+  /** 整组替换片商：items 里给 id 用已有的，只给 name 就自动归一/新建 */
+  setStudios: (id, items) => api.put(`/video/${id}/studios`, { items }),
+  /** 整组替换标签（人工路径，允许顺手建新标签；AI 走 tagApi.propose） */
+  setTags: (id, names) => api.put(`/video/${id}/tags`, { names }),
+  setLinks: (id, links) => api.put(`/video/${id}/links`, { links }),
+  /** 只改原名与发行日期；整份 PUT /video/{id} 会连封面路径一起按传入值写，不敢用它 */
+  setMeta: (id, body) => api.put(`/video/${id}/meta`, body),
+  joinGroup: (id, body) => api.post(`/video/${id}/groups`, body),
+  leaveGroup: (id, groupId) => api.delete(`/video/${id}/groups/${groupId}`),
+  setGroupPosition: (id, groupId, position) => api.put(`/video/${id}/groups/${groupId}/position`, { position }),
+  renameGroup: (groupId, name) => api.put(`/video/groups/${groupId}`, { name }),
+  deleteGroup: (groupId) => api.delete(`/video/groups/${groupId}`),
+}
+
+// 片商词表
+export const studioApi = {
+  getList: (params) => api.get('/studio', { params }),
+  getDetail: (id) => api.get(`/studio/${id}`),
+  getVideos: (id, params) => api.get(`/studio/${id}/videos`, { params }),
+  add: (data) => api.post('/studio', data),
+  update: (id, data) => api.put(`/studio/${id}`, data),
+  remove: (id) => api.delete(`/studio/${id}`)
+}
+
+// 题材标签：词表 + AI 候选队列
+export const tagApi = {
+  getList: (params) => api.get('/tag', { params }),
+  getVideos: (id, params) => api.get(`/tag/${id}/videos`, { params }),
+  add: (data) => api.post('/tag', data),
+  update: (id, data) => api.put(`/tag/${id}`, data),
+  remove: (id) => api.delete(`/tag/${id}`),
+  merge: (id, into) => api.post(`/tag/${id}/merge`, { into }),
+  suggestions: (params) => api.get('/tag/suggestions', { params }),
+  propose: (data) => api.post('/tag/suggestions', data),
+  approve: (id, tagId) => api.post(`/tag/suggestions/${id}/approve`, { tagId: tagId || null }),
+  moveTo: (id, tagId) => api.post(`/tag/suggestions/${id}/merge`, { tagId }),
+  reject: (id) => api.post(`/tag/suggestions/${id}/reject`)
 }
 
 // 演员相关API

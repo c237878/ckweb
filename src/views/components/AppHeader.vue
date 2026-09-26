@@ -62,6 +62,7 @@ const navItems = [
   { to: '/comics', label: '漫画' },
   { to: '/likes', label: '点赞' },
   { to: '/highlights', label: '艳图' },
+  { to: '/metadata', label: '词表' },
   { to: '/settings', label: '设置' }
 ]
 </script>
