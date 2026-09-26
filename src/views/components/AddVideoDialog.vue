@@ -37,6 +37,42 @@
         </div>
 
         <div class="row row--two">
+          <div class="field">
+            <label for="av-original">原名</label>
+            <input
+              id="av-original"
+              v-model="form.originalName"
+              class="input"
+              type="text"
+              placeholder="日文原名（可留空）"
+              maxlength="300"
+            />
+          </div>
+          <div class="field">
+            <label for="av-release">发行日期</label>
+            <input
+              id="av-release"
+              v-model="form.releaseDate"
+              class="input"
+              type="text"
+              placeholder="2024-03-15"
+              maxlength="10"
+            />
+            <p class="hint">只到年月就写 2024-03，别补 01 号</p>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field__label">片商</label>
+          <TokenPicker
+            v-model="studioPicked"
+            :options="studioOptions"
+            placeholder="输入片商名，回车添加"
+          />
+          <p class="hint">词表里没有的名字会顺手建一家；要改名或合并去 词表 → 片商。</p>
+        </div>
+
+        <div class="row row--two">
           <!-- 地区 / 分类的可选值来自系统设置的规范列表，这里只做选择；
                要新增取值去 设置 → 数据源 -->
           <label class="field">
@@ -229,7 +265,7 @@
 
 <script setup>
 import { computed, nextTick, ref, watch, onUnmounted } from 'vue'
-import { videoApi, actorApi, scanDirectoryApi, uploadApi } from '@/scripts/api'
+import { videoApi, actorApi, scanDirectoryApi, uploadApi, studioApi } from '@/scripts/api'
 import { useUiStore, errText } from '@/scripts/store/ui'
 import { formatSize } from '@/scripts/utils/format'
 import { debounce } from '@/scripts/utils/debounce'
@@ -281,8 +317,24 @@ const form = ref({
   seriesId: '',
   filePath: '',
   coverPath: '',
-  fileSize: null
+  fileSize: null,
+  originalName: '',
+  releaseDate: ''
 })
+
+// 片商是 M:N，不在这份 form 里（form 是"一列一值"的形状），单独一个数组随 payload 一起交
+const studioPicked = ref([])
+const studioOptions = ref([])
+
+const loadStudios = async () => {
+  try {
+    const res = await studioApi.getList({ pageSize: 500 })
+    if (res.success) studioOptions.value = res.data || []
+  } catch (err) {
+    // 词表拉不到只是少一个补全，不该挡住这个对话框打开
+    console.error('加载片商词表失败:', err)
+  }
+}
 
 const countryOptions = computed(() => toOptions(meta.value.countries, form.value.country))
 
@@ -571,7 +623,7 @@ watch(() => props.visible, async (val) => {
   showCoverDirDropdown.value = false
   resetActors()
 
-  await Promise.all([loadMeta(), loadActorList(), loadScanDirectories()])
+  await Promise.all([loadMeta(), loadActorList(), loadScanDirectories(), loadStudios()])
   if (!props.editingVideo) {
     resetForm()
     return
@@ -587,8 +639,11 @@ watch(() => props.visible, async (val) => {
       country: video.country || '',
       seriesId: video.seriesId || '',
       filePath: video.filePath || '',
-      coverPath: video.coverPath || ''
+      coverPath: video.coverPath || '',
+      originalName: video.originalName || '',
+      releaseDate: video.releaseDate || ''
     }
+    studioPicked.value = (video.studios || []).map((x) => ({ id: x.id, name: x.name }))
     selectedActors.value = detail.data.actors || []
     // 编辑值不在已有选项里时，直接落到手填输入框，免得看起来像没选
   } catch (e) {
@@ -597,7 +652,11 @@ watch(() => props.visible, async (val) => {
 })
 
 const resetForm = () => {
-  form.value = { name: '', code: '', category: '', country: '', seriesId: '', filePath: '', coverPath: '', fileSize: null }
+  form.value = {
+    name: '', code: '', category: '', country: '', seriesId: '',
+    filePath: '', coverPath: '', fileSize: null, originalName: '', releaseDate: ''
+  }
+  studioPicked.value = []
   resetActors()
 }
 
@@ -623,6 +682,9 @@ const handleSave = () => {
     filePath: form.value.filePath,
     coverPath: form.value.coverPath,
     fileSize: form.value.fileSize,
+    originalName: form.value.originalName,
+    releaseDate: form.value.releaseDate,
+    studios: studioPicked.value.map((x) => ({ id: x.id, name: x.name })),
     actorIds: selectedActors.value.map((a) => a.id)
   })
 }
@@ -641,6 +703,9 @@ const handleSaveContinue = () => {
     filePath: form.value.filePath,
     coverPath: form.value.coverPath,
     fileSize: form.value.fileSize,
+    originalName: form.value.originalName,
+    releaseDate: form.value.releaseDate,
+    studios: studioPicked.value.map((x) => ({ id: x.id, name: x.name })),
     actorIds: selectedActors.value.map((a) => a.id)
   })
   // 清空番号、视频路径、封面路径、演员
@@ -648,6 +713,9 @@ const handleSaveContinue = () => {
   form.value.filePath = ''
   form.value.coverPath = ''
   form.value.fileSize = null
+  form.value.originalName = ''
+  form.value.releaseDate = ''
+  studioPicked.value = []
   resetActors()
 }
 

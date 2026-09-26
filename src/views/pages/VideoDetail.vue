@@ -66,34 +66,18 @@
                             title="读这个视频文件的容器头量宽高（只读文件，不改文件；字幕和广告水印由你自己标）"
                             @click="scanThis"
                         >{{ scanning ? '扫描中…' : '扫描' }}</button>
-                        <span v-if="video.scanTime" class="media-unknown">扫描于 {{ video.scanTime }}</span>
+                        <span v-if="!video.resH" class="media-unknown">点「扫描」量一次</span>
                     </div>
-                    <!-- 元数据四行：原名/发行日期直接输入即存，片商与标签用同一个 TokenPicker -->
-                    <div class="info-row-media">
-                        <span class="media-label">原名：</span>
-                        <input
-                            v-model="metaDraft.originalName"
-                            class="input meta-input"
-                            placeholder="日文原名"
-                            @change="saveMeta"
-                        />
-                        <span class="media-label">发行：</span>
-                        <input
-                            v-model="metaDraft.releaseDate"
-                            class="input meta-input meta-input--date"
-                            placeholder="2024-03-15"
-                            @change="saveMeta"
-                        />
-                    </div>
-                    <div class="info-row-media">
-                        <span class="media-label">片商：</span>
-                        <TokenPicker
-                            v-model="studioPicked"
-                            :options="studioOptions"
-                            placeholder="输入片商名"
-                            @change="saveStudios"
-                        />
-                    </div>
+                    <!-- 只读元数据。填写都在「编辑」对话框里：详情页是看片的地方，
+                         输入框混在信息区里既容易误改，也让这一屏看起来像没排完 -->
+                    <dl v-if="video.originalName || video.releaseDate || studios.length" class="meta-grid">
+                        <template v-if="video.originalName"><dt>原名</dt><dd>{{ video.originalName }}</dd></template>
+                        <template v-if="video.releaseDate"><dt>发行</dt><dd>{{ video.releaseDate }}</dd></template>
+                        <template v-if="studios.length">
+                            <dt>片商</dt>
+                            <dd>{{ studios.map((x) => x.name).join(' · ') }}</dd>
+                        </template>
+                    </dl>
                     <div class="info-row-media">
                         <span class="media-label">标签：</span>
                         <TokenPicker
@@ -213,7 +197,7 @@ import {
     SUBTITLE_STATES, WATERMARK_STATES, SUBTITLE_OPTIONS, WATERMARK_OPTIONS,
     subtitleClass, watermarkClass
 } from '@/scripts/constants'
-import { studioApi, tagApi } from '@/scripts/api'
+import { tagApi } from '@/scripts/api'
 import TokenPicker from '@/views/components/TokenPicker.vue'
 import { loadCkplayer } from '@/scripts/utils/ckplayer'
 
@@ -347,20 +331,17 @@ const scanning = ref(false)
 
 // ---------------------------------------------------------------- 元数据：原名 / 发行日期 / 片商 / 标签 / 合辑
 
-const metaDraft = ref({ originalName: '', releaseDate: '' })
-const studioPicked = ref([])
 const tagPicked = ref([])
-const studioOptions = ref([])
 const tagOptions = ref([])
 const groups = ref([])
+const studios = ref([])
 
 /**
  * 详情回来的一次性状态灌进三个可编辑控件。
  * 只在加载时调用，不做双向绑定：绑了的话用户改到一半、后台刷新会把半截输入冲掉。
  */
 const applyMeta = (v) => {
-    metaDraft.value = { originalName: v.originalName || '', releaseDate: v.releaseDate || '' }
-    studioPicked.value = (v.studios || []).map((s) => ({ id: s.id, name: s.name }))
+    studios.value = v.studios || []
     tagPicked.value = (v.tags || []).map((t) => ({ id: t.id, name: t.name }))
     groups.value = v.groups || []
 }
@@ -368,38 +349,11 @@ const applyMeta = (v) => {
 /** 词表整个拉到前端过滤：片商几百、标签几百，比每敲一个字问一次后端便宜 */
 const loadVocab = async () => {
     try {
-        const [s, t] = await Promise.all([
-            studioApi.getList({ pageSize: 500 }),
-            tagApi.getList({ pageSize: 500 })
-        ])
-        if (s.success) studioOptions.value = s.data || []
+        const t = await tagApi.getList({ pageSize: 500 })
         if (t.success) tagOptions.value = t.data || []
     } catch (err) {
         console.error('加载词表失败:', err)
     }
-}
-
-const saveMeta = async () => {
-    try {
-        const res = await videoApi.setMeta(video.value.id, {
-            originalName: metaDraft.value.originalName,
-            releaseDate: metaDraft.value.releaseDate
-        })
-        if (!res.success) return ui.error(res.message || '没保存')
-        video.value.originalName = res.data?.originalName ?? metaDraft.value.originalName.trim()
-        video.value.releaseDate = res.data?.releaseDate ?? metaDraft.value.releaseDate.trim()
-        ui.success('已保存')
-    } catch (err) { ui.error('保存失败：' + errText(err)) }
-}
-
-const saveStudios = async (list) => {
-    try {
-        const res = await videoApi.setStudios(video.value.id, list.map((x) => ({ id: x.id, name: x.name })))
-        if (!res.success) { ui.error(res.message || '没保存'); return }
-        await loadVideo()
-        await loadVocab()   // 新建的片商要能马上被下次输入补全到
-        ui.success(res.message)
-    } catch (err) { ui.error('保存失败：' + errText(err)) }
 }
 
 const saveTags = async (list) => {
@@ -1043,15 +997,24 @@ const handleLike = async () => {
     font-size: var(--f-xs);
 }
 
-/* 元数据行里的输入框：矮到和胶囊同高，不然一行里两个高度打架 */
-.meta-input {
-    width: 260px;
-    height: var(--ctl-h-xs);
-    font-size: var(--f-xs);
+/* 只读元数据：标签列定宽对齐，值长的原名自己换行 */
+.meta-grid {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: var(--s1) var(--s3);
+    margin: 0;
+    font-size: var(--f-sm);
 }
 
-.meta-input--date {
-    width: 112px;
+.meta-grid dt {
+    color: var(--text-faint);
+    white-space: nowrap;
+}
+
+.meta-grid dd {
+    margin: 0;
+    color: var(--text-dim);
+    overflow-wrap: anywhere;
 }
 
 /* 合辑导航：当前这部高亮，其余可点跳转 */
