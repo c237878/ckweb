@@ -177,6 +177,18 @@
           </div>
         </section>
 
+        <!-- 抓取通道：整块逻辑在组件里，这里只挂一个分区，免得设置页长到没法维护 -->
+        <section
+          v-else-if="activeGroup === 'channels'"
+          id="panel-channels"
+          class="panel settings-group"
+          role="tabpanel"
+          aria-labelledby="tab-channels"
+          tabindex="-1"
+        >
+          <ScrapeChannelsPanel />
+        </section>
+
         <!-- 其余分区都是一组单值设置 -->
         <section
           v-else
@@ -329,9 +341,13 @@ import api, { settingApi, friendLinkApi, scanDirectoryApi, taxonomyApi } from '@
 import { useAppStore } from '@/scripts/store/app'
 import { useUiStore } from '@/scripts/store/ui'
 import TaxonomyTable from '@/views/components/TaxonomyTable.vue'
+import ScrapeChannelsPanel from '@/views/components/ScrapeChannelsPanel.vue'
+import { useRoute, useRouter } from 'vue-router'
 
 const app = useAppStore()
 const ui = useUiStore()
+const route = useRoute()
+const router = useRouter()
 
 const CATEGORY_OPTIONS = ['视频', '封面', '字幕']
 
@@ -342,7 +358,8 @@ const GROUPS = [
   { id: 'media', label: '媒体路径', desc: '艳图与演员海报使用的图片目录；影片扫描目录见「扫描目录」。' },
   { id: 'taxonomy', label: '数据源' },
   { id: 'dirs', label: '扫描目录' },
-  { id: 'links', label: '友情链接' }
+  { id: 'links', label: '友情链接' },
+  { id: 'channels', label: '抓取通道', desc: '外部站点的查询地址、字段抽取规则，以及限速 / 每日配额 / 连续失败熔断。' }
 ]
 
 /** content 一律按字符串提交（后端存的就是字符串），所以这里不能用 v-model.number */
@@ -501,7 +518,10 @@ const saveGroup = async (group) => {
 
 // ---------- 分区标签 ----------
 
-const activeGroup = ref(GROUPS[0].id)
+// 分区可深链：/settings?group=channels 直接落到那一格，刷新也停在原地。
+// 之前只记在组件里，从别处想跳"抓取通道"就只能让人自己点两下
+const knownGroup = (g) => typeof g === 'string' && GROUPS.some((x) => x.id === g)
+const activeGroup = ref(knownGroup(route.query.group) ? route.query.group : GROUPS[0].id)
 const navEl = ref(null)
 
 const activeFieldGroup = computed(
@@ -512,6 +532,7 @@ const activeFieldGroup = computed(
 const selectGroup = (id) => {
   if (activeGroup.value === id) return
   activeGroup.value = id
+  router.replace({ query: { ...route.query, group: id } })
   if (id === 'taxonomy' && !loadingTaxonomy.value) loadTaxonomy()
 }
 

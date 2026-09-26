@@ -116,6 +116,16 @@ export const videoApi = {
   deleteGroup: (groupId) => api.delete(`/video/groups/${groupId}`),
 }
 
+// 抓取通道：去哪查 / 怎么抽 / 要多礼貌，全在设置页里配
+export const scrapeApi = {
+  channels: () => api.get('/scrape/channel'),
+  saveChannel: (body) => api.put('/scrape/channel', body),
+  deleteChannel: (id) => api.delete(`/scrape/channel/${id}`),
+  resetChannel: (id) => api.post(`/scrape/channel/${id}/reset`),
+  testChannel: (id, params) => api.post(`/scrape/channel/${id}/test`, null, { params }),
+  applyChannel: (id, entityId) => api.post(`/scrape/channel/${id}/apply`, null, { params: { entityId } })
+}
+
 // 片商词表
 export const studioApi = {
   getList: (params) => api.get('/studio', { params }),

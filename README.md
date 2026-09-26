@@ -499,6 +499,37 @@ JSON 接口，不去解析网页排版。抓回来的是事实字段（日期、
 javcup 详情字段是混淆 JS，javlibrary / javdb 从这台机器连不上。
 所以这几列先由人工填，通道恢复或换到别的源之后再补抓取，并且要把限速/配额/熔断做成可视化配置。
 
+### 抓取通道（可视化配置，`scrape_channels` + `Services/ScrapeChannel.cs`）
+
+设置页新增「抓取通道」分区（可深链 `/settings?group=channels`）。一条通道 = 一个站点，三段都可配：
+
+| 段 | 字段 |
+| --- | --- |
+| 去哪查 | `entity`（演员/影片）、`query_source`（番号 / 姓名 / 已有档案链接的 slug）、`fetch_url` 模板（`{q}` 编码、`{raw}` 原样、`{slug}`） |
+| 怎么抽 | `fetch_kind` = `json`（点路径 `0.title.rendered`）· `html`（正则取第一个捕获组）· `builtin`（抽取在代码里，只管开关与礼貌）；`rules` 每条含目标、路径、转换（`jdate`/`upper`/`collapse`）、是否只填空值 |
+| 多礼貌 | `min_interval_ms`、`daily_quota`、`fail_limit` + `cooldown_minutes`；运行态（今日已问、连续失败、冷却到几点、最后一次为什么被拒）同表同行，列表一次就能显示"能不能问、为什么不能" |
+
+三条设计上的硬话：
+
+- **可写目标走白名单**（`ScrapeChannelService.Targets`）。不做这层，规则里写 `videos.file_path`
+  就等于给配置界面开了个任意 UPDATE 的入口。目标与通道实体不匹配、正则不合法、非 http(s)
+  都会在保存时一次把所有问题说完，不让人一条条试。
+- **反爬拦截要认出来，不能当"没查到"**。av-wiki 现在是 403 + `Access denied by Imunify360`，
+  以前也回过 200 + `One moment, please` 的 JS 挑战页。两种都由 `DetectChallenge` 判成"被拦"
+  并计入连续失败 → 到阈值自动进冷却。认不出来的话，批量任务会把"被拒"当"这条没有"，
+  然后一路把剩下几千次全敲完 —— 这次被封就是这么来的。
+- **试抓只读不写**（`POST /scrape/channel/{id}/test`）。改完地址与规则当场就能看到抽出了什么，
+  不用改一版部署一次；它算真请求所以也计配额。落库走 `/{id}/apply`，`ifEmptyOnly` 的规则只填空值。
+
+内置的 av-wiki 女优档案是表里种下的第一条通道（`fetch_kind=builtin`），
+**批量抓取头像/资料现在也走这道闸门**：`ScrapeJob` 原来写死 `Task.Delay(300)`，
+现在每条之前先问通道能不能问、按 `min_interval_ms` 等、把结果回报给熔断，
+被拦或配额用满就带着原因停下这一轮（界面上看得到原因）。
+只有"站点侧失败"才累计熔断数，"查无此档"是对话正常结束，不该把通道打死。
+
+没上 CSS 选择器是因为要引 AngleSharp，一个依赖换一种写法不划算；正则丑但够用。
+设置页的分区现在可深链（`?group=…`），刷新也停在原分区。
+
 ### 重复演员合并（`views/components/ActorMergeDialog.vue`）
 
 演员列表页工具栏的「查重」打开一张候选表，一行一组，两个按钮决定**留谁**（留下来的是哪个艺名，
