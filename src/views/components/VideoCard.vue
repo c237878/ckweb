@@ -94,6 +94,7 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { formatSize } from '@/scripts/utils/format'
+import { copyText } from '@/scripts/utils/clipboard'
 import { subtitleText, subtitleClass, watermarkText, watermarkClass, resolutionText } from '@/scripts/constants'
 import { videoApi } from '@/scripts/api'
 import { useUiStore, errText } from '@/scripts/store/ui'
@@ -148,20 +149,7 @@ const actorList = computed(() => {
 const copyCode = async () => {
   const code = props.video.code || ''
   if (!code) return
-  try {
-    await navigator.clipboard.writeText(code)
-    copied.value = true
-    setTimeout(() => { copied.value = false }, 1500)
-  } catch {
-    // 非安全上下文（局域网 http 直连）下 clipboard 不可用，退回 execCommand
-    const ta = document.createElement('textarea')
-    ta.value = code
-    ta.style.position = 'fixed'
-    ta.style.opacity = '0'
-    document.body.appendChild(ta)
-    ta.select()
-    document.execCommand('copy')
-    document.body.removeChild(ta)
+  if (await copyText(code)) {
     copied.value = true
     setTimeout(() => { copied.value = false }, 1500)
   }

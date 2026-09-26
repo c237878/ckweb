@@ -44,7 +44,7 @@
       </div>
 
       <div class="settings-body">
-        <!-- 数据源：地区与分类的规范可选值 -->
+        <!-- 地区与分类：规范可选值 -->
         <section
           v-if="activeGroup === 'taxonomy'"
           id="panel-taxonomy"
@@ -53,7 +53,7 @@
           aria-labelledby="tab-taxonomy"
           tabindex="-1"
         >
-          <h2 class="section-title">数据源</h2>
+          <h2 class="section-title">地区与分类</h2>
           <p class="panel-desc">
             影片、系列、演员的「地区」和影片的「分类」都从这两份清单里取，所以各页面的下拉框永远一致。
             改名会把已经用着旧值的记录一起更新；删除只从可选值里去掉，不动任何记录。
@@ -85,7 +85,7 @@
               :rows="categoryRows"
               :orphans="categoryOrphans"
               placeholder="如：同人志"
-              hint="首页展示哪几个分类，由「首页」分组的「首页展示分类」决定"
+              hint="首页展示哪几个分类，由「站点与首页」分组的「首页展示分类」决定"
               @saved="loadTaxonomy"
             />
           </div>
@@ -187,6 +187,35 @@
           tabindex="-1"
         >
           <ScrapeChannelsPanel />
+        </section>
+
+        <!-- 词表：原先独立成 /metadata 挂在顶部菜单，但它属于配置，收进设置复用同一个组件 -->
+        <section
+          v-else-if="activeGroup === 'vocab'"
+          id="panel-vocab"
+          class="panel settings-group"
+          role="tabpanel"
+          aria-labelledby="tab-vocab"
+          tabindex="-1"
+        >
+          <h2 class="section-title">标签与片商</h2>
+          <p class="panel-desc">
+            两份词表只在这里增删：题材标签管影片的内容特征，片商管谁发行的。
+            AI 只能提候选，批准、并入、驳回都由你点。
+          </p>
+          <MetaLists embedded />
+        </section>
+
+        <!-- AI 接口：端点、密钥、工具清单与打标口径，整块在组件里 -->
+        <section
+          v-else-if="activeGroup === 'mcp'"
+          id="panel-mcp"
+          class="panel settings-group"
+          role="tabpanel"
+          aria-labelledby="tab-mcp"
+          tabindex="-1"
+        >
+          <McpPanel />
         </section>
 
         <!-- 其余分区都是一组单值设置 -->
@@ -342,6 +371,8 @@ import { useAppStore } from '@/scripts/store/app'
 import { useUiStore } from '@/scripts/store/ui'
 import TaxonomyTable from '@/views/components/TaxonomyTable.vue'
 import ScrapeChannelsPanel from '@/views/components/ScrapeChannelsPanel.vue'
+import MetaLists from '@/views/pages/MetaLists.vue'
+import McpPanel from '@/views/components/McpPanel.vue'
 import { useRoute, useRouter } from 'vue-router'
 
 const app = useAppStore()
@@ -351,23 +382,29 @@ const router = useRouter()
 
 const CATEGORY_OPTIONS = ['视频', '封面', '字幕']
 
-/** 分区的唯一来源：导航项与各分区标题读这里，新增分组只改这一份 */
+/**
+ * 分区的唯一来源：导航项与各分区标题读这里，新增分组只改这一份。
+ *
+ * 顺序按"先定站点长什么样 → 再定数据从哪来 → 然后是内容与词表 → 最后外部站点与页脚"排：
+ * 抓取通道与词表是日常维护，友情链接几乎不动，所以垫底。
+ */
 const GROUPS = [
-  { id: 'site', label: '站点信息', desc: '网站名称与各列表页的分页条数。' },
-  { id: 'home', label: '首页', desc: '首页取哪几个分类、每个分类显示多少条。' },
-  { id: 'media', label: '媒体路径', desc: '艳图与演员海报使用的图片目录；影片扫描目录见「扫描目录」。' },
-  { id: 'taxonomy', label: '数据源' },
-  { id: 'dirs', label: '扫描目录' },
-  { id: 'links', label: '友情链接' },
-  { id: 'channels', label: '抓取通道', desc: '外部站点的查询地址、字段抽取规则，以及限速 / 每日配额 / 连续失败熔断。' }
+  { id: 'site', label: '站点与首页', desc: '网站名称、各列表页的分页条数，以及首页取哪几个分类、每个分类显示多少条。' },
+  { id: 'media', label: '图片目录', desc: '艳图与演员海报使用的图片目录；影片扫描目录见「扫描目录」。' },
+  { id: 'dirs', label: '扫描目录', desc: '导入影片、封面、字幕时从哪里找文件。' },
+  { id: 'taxonomy', label: '地区与分类' },
+  { id: 'vocab', label: '标签与片商' },
+  { id: 'channels', label: '抓取通道', desc: '外部站点的查询地址、字段抽取规则，以及限速 / 每日配额 / 连续失败熔断。' },
+  { id: 'mcp', label: 'AI 接口' },
+  { id: 'links', label: '友情链接', desc: '显示在页脚，按排序数字从小到大排列。' }
 ]
 
 /** content 一律按字符串提交（后端存的就是字符串），所以这里不能用 v-model.number */
 const settingsList = ref([
   { id: 'siteName', group: 'site', label: '网站名称', value: '', placeholder: '影视网站', hint: '显示在页头与浏览器标签' },
   { id: 'pageSize', group: 'site', label: '每页数量', value: '', type: 'number', min: 1, max: 100, placeholder: '默认 24', hint: '各列表页每页显示的条数' },
-  { id: 'homePageCategories', group: 'home', label: '首页展示分类', value: '', placeholder: '多个分类用逗号分隔，留空显示全部', hint: '可选值见「数据源」' },
-  { id: 'homePageCategoryCount', group: 'home', label: '首页分类数量', value: '', type: 'number', min: 1, max: 100, placeholder: '默认 12', hint: '每个分类/板块显示的数量，今日推荐也用这个值' },
+  { id: 'homePageCategories', group: 'site', label: '首页展示分类', value: '', placeholder: '多个分类用逗号分隔，留空显示全部', hint: '可选值见「地区与分类」' },
+  { id: 'homePageCategoryCount', group: 'site', label: '首页分类数量', value: '', type: 'number', min: 1, max: 100, placeholder: '默认 12', hint: '每个分类/板块显示的数量，今日推荐也用这个值' },
   { id: 'posterDir', group: 'media', label: '艳图目录', value: '', placeholder: '如: /Volumes/disk1/posters' }
 ])
 
@@ -449,7 +486,7 @@ const loadTaxonomy = async () => {
     categoryOrphans.value = data.categoryOrphans || []
   } catch (error) {
     console.error('加载数据源失败:', error)
-    taxonomyError.value = '数据源加载失败，请确认后端服务可用'
+    taxonomyError.value = '地区与分类加载失败，请确认后端服务可用'
   } finally {
     loadingTaxonomy.value = false
   }
@@ -528,7 +565,7 @@ const activeFieldGroup = computed(
   () => fieldGroups.value.find((g) => g.id === activeGroup.value) || fieldGroups.value[0]
 )
 
-/** 引用数会随别处的修改变化，每次进数据源标签都重新拉一次 */
+/** 引用数会随别处的修改变化，每次进这个标签都重新拉一次 */
 const selectGroup = (id) => {
   if (activeGroup.value === id) return
   activeGroup.value = id

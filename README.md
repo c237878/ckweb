@@ -178,7 +178,8 @@ v4 迁移把含 `http` 的简介逐条抽出（382 位演员 → 528 行，379 �
 `/api/ScanDirectory` `GET /` · `GET /{id}` · `POST /` · `PUT /{id}` · `DELETE /{id}` · `POST /check` ；
 `/api/FriendLink` `GET /` · `POST /` · `PUT /{id}` · `DELETE /{id}` ；
 `/api/Highlights` `GET /posters`（读 `highlight_images`） · `POST /images/sync` · `GET /poster/{fileName}`（原图） · `GET /thumb/{s|m}/{fileName}` ；
-`/api/Upload` `POST /video` · `POST /cover`
+`/api/Upload` `POST /video` · `POST /cover` ；
+`/mcp` （JSON-RPC 2.0，需 `X-API-Key`）· `/api/mcp/status` · `/api/mcp/key`
 
 ### 响应约定
 统一 `{ success, data, message }`。分页有两种历史形态，前端按端点分别读取，勿混用：
@@ -412,7 +413,7 @@ JSON 接口，不去解析网页排版。抓回来的是事实字段（日期、
   一个中国网红的名字恰好撞上某个日文 tag，就会把别人的脸和简介安到她身上，而这种错法长期没人会去核对。
   单演员入口在任何网络请求之前先挡，返回可直接展示的原因；
   详情接口带 `scrapeable`，不合格的人页面上两个抓取按钮直接不出现。
-  `'日本'` 是 设置 → 数据源 里的规范取值，在那里改名要同步改这里。
+  `'日本'` 是 设置 → 地区与分类 里的规范取值，在那里改名要同步改这里。
 - **还在查重候选里的一律跳过**（先合并再抓，免得同一张脸、同一段简介在两个名字下各存一份）。
 - 站间节流 300ms；连续 3 次站点失败就中止本轮，不跟限流硬碰。
 - 全站抓取是**服务端后台任务**（`Services/ScrapeJob.cs`）：`POST /scrape/fetch {what}` 启动并立刻返回，
@@ -488,10 +489,20 @@ JSON 接口，不去解析网页排版。抓回来的是事实字段（日期、
   详情页每个组渲染成一排可点胶囊，当前这部高亮。
 - `video_links`：影片的外部档案地址，与 `actor_links` 同构、共用 `Utils/Links` 的校验与归类。
   它同时是将来抓取的首选定位键——自己的数据已经指向档案时，抓取不用再搜一遍也不会认错片。
-- 词表管理页 `/metadata`（导航「词表」）三个标签：题材标签、片商、AI 候选待审（带角标数）。
-  标签支持改名/删除/并入已有，片商支持改名/删除。删除都会连带摘掉影片上的挂接。
+- 词表管理在**设置 → 标签与片商**（`/metadata` 老地址做了重定向，不再占顶部菜单一个位置）。
+  三个标签：题材标签、片商、AI 候选待审（带角标数）。标签支持改名/删除/并入已有；
+  片商走对话框，正名 / 别名 / 国家 / 官网四个字段一起给（国家取自「地区与分类」那份规范清单，
+  官网缺协议会补 `https://`，否则点开来会跳回本站）。删除都会连带摘掉影片上的挂接。
 - 挑选控件是 `views/components/TokenPicker.vue`（片商与标签共用）：输入即过滤正名与别名，
-  下拉自己画——用 `<datalist>` 会弹系统浅色面板，暗色主题下像另一个网站。
+  定高与「所属系列」同一档（`.input` 的 `--ctl-h`），浮层走全局 `.dropdown-menu` 并复用
+  `autoFitDropdown` —— 编辑对话框的 `.dialog__body` 会裁掉溢出部分，不自适应就点不到下半截。
+  下拉自己画：用 `<datalist>` 会弹系统浅色面板，暗色主题下像另一个网站。
+- 详情页播放器下方统一成**一份两列清单**（`.kv-list`：定宽标签列 + 值列），标签一律不带冒号、
+  字号统一 `--f-sm`；顺序按关联度分三档：片源（字幕 / 广告水印 / 分辨率）→ 内容（标签 / 合辑）
+  → 档案（原名 / 发行 / 片商 / 系列 / 演员）。类名别叫 `.facts`，那是卡片属性行的全局类，会串味。
+- **演员年龄**：`ageAt(发行日期, 出生日期)`（`scripts/utils/format.js`）算的是"发行时多大"，
+  两边都精确到月日才按生日是否未到减 1，缺日期或算出负数一律不显示。渲染成演员名字后面
+  一段 `· 24 岁` 的次要文本（`--f-xs` + `--text-faint`），不额外占行也不抢链接的视觉重心。
 - 列表页新增「按片商」「按标签」两个筛选，值传 id。
 
 **抓取通道目前不通**：av-wiki.net 已上 Imunify360 反爬，我们那套请求头被直接拒
@@ -529,6 +540,31 @@ javcup 详情字段是混淆 JS，javlibrary / javdb 从这台机器连不上。
 
 没上 CSS 选择器是因为要引 AngleSharp，一个依赖换一种写法不划算；正则丑但够用。
 设置页的分区现在可深链（`?group=…`），刷新也停在原分区。
+
+### AI 接口（MCP，`Services/Mcp.cs` + `Controllers/McpController.cs`）
+
+给本机大模型用的口子，形状与 logapi-finance 一致：**同一个 `/mcp` 端点 + `X-API-Key` 头**，
+JSON-RPC 2.0 手写（`initialize` / `tools/list` / `tools/call` / `notifications/*` / `ping`），
+不引 SDK —— 面就这几个方法，加依赖换来的是版本漂移和一层不受控的 HTTP 栈。
+`GET/DELETE /mcp` 按规范回 405（服务端不推事件流），通知回 202 空体。
+
+六个工具：`video_list`（含 `noTags` 捞没打过标的）、`video_get`、`tag_list`、`tag_propose`、
+`studio_list`、`vocab_counts`。筛选参数里的标签与片商**接受正名、别名或 id**，
+认不出直接报错——模型手上只有名字，硬要它先查一轮 id 只是白费往返。
+
+三条收口：
+
+- **整站免鉴权，只有这里加一道**。密钥存 `system_settings.mcpApiKey`，那行是空的分身就等于没开门
+  （全 401）。生成与查看在 设置 → AI 接口，端点地址、客户端配置片段、工具清单、打标口径
+  全在那一屏，每块都能一键复制。
+- **AI 建不出标签**。`tag_propose` 里词表已有的（正名或别名都算）直接挂、`source` 记 `ai`；
+  没收录的词只进 `tag_suggestions` 待审。代码里压根不写 `tags` 的 INSERT，
+  所以再怎么调用都扩不了词表——提示词会被改，接口不会。
+- **参数错按工具内错误回**（`isError: true` + 一句中文原因），不报 JSON-RPC 错误：
+  SDK 会把后者当服务端故障，模型就再也读不到"你少传了 videoId"这种可自救的信息。
+
+打标口径存在 `system_settings.aiTagRule`（就是条普通设置，界面走 `/api/systemsetting` 保存，
+不另开写入口），每次 `tools/list` 都拼在 `tag_propose` 的说明上。默认口径是"按中文片名总结特色标签"。
 
 ### 重复演员合并（`views/components/ActorMergeDialog.vue`）
 
@@ -570,11 +606,19 @@ javcup 详情字段是混淆 JS，javlibrary / javdb 从这台机器连不上。
 新增一项设置只给 `settingsList` 的元素加上 `group`，它会自动落进对应分区并共用该分区的保存按钮。
 窄屏（<900px）时标签变成顶部一行可横滑的标签条。
 
-**数据源**分区管 `countries` / `categories` 两份清单：影片、系列、演员的地区和影片的分类，
+当前分区（`GROUPS` 就是这个顺序）：**站点与首页**（网站名称、每页数量、首页展示分类与条数）
+→ **图片目录** → **扫描目录** → **地区与分类**（即原来的「数据源」）→ **标签与片商**
+→ **抓取通道** → **AI 接口** → **友情链接**。
+
+**配置类功能不进顶部菜单**：词表原先是 `/metadata` + 导航「词表」，现在整页嵌进设置
+（`MetaLists.vue` 收 `embedded` 属性，独立成页时才有自己的页头），顶部菜单只剩浏览页。
+`/metadata` 保留为重定向，老书签不会 404。
+
+**地区与分类**分区管 `countries` / `categories` 两份清单：影片、系列、演员的地区和影片的分类，
 可选值全部来自这里（后端 `Utils.Options.CommaList`），编辑页只能选不能造词，
 所以不同页面看到的选项一定一致。清单为空时后端不回退到表内 DISTINCT —— 管理员清空是有意为之。
 
-数据源用 **TaxonomyTable** 管理（`GET/POST /api/taxonomy`）：表格里能同时看到现有值、
+这两份清单用 **TaxonomyTable** 管理（`GET/POST /api/taxonomy`）：表格里能同时看到现有值、
 每个值的分表引用数，并可改名 / 删除 / 上移下移 / 新增，每个操作立即落库，没有整页"保存"按钮。
 
 ```vue

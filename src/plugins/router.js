@@ -9,7 +9,6 @@ const ActorDetail = () => import('@/views/pages/ActorDetail.vue')
 const SeriesList = () => import('@/views/pages/SeriesList.vue')
 const SeriesDetail = () => import('@/views/pages/SeriesDetail.vue')
 const Settings = () => import('@/views/pages/Settings.vue')
-const MetaLists = () => import('@/views/pages/MetaLists.vue')
 const Highlights = () => import('@/views/pages/Highlights.vue')
 const ComicList = () => import('@/views/pages/ComicList.vue')
 const ComicDetail = () => import('@/views/pages/ComicDetail.vue')
@@ -73,9 +72,9 @@ const routes = [
     component: LikeList
   },
   {
+    // 词表属于配置，收进设置页的「标签与片商」分区；老书签不能点开来是 404
     path: '/metadata',
-    name: 'MetaLists',
-    component: MetaLists
+    redirect: { path: '/settings', query: { group: 'vocab' } }
   },
   {
     path: '/settings',

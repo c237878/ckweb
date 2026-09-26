@@ -28,105 +28,131 @@
                         <span v-if="likeCount > 0" class="tag tag--like">♥ {{ likeCount }}</span>
                         <span class="tag tag--muted">{{ video.fileSize?formatSize(video.fileSize):'无文件' }}</span>
                     </div>
-                    <!-- 片源拆成两维分开标：一行一维，再点一次当前值就是清掉这一维的结论 -->
-                    <div class="info-row-media">
-                        <span class="media-label">字幕：</span>
-                        <button
-                            v-for="opt in SUBTITLE_OPTIONS"
-                            :key="opt.value"
-                            type="button"
-                            class="tag media-option"
-                            :class="[subtitleClass(opt.value), { 'is-on': video.subtitleState === opt.value }]"
-                            :title="SUBTITLE_STATES[opt.value]?.long"
-                            :aria-pressed="video.subtitleState === opt.value"
-                            @click="markSource('subtitle', opt.value)"
-                        >{{ opt.label }}</button>
-                    </div>
-                    <div class="info-row-media">
-                        <span class="media-label">广告水印：</span>
-                        <button
-                            v-for="opt in WATERMARK_OPTIONS"
-                            :key="opt.value"
-                            type="button"
-                            class="tag media-option"
-                            :class="[watermarkClass(opt.value), { 'is-on': video.watermarkState === opt.value }]"
-                            :title="WATERMARK_STATES[opt.value]?.long"
-                            :aria-pressed="video.watermarkState === opt.value"
-                            @click="markSource('watermark', opt.value)"
-                        >{{ opt.label }}</button>
-                    </div>
-                    <div class="info-row-media">
-                        <span class="media-label">分辨率：</span>
-                        <span v-if="video.resH" class="tag tag--info">{{ video.resW }}×{{ video.resH }}</span>
-                        <span v-else class="media-unknown">未扫描</span>
-                        <button
-                            type="button"
-                            class="tag media-option"
-                            :disabled="scanning"
-                            title="读这个视频文件的容器头量宽高（只读文件，不改文件；字幕和广告水印由你自己标）"
-                            @click="scanThis"
-                        >{{ scanning ? '扫描中…' : '扫描' }}</button>
-                        <span v-if="!video.resH" class="media-unknown">点「扫描」量一次</span>
-                    </div>
-                    <!-- 只读元数据。填写都在「编辑」对话框里：详情页是看片的地方，
-                         输入框混在信息区里既容易误改，也让这一屏看起来像没排完 -->
-                    <dl v-if="video.originalName || video.releaseDate || studios.length" class="meta-grid">
-                        <template v-if="video.originalName"><dt>原名</dt><dd>{{ video.originalName }}</dd></template>
-                        <template v-if="video.releaseDate"><dt>发行</dt><dd>{{ video.releaseDate }}</dd></template>
-                        <template v-if="studios.length">
-                            <dt>片商</dt>
-                            <dd>{{ studios.map((x) => x.name).join(' · ') }}</dd>
-                        </template>
-                    </dl>
-                    <div class="info-row-media">
-                        <span class="media-label">标签：</span>
-                        <TokenPicker
-                            v-model="tagPicked"
-                            :options="tagOptions"
-                            placeholder="输入题材标签"
-                            chip-class="tag--info"
-                            @change="saveTags"
-                        />
-                    </div>
-                    <!-- 合辑导航：一部片是几部片子剪在一起时，从这里跳别部，不用回列表搜 -->
-                    <div v-for="g in groups" :key="g.id" class="info-row-media">
-                        <span class="media-label">合辑：</span>
-                        <router-link
-                            v-for="p in g.peers"
-                            :key="p.id"
-                            class="tag group-peer"
-                            :class="{ 'is-current': p.id === video.id }"
-                            :to="`/video/${p.id}`"
-                        >{{ p.code || p.name }}</router-link>
-                        <button type="button" class="tag media-option" @click="leaveGroup(g.id)">移出本组</button>
-                    </div>
-                    <div class="info-row-media">
-                        <span class="media-label">关联：</span>
-                        <template v-if="joining">
-                            <input
-                                v-model="groupName"
-                                class="input meta-input"
-                                placeholder="合辑名，回车加入"
-                                @keyup.enter="joinGroup"
-                                @keyup.esc="joining = false"
-                            />
-                            <button type="button" class="tag media-option" @click="joinGroup">加入</button>
-                            <button type="button" class="tag media-option" @click="joining = false">取消</button>
-                        </template>
-                        <button v-else type="button" class="tag media-option" @click="joining = true">加入合辑…</button>
-                    </div>
-                    <div class="info-row3" v-if="video.seriesName">
-                        <span>系列：</span>
-                        <a :key="video.seriesId" class="actor-link" @click="goToSeries(video.seriesId)">{{ video.seriesName }}</a>
-                    </div>
-                    <div class="info-row4" v-if="actors.length > 0">
-                        <span>参演演员：</span>
-                        <a
-                            v-for="actor in actors"
-                            :key="actor.id"
-                            class="actor-link"
-                            @click="goToActor(actor.id)"
-                        >{{ actor.name }}</a>
+                    <!-- 信息区统一成「定宽标签 + 值」两列一行的清单，标签一律不带冒号。
+                         顺序按关联度分三档：这一版片源 → 内容与合辑 → 档案（含演员年龄） -->
+                    <div class="kv-list">
+                        <div class="kv">
+                            <span class="kv__k">字幕</span>
+                            <div class="kv__v">
+                                <button
+                                    v-for="opt in SUBTITLE_OPTIONS"
+                                    :key="opt.value"
+                                    type="button"
+                                    class="tag media-option"
+                                    :class="[subtitleClass(opt.value), { 'is-on': video.subtitleState === opt.value }]"
+                                    :title="SUBTITLE_STATES[opt.value]?.long"
+                                    :aria-pressed="video.subtitleState === opt.value"
+                                    @click="markSource('subtitle', opt.value)"
+                                >{{ opt.label }}</button>
+                            </div>
+                        </div>
+                        <!-- 再点一次当前值就是清掉这一维，所以不做单独的"清除"按钮 -->
+                        <div class="kv">
+                            <span class="kv__k">广告水印</span>
+                            <div class="kv__v">
+                                <button
+                                    v-for="opt in WATERMARK_OPTIONS"
+                                    :key="opt.value"
+                                    type="button"
+                                    class="tag media-option"
+                                    :class="[watermarkClass(opt.value), { 'is-on': video.watermarkState === opt.value }]"
+                                    :title="WATERMARK_STATES[opt.value]?.long"
+                                    :aria-pressed="video.watermarkState === opt.value"
+                                    @click="markSource('watermark', opt.value)"
+                                >{{ opt.label }}</button>
+                            </div>
+                        </div>
+                        <div class="kv">
+                            <span class="kv__k">分辨率</span>
+                            <div class="kv__v">
+                                <span v-if="video.resH" class="tag tag--info">{{ video.resW }}×{{ video.resH }}</span>
+                                <span v-else class="media-unknown">未扫描</span>
+                                <button
+                                    type="button"
+                                    class="tag media-option"
+                                    :disabled="scanning"
+                                    title="读这个视频文件的容器头量宽高（只读文件，不改文件；字幕和广告水印由你自己标）"
+                                    @click="scanThis"
+                                >{{ scanning ? '扫描中…' : '扫描' }}</button>
+                            </div>
+                        </div>
+                        <div class="kv">
+                            <span class="kv__k">标签</span>
+                            <div class="kv__v kv__v--ctl">
+                                <TokenPicker
+                                    v-model="tagPicked"
+                                    :options="tagOptions"
+                                    placeholder="选择或输入题材标签"
+                                    chip-class="tag--info"
+                                    @change="saveTags"
+                                />
+                            </div>
+                        </div>
+                        <!-- 合辑导航：一部片是几部片子剪在一起时，从这里跳别部，不用回列表搜 -->
+                        <div v-for="g in groups" :key="g.id" class="kv">
+                            <span class="kv__k">合辑</span>
+                            <div class="kv__v">
+                                <router-link
+                                    v-for="p in g.peers"
+                                    :key="p.id"
+                                    class="tag group-peer"
+                                    :class="{ 'is-current': p.id === video.id }"
+                                    :to="`/video/${p.id}`"
+                                >{{ p.code || p.name }}</router-link>
+                                <button type="button" class="tag media-option" @click="leaveGroup(g.id)">移出本组</button>
+                            </div>
+                        </div>
+                        <div class="kv">
+                            <span class="kv__k">加入合辑</span>
+                            <div class="kv__v">
+                                <template v-if="joining">
+                                    <input
+                                        v-model="groupName"
+                                        class="input meta-input"
+                                        placeholder="合辑名，回车加入"
+                                        @keyup.enter="joinGroup"
+                                        @keyup.esc="joining = false"
+                                    />
+                                    <button type="button" class="tag media-option" @click="joinGroup">加入</button>
+                                    <button type="button" class="tag media-option" @click="joining = false">取消</button>
+                                </template>
+                                <button v-else type="button" class="tag media-option" @click="joining = true">加入合辑…</button>
+                            </div>
+                        </div>
+                        <!-- 以下都是只读档案，填写在「编辑」对话框里：详情页是看片的地方，
+                             输入框混在信息区里既容易误改，也让这一屏看起来像没排完 -->
+                        <div v-if="video.originalName" class="kv">
+                            <span class="kv__k">原名</span>
+                            <div class="kv__v">{{ video.originalName }}</div>
+                        </div>
+                        <div v-if="video.releaseDate" class="kv">
+                            <span class="kv__k">发行</span>
+                            <div class="kv__v">{{ video.releaseDate }}</div>
+                        </div>
+                        <div v-if="studios.length" class="kv">
+                            <span class="kv__k">片商</span>
+                            <div class="kv__v">{{ studios.map((x) => x.name).join(' · ') }}</div>
+                        </div>
+                        <div v-if="video.seriesName" class="kv">
+                            <span class="kv__k">系列</span>
+                            <div class="kv__v">
+                                <a :key="video.seriesId" class="actor-link" @click="goToSeries(video.seriesId)">{{ video.seriesName }}</a>
+                            </div>
+                        </div>
+                        <div v-if="actors.length" class="kv">
+                            <span class="kv__k">演员</span>
+                            <div class="kv__v">
+                                <a
+                                    v-for="actor in actors"
+                                    :key="actor.id"
+                                    class="actor-link"
+                                    :title="actor.birthdate ? `${actor.birthdate} 出生` : ''"
+                                    @click="goToActor(actor.id)"
+                                >
+{{ actor.name }}<em v-if="ageAt(video.releaseDate, actor.birthdate)" class="actor-age">{{ ageAt(video.releaseDate, actor.birthdate) }} 岁</em>
+</a>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -192,7 +218,7 @@ import { videoApi } from '@/scripts/api'
 import { useUiStore, errText } from '@/scripts/store/ui'
 import AddVideoDialog from '@/views/components/AddVideoDialog.vue'
 import VideoCard from '@/views/components/VideoCard.vue'
-import { formatSize } from '@/scripts/utils/format'
+import { formatSize, ageAt } from '@/scripts/utils/format'
 import {
     SUBTITLE_STATES, WATERMARK_STATES, SUBTITLE_OPTIONS, WATERMARK_OPTIONS,
     subtitleClass, watermarkClass
@@ -945,16 +971,6 @@ const handleLike = async () => {
     color: var(--text-dim);
 }
 
-.info-row3,
-.info-row4 {
-    display: flex;
-    align-items: baseline;
-    flex-wrap: wrap;
-    gap: 6px;
-    font-size: var(--f-md);
-    color: var(--text-dim);
-}
-
 .actor-link {
     color: var(--info);
     cursor: pointer;
@@ -964,20 +980,57 @@ const handleLike = async () => {
     text-decoration: underline;
 }
 
-/* 片源标记 */
-.info-row-media {
+/* ==================== 信息清单 ====================
+   一行一项：标签列定宽，所以所有行落在同一条竖线上；标签一律不带冒号，
+   字号统一 --f-sm，可点与否只靠 hover 区分 */
+.kv-list {
     display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-wrap: wrap;
+    flex-direction: column;
+    gap: var(--s2);
+}
+
+.kv {
+    display: grid;
+    grid-template-columns: 5em minmax(0, 1fr);
+    gap: var(--s2);
+    align-items: baseline;
     font-size: var(--f-sm);
 }
 
-.media-label {
+.kv__k {
     color: var(--text-faint);
+    white-space: nowrap;
 }
 
-/* 芯片外形走全局 .tag，这里只补"可点选择"这一层交互态 */
+.kv__v {
+    display: flex;
+    align-items: center;
+    gap: var(--s1);
+    flex-wrap: wrap;
+    min-width: 0;
+    color: var(--text-dim);
+    overflow-wrap: anywhere;
+}
+
+/* 标签选择器占满整条值列，输入框才和编辑对话框里的「所属系列」一样宽 */
+.kv__v--ctl {
+    align-items: flex-start;
+}
+
+.kv__v--ctl :deep(.picker) {
+    flex: 1;
+    min-width: 0;
+}
+
+/* 加入合辑的行内输入：定高走 token，宽度跟着值列走，别用全局 .input 的 100% */
+.meta-input {
+    flex: 1;
+    min-width: 160px;
+    height: var(--ctl-h-sm);
+    font-size: var(--f-sm);
+}
+
+/* 片源标记 */
 .media-option {
     border-color: var(--border);
     color: var(--text-dim);
@@ -997,24 +1050,15 @@ const handleLike = async () => {
     font-size: var(--f-xs);
 }
 
-/* 只读元数据：标签列定宽对齐，值长的原名自己换行 */
-.meta-grid {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    gap: var(--s1) var(--s3);
-    margin: 0;
-    font-size: var(--f-sm);
-}
-
-.meta-grid dt {
+/* 发行时年龄：跟在姓名后面的次要文本，不抢演员链接的视觉重心 */
+.actor-age {
+    font-style: normal;
+    font-size: var(--f-xs);
     color: var(--text-faint);
-    white-space: nowrap;
 }
 
-.meta-grid dd {
-    margin: 0;
-    color: var(--text-dim);
-    overflow-wrap: anywhere;
+.actor-age::before {
+    content: ' · ';
 }
 
 /* 合辑导航：当前这部高亮，其余可点跳转 */

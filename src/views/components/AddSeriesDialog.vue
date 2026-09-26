@@ -33,7 +33,7 @@
         </div>
 
         <!-- 地区：既能在已有值里搜，也能手填一个新值 -->
-        <!-- 可选值来自系统设置的规范列表，这里只做选择；要新增取值去 设置 → 数据源 -->
+        <!-- 可选值来自系统设置的规范列表，这里只做选择；要新增取值去 设置 → 地区与分类 -->
         <label class="field">
           <span class="field__label">地区</span>
           <SelectList v-model="form.country" :options="countryOptions" all-label="（无地区）" label="选择地区" />

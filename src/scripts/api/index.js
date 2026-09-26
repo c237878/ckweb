@@ -126,6 +126,12 @@ export const scrapeApi = {
   applyChannel: (id, entityId) => api.post(`/scrape/channel/${id}/apply`, null, { params: { entityId } })
 }
 
+// AI 接口（MCP）：设置页只用得到查状态与换密钥，工具调用是大模型自己的事
+export const mcpApi = {
+  status: () => api.get('/mcp/status'),
+  rotateKey: () => api.post('/mcp/key')
+}
+
 // 片商词表
 export const studioApi = {
   getList: (params) => api.get('/studio', { params }),

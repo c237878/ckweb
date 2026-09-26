@@ -15,11 +15,16 @@
       >&times;</button>
     </span>
 
-    <span class="picker__input-wrap">
+    <!-- 控件本体单独一层 .dropdown：浮层要贴着输入框翻，不能被上面那排胶囊顶偏 -->
+    <span ref="ctlEl" class="picker__ctl dropdown">
       <input
         v-model="draft"
-        class="input picker__input"
+        class="input"
+        type="text"
+        role="combobox"
+        aria-autocomplete="list"
         :placeholder="placeholder"
+        :aria-expanded="open ? 'true' : 'false'"
         autocomplete="off"
         @focus="open = true"
         @input="open = true"
@@ -27,26 +32,31 @@
         @keydown.up.prevent="move(-1)"
         @keydown.enter.prevent="pick(active >= 0 ? matches[active] : null)"
         @keydown.esc="open = false"
-        @blur="closeSoon"
+        @blur="onBlur"
       />
       <!-- 自己画下拉而不是用 datalist：浏览器给 datalist 弹的是系统浅色面板，暗色主题下像另一个网站 -->
-      <ul v-if="open && matches.length" class="picker__list" role="listbox">
+      <ul v-if="open" ref="menuEl" class="dropdown-menu" role="listbox">
         <li
           v-for="(m, i) in matches"
           :key="m.id"
-          :class="{ 'is-active': i === active }"
+          class="dropdown-option"
+          :class="{ 'is-hl': i === active }"
           role="option"
           :aria-selected="i === active"
           @mousedown.prevent="pick(m)"
+          @mouseenter="active = i"
         >
-          {{ m.name }}
+{{ m.name }}
           <span v-if="m.hint" class="picker__hint">{{ m.hint }}</span>
+        </li>
+        <li v-if="!matches.length" class="dropdown-empty">
+{{ draft.trim() ? (allowCreate ? '回车新建，或换个关键词' : '词表里没有这个词') : '词表是空的' }}
         </li>
       </ul>
     </span>
 
     <button
-      v-if="draft.trim() && !exactMatch"
+      v-if="allowCreate && draft.trim() && !exactMatch"
       type="button"
       class="tag picker__new"
       @mousedown.prevent="createNew"
@@ -57,7 +67,8 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
+import { autoFitDropdown } from '@/scripts/utils/dropdownFit'
 
 const props = defineProps({
   /** 已选中的条目：[{id, name, …}]，id 为空串表示"词表里还没有、提交时由后端建" */
@@ -74,6 +85,25 @@ const emit = defineEmits(['update:modelValue', 'change'])
 const draft = ref('')
 const open = ref(false)
 const active = ref(-1)
+const ctlEl = ref(null)
+const menuEl = ref(null)
+
+// 面板会被 .dialog__body / .info-grid 的滚动容器裁掉，和 ComboBox 用同一套自适应
+let stopFit = null
+
+watch(open, (expanded) => {
+  if (!expanded) {
+    stopFit?.()
+    stopFit = null
+    return
+  }
+  nextTick(() => {
+    stopFit?.()
+    stopFit = autoFitDropdown(menuEl.value, ctlEl.value)
+  })
+})
+
+onUnmounted(() => stopFit?.())
 
 const norm = (s) => (s || '').trim().toLowerCase()
 
@@ -125,8 +155,12 @@ const move = (step) => {
   active.value = (active.value + step + matches.value.length) % matches.value.length
 }
 
-// blur 先到、点击后到：立刻收起来就点不到候选项了
-const closeSoon = () => setTimeout(() => { open.value = false }, 120)
+watch(matches, () => { active.value = -1 })
+
+const onBlur = () => {
+  // 用 nextTick 让 mousedown.prevent 的选项点击先完成，否则点了也选不上
+  nextTick(() => { open.value = false })
+}
 </script>
 
 <style scoped>
@@ -138,73 +172,44 @@ const closeSoon = () => setTimeout(() => { open.value = false }, 120)
   min-width: 0;
 }
 
+.picker__ctl {
+  flex: 1;
+  min-width: 168px;
+}
+
 .picker__chip {
   /* 可移除的胶囊：右侧留一个 × 的位置，其余外观跟全局 .tag 一致 */
-  padding-right: 2px;
+  gap: var(--s1);
+  padding-right: var(--ctl-pad-x-xs);
 }
 
 .picker__x {
-  border: 0;
-  background: none;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--rp);
   color: inherit;
-  cursor: pointer;
-  font-size: 14px;
+  font-size: var(--f-md);
   line-height: 1;
-  padding: 0 3px;
   opacity: .6;
-}
-
-.picker__x:hover { opacity: 1; }
-
-.picker__input-wrap {
-  position: relative;
-  display: inline-flex;
-}
-
-.picker__input {
-  width: 168px;
-  height: var(--ctl-h-xs);
-  font-size: var(--f-xs);
-}
-
-.picker__list {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  z-index: 20;
-  min-width: 100%;
-  margin: 0;
-  padding: var(--s1) 0;
-  list-style: none;
-  background: var(--bg-elev);
-  border: 1px solid var(--border);
-  border-radius: var(--r2);
-  box-shadow: var(--shadow-1);
-}
-
-.picker__list li {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--s3);
-  padding: 3px var(--s3);
-  font-size: var(--f-xs);
-  white-space: nowrap;
   cursor: pointer;
 }
 
-.picker__list li.is-active,
-.picker__list li:hover {
-  background: var(--bg-elev-2);
-  color: var(--accent);
+.picker__x:hover {
+  opacity: 1;
+  background: var(--bg-hover);
 }
 
+/* 选项行右端那一点补充信息（几部片 / 别名匹配），走 .meta 的次要文本口径 */
 .picker__hint {
+  margin-left: auto;
+  font-size: var(--f-xs);
   color: var(--text-faint);
 }
 
 .picker__new {
   color: var(--accent);
-  border-color: var(--border);
   cursor: pointer;
 }
 </style>

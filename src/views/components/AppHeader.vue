@@ -62,7 +62,7 @@ const navItems = [
   { to: '/comics', label: '漫画' },
   { to: '/likes', label: '点赞' },
   { to: '/highlights', label: '艳图' },
-  { to: '/metadata', label: '词表' },
+  // 词表、抓取通道这类配置项不进顶部菜单，统一从 设置 进
   { to: '/settings', label: '设置' }
 ]
 </script>

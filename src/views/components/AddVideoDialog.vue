@@ -55,10 +55,9 @@
               v-model="form.releaseDate"
               class="input"
               type="text"
-              placeholder="2024-03-15"
+              placeholder="2024-03-15，只到年月就写 2024-03"
               maxlength="10"
             />
-            <p class="hint">只到年月就写 2024-03，别补 01 号</p>
           </div>
         </div>
 
@@ -67,14 +66,14 @@
           <TokenPicker
             v-model="studioPicked"
             :options="studioOptions"
-            placeholder="输入片商名，回车添加"
+            placeholder="选择或输入片商名称"
           />
-          <p class="hint">词表里没有的名字会顺手建一家；要改名或合并去 词表 → 片商。</p>
+          <p class="hint">词表里没有的名字会顺手建一家；改名、合并、补别名去 设置 → 标签与片商。</p>
         </div>
 
         <div class="row row--two">
           <!-- 地区 / 分类的可选值来自系统设置的规范列表，这里只做选择；
-               要新增取值去 设置 → 数据源 -->
+               要新增取值去 设置 → 地区与分类 -->
           <label class="field">
             <span class="field__label">地区</span>
             <SelectList v-model="form.country" :options="countryOptions" label="选择地区" />
@@ -273,6 +272,7 @@ import { autoFitDropdown } from '@/scripts/utils/dropdownFit'
 import Dialog from './Dialog.vue'
 import ComboBox from './ComboBox.vue'
 import SelectList from './SelectList.vue'
+import TokenPicker from './TokenPicker.vue'
 import { toOptions } from '@/scripts/utils/options'
 
 const props = defineProps({

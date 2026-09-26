@@ -1,29 +1,30 @@
 <template>
-  <div class="page meta-lists">
-    <div class="page-header">
-      <h1 class="page-title">词表管理</h1>
-      <div class="header-actions">
-        <div class="tabs" role="tablist">
-          <button
-            v-for="t in TABS"
-            :key="t.key"
-            role="tab"
-            class="tag tab"
-            :class="{ 'is-on': tab === t.key }"
-            :aria-selected="tab === t.key"
-            @click="switchTab(t.key)"
-          >
-            {{ t.label }}
-            <span v-if="t.key === 'pending' && pendingCount" class="tab__badge">{{ pendingCount }}</span>
-          </button>
-        </div>
+  <div class="meta-lists" :class="embedded ? 'meta-lists--embedded' : 'page'">
+    <div class="meta-lists__head">
+      <h1 v-if="!embedded" class="page-title">词表管理</h1>
+      <div class="tabs" role="tablist">
+        <button
+          v-for="t in TABS"
+          :key="t.key"
+          role="tab"
+          class="tag tab"
+          :class="{ 'is-on': tab === t.key }"
+          :aria-selected="tab === t.key"
+          @click="switchTab(t.key)"
+        >
+          {{ t.label }}
+          <span v-if="t.key === 'pending' && pendingCount" class="tab__badge">{{ pendingCount }}</span>
+        </button>
       </div>
     </div>
 
-    <!-- 新建：标签与片商共用一条输入 -->
+    <!-- 新建：标签只缺一个名字，行内输入就够；片商有四个字段，走对话框 -->
     <div v-if="tab !== 'pending'" class="filters">
-      <input v-model="newName" class="input grow" :placeholder="tab === 'tag' ? '新标签名' : '新片商名'" @keyup.enter="create" />
-      <button class="btn btn--sm btn--primary" :disabled="!newName.trim() || busy" @click="create">添加</button>
+      <template v-if="tab === 'tag'">
+        <input v-model="newName" class="input grow" placeholder="新标签名" @keyup.enter="create" />
+        <button class="btn btn--sm btn--primary" :disabled="!newName.trim() || busy" @click="create">添加</button>
+      </template>
+      <button v-else class="btn btn--sm btn--primary" @click="openStudio(null)">添加片商</button>
       <input
         v-model="keyword"
         class="input grow"
@@ -66,25 +67,21 @@
     <!-- 片商词表 -->
     <table v-else-if="tab === 'studio'" class="grid-table">
       <thead>
-        <tr><th>片商</th><th>别名</th><th class="num">影片</th><th class="ops">操作</th></tr>
+        <tr><th>片商</th><th>别名</th><th>国家</th><th>官网</th><th class="num">影片</th><th class="ops">操作</th></tr>
       </thead>
       <tbody>
         <tr v-for="s in rows" :key="s.id">
-          <td>
-            <input v-if="editing === s.id" v-model="editName" class="input input--sm" @keyup.enter="saveEdit(s)" />
-            <span v-else>{{ s.name }}</span>
-          </td>
+          <td>{{ s.name }}</td>
           <td class="dim">{{ s.aliases.join('、') || '—' }}</td>
+          <td class="dim">{{ s.country || '—' }}</td>
+          <td>
+            <a v-if="s.link" class="link" :href="s.link" target="_blank" rel="noreferrer">官网</a>
+            <span v-else class="dim">—</span>
+          </td>
           <td class="num">{{ s.videoCount }}</td>
           <td class="ops">
-            <template v-if="editing === s.id">
-              <button class="btn btn--sm" @click="saveEdit(s)">存</button>
-              <button class="btn btn--sm btn--ghost" @click="editing = ''">取消</button>
-            </template>
-            <template v-else>
-              <button class="btn btn--sm btn--ghost" @click="startEdit(s)">改名</button>
-              <button class="btn btn--sm btn--danger" @click="askDelete(s)">删除</button>
-            </template>
+            <button class="btn btn--sm btn--ghost" @click="openStudio(s)">编辑</button>
+            <button class="btn btn--sm btn--danger" @click="askDelete(s)">删除</button>
           </td>
         </tr>
       </tbody>
@@ -115,17 +112,73 @@
     </div>
 
     <Pagination v-if="tab !== 'pending'" v-model:page="page" :page-size="pageSize" :total="total" @change="load" />
+
+    <!-- 片商表单：正名 + 别名 + 国家 + 官网，四个字段一起给，
+         因为抓取通道只会填正名，剩下的补齐只能在这里 -->
+    <Dialog
+      :visible="showStudio"
+      :title="editingStudio ? `编辑片商「${editingStudio.name}」` : '添加片商'"
+      size="sm"
+      @cancel="showStudio = false"
+    >
+      <template #content>
+        <div class="form">
+          <div class="field">
+            <label for="st-name">正名 <span class="req">*</span></label>
+            <input id="st-name" v-model="studioForm.name" class="input" maxlength="60" placeholder="如：プレステージ" />
+          </div>
+          <div class="field">
+            <span class="field__label">别名</span>
+            <ChipListEditor
+              v-model="studioForm.aliases"
+              label="片商别名"
+              placeholder="如：Prestige、マドンナ社，回车添加"
+              empty-text="暂无别名"
+              hint="搜索与抓取归一时别名也算命中；与正名重复的会被自动丢掉"
+            />
+          </div>
+          <div class="field">
+            <span class="field__label">国家</span>
+            <SelectList
+              v-model="studioForm.country"
+              :options="countryOptions"
+              label="选择国家"
+              all-label="（未填）"
+              placeholder="选择国家"
+            />
+          </div>
+          <div class="field">
+            <label for="st-link">官网</label>
+            <input id="st-link" v-model="studioForm.link" class="input" maxlength="300" placeholder="https://…（可留空）" />
+          </div>
+        </div>
+      </template>
+
+      <!-- 自带确认按钮会先关窗再发事件，名称为空时人就跑了，所以自己放一对 -->
+      <template #actions>
+        <button type="button" class="btn" @click="showStudio = false">取消</button>
+        <button type="button" class="btn btn--primary" :disabled="busy || !studioForm.name.trim()" @click="saveStudio">
+          {{ busy ? '保存中…' : '保存' }}
+        </button>
+      </template>
+    </Dialog>
   </div>
 </template>
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { tagApi, studioApi } from '@/scripts/api'
+import { tagApi, studioApi, actorApi } from '@/scripts/api'
 import { useAppStore } from '@/scripts/store/app'
 import { useUiStore, errText } from '@/scripts/store/ui'
+import { toOptions } from '@/scripts/utils/options'
 import { debounce } from '@/scripts/utils/debounce'
 import Pagination from '@/views/components/Pagination.vue'
 import SelectList from '@/views/components/SelectList.vue'
+import ChipListEditor from '@/views/components/ChipListEditor.vue'
+import Dialog from '@/views/components/Dialog.vue'
+
+/** 嵌进设置页时不要自己的页头与页面级留白，只留标签条和表格 */
+defineProps({ embedded: { type: Boolean, default: false } })
 
 const TABS = [
   { key: 'tag', label: '题材标签' },
@@ -197,8 +250,7 @@ const create = async () => {
   if (!name) return
   busy.value = true
   try {
-    const api = tab.value === 'tag' ? tagApi : studioApi
-    const res = await api.add({ name })
+    const res = await tagApi.add({ name })
     if (res.success) {
       newName.value = ''
       ui.success(res.message)
@@ -219,8 +271,7 @@ const startEdit = (row) => {
 const saveEdit = async (row) => {
   const name = editName.value.trim()
   if (!name || name === row.name) return (editing.value = '')
-  const api = tab.value === 'tag' ? tagApi : studioApi
-  const res = await api.update(row.id, { name })
+  const res = await tagApi.update(row.id, { name })
   if (res.success) { editing.value = ''; ui.success(res.message); load() } else ui.error(res.message || '没改')
 }
 
@@ -276,6 +327,65 @@ const reject = async (sg) => {
   if (res.success) loadSuggestions()
 }
 
+/* ---------------------------------------------------------------
+   片商表单
+   --------------------------------------------------------------- */
+
+const showStudio = ref(false)
+const editingStudio = ref(null)
+const studioForm = ref({ name: '', aliases: [], country: '', link: '' })
+const countries = ref([])
+
+const countryOptions = computed(() => toOptions(countries.value, studioForm.value.country))
+
+/** 只填了个 example.com 也要能点：缺协议就补 https://，否则链接会指向本站 */
+const withScheme = (value) => {
+  const v = (value || '').trim()
+  return v && !/^https?:\/\//i.test(v) ? `https://${v}` : v
+}
+
+const openStudio = async (row) => {
+  editingStudio.value = row || null
+  studioForm.value = row
+    ? { name: row.name, aliases: [...(row.aliases || [])], country: row.country || '', link: row.link || '' }
+    : { name: '', aliases: [], country: '', link: '' }
+  showStudio.value = true
+  if (!countries.value.length) {
+    try {
+      const res = await actorApi.getCountries()
+      if (res.success) countries.value = res.data || []
+    } catch (err) {
+      console.error('加载国家清单失败:', err)
+    }
+  }
+}
+
+const saveStudio = async () => {
+  const name = studioForm.value.name.trim()
+  if (!name) return ui.warn('片商名不能为空')
+  busy.value = true
+  try {
+    const payload = {
+      name,
+      aliases: studioForm.value.aliases,
+      country: studioForm.value.country,
+      link: withScheme(studioForm.value.link)
+    }
+    const res = editingStudio.value
+      ? await studioApi.update(editingStudio.value.id, payload)
+      : await studioApi.add(payload)
+    if (res.success) {
+      showStudio.value = false
+      ui.success(res.message)
+      load()
+    } else ui.warn(res.message || '没保存')
+  } catch (err) {
+    ui.error('保存失败：' + errText(err))
+  } finally {
+    busy.value = false
+  }
+}
+
 onMounted(async () => {
   await load()
   // 角标要在别的标签页也看得见，所以进页面先摸一次待审数
@@ -289,6 +399,19 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: var(--s4);
+}
+
+/* 独立成页时靠 .page 的留白，嵌进设置分区就贴着面板自己的间距 */
+.meta-lists--embedded {
+  gap: var(--s3);
+}
+
+.meta-lists__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+  flex-wrap: wrap;
 }
 
 .tabs {
@@ -313,6 +436,16 @@ onMounted(async () => {
   background: var(--warn);
   color: var(--text-on-accent);
   font-size: 10px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+}
+
+.req {
+  color: var(--danger);
 }
 
 .grid-table {
