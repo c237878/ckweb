@@ -189,24 +189,8 @@
           <ScrapeChannelsPanel />
         </section>
 
-        <!-- 词表：原先独立成 /metadata 挂在顶部菜单，但它属于配置，收进设置复用同一个组件。
-             标签与片商各占一个分区——两份词表管的东西不一样，混在一个标签条里来回找不如分开点 -->
-        <section
-          v-else-if="activeGroup === 'tags'"
-          id="panel-tags"
-          class="panel settings-group"
-          role="tabpanel"
-          aria-labelledby="tab-tags"
-          tabindex="-1"
-        >
-          <h2 class="section-title">题材标签</h2>
-          <p class="panel-desc">
-            标签只描述影片的内容特征，一部片可以挂好几个。词表只在这里增删；
-            AI 只能提候选，批准、并入、驳回都由你点。
-          </p>
-          <MetaLists embedded :tabs="['tag', 'pending']" />
-        </section>
-
+        <!-- 片商词表。原先与题材标签挤在同一个「词表」页/分区里，
+             两份词表管的东西不一样，各占一个分区点起来更直接 -->
         <section
           v-else-if="activeGroup === 'studios'"
           id="panel-studios"
@@ -220,7 +204,7 @@
             片商是发行一部片的那家，一部片只有一个，所以影片编辑里它和「所属系列」一样是单选。
             别名让搜索与抓取归一，国家取自「地区与分类」，官网是它自己的站点。
           </p>
-          <MetaLists embedded :tabs="['studio']" />
+          <StudioManager embedded />
         </section>
 
         <!-- AI 接口：端点、密钥、工具清单与打标口径，整块在组件里 -->
@@ -388,7 +372,7 @@ import { useAppStore } from '@/scripts/store/app'
 import { useUiStore } from '@/scripts/store/ui'
 import TaxonomyTable from '@/views/components/TaxonomyTable.vue'
 import ScrapeChannelsPanel from '@/views/components/ScrapeChannelsPanel.vue'
-import MetaLists from '@/views/pages/MetaLists.vue'
+import StudioManager from '@/views/pages/StudioManager.vue'
 import McpPanel from '@/views/components/McpPanel.vue'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -410,7 +394,6 @@ const GROUPS = [
   { id: 'media', label: '图片目录', desc: '艳图与演员海报使用的图片目录；影片扫描目录见「扫描目录」。' },
   { id: 'dirs', label: '扫描目录', desc: '导入影片、封面、字幕时从哪里找文件。' },
   { id: 'taxonomy', label: '地区与分类' },
-  { id: 'tags', label: '题材标签' },
   { id: 'studios', label: '片商' },
   { id: 'channels', label: '抓取通道', desc: '外部站点的查询地址、字段抽取规则，以及限速 / 每日配额 / 连续失败熔断。' },
   { id: 'mcp', label: 'AI 接口' },
@@ -420,7 +403,8 @@ const GROUPS = [
 /** content 一律按字符串提交（后端存的就是字符串），所以这里不能用 v-model.number */
 const settingsList = ref([
   { id: 'siteName', group: 'site', label: '网站名称', value: '', placeholder: '影视网站', hint: '显示在页头与浏览器标签' },
-  { id: 'pageSize', group: 'site', label: '每页数量', value: '', type: 'number', min: 1, max: 100, placeholder: '默认 24', hint: '各列表页每页显示的条数' },
+  { id: 'pageSize', group: 'site', label: '影片每页数量', value: '', type: 'number', min: 1, max: 100, placeholder: '默认 24', hint: '影片列表每页显示的条数' },
+  { id: 'personPageSize', group: 'site', label: '系列/演员每页数量', value: '', type: 'number', min: 1, max: 100, placeholder: '留空则与影片一致', hint: '系列与演员的卡片比影片小得多，一屏能放的条数不是一个量级' },
   { id: 'homePageCategories', group: 'site', label: '首页展示分类', value: '', placeholder: '多个分类用逗号分隔，留空显示全部', hint: '可选值见「地区与分类」' },
   { id: 'homePageCategoryCount', group: 'site', label: '首页分类数量', value: '', type: 'number', min: 1, max: 100, placeholder: '默认 12', hint: '每个分类/板块显示的数量，今日推荐也用这个值' },
   { id: 'posterDir', group: 'media', label: '艳图目录', value: '', placeholder: '如: /Volumes/disk1/posters' }

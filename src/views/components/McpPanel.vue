@@ -5,7 +5,7 @@
         <h3 class="panel-title">AI 接口（MCP）</h3>
         <p class="panel-desc">
           给本机大模型留的口子：一个 <code>/mcp</code> 端点 + <code>X-API-Key</code> 头。
-          读的工具多，写的只有一条路——提交候选标签，词表仍然只能由人扩。
+          目前全是只读——模型看得懂整个库，改不动整个库。
         </p>
       </div>
       <button class="btn btn--sm btn--primary" :disabled="busy" @click="rotate">
@@ -87,37 +87,12 @@
       </table>
     </div>
 
-    <div class="field">
-      <label for="mcp-rule">AI 打标口径</label>
-      <textarea
-        id="mcp-rule"
-        v-model="rule"
-        class="textarea"
-        rows="9"
-        placeholder="告诉大模型按什么标准提标签"
-      ></textarea>
-      <p class="hint">
-        这段文字挂在 tag_propose 的工具说明上，是大模型打标时唯一能读到的规则。
-        写清"从哪判断、一次几个、什么不算标签"，它就不会自己发明口径。
-      </p>
-      <div class="row-actions">
-        <button class="btn btn--sm btn--ghost" @click="copy('rule', rule)">
-          {{ copied === 'rule' ? '已复制' : '复制' }}
-        </button>
-        <button class="btn btn--sm btn--ghost" :disabled="rule === status.defaultRule" @click="rule = status.defaultRule">
-          填入默认
-        </button>
-        <button class="btn btn--sm btn--primary" :disabled="busy || rule === status.rule" @click="saveRule">
-          {{ busy ? '保存中…' : '保存口径' }}
-        </button>
-      </div>
-    </div>
   </div>
 </template>
 
 <script setup>
 import { computed, onUnmounted, ref } from 'vue'
-import { mcpApi, settingApi } from '@/scripts/api'
+import { mcpApi } from '@/scripts/api'
 import { useUiStore, errText } from '@/scripts/store/ui'
 import { copyText } from '@/scripts/utils/clipboard'
 
@@ -126,10 +101,9 @@ const ui = useUiStore()
 const loading = ref(true)
 const busy = ref(false)
 const error = ref('')
-const rule = ref('')
 const reveal = ref(false)
 const copied = ref('')
-const status = ref({ endpoint: '', key: '', enabled: false, tools: [], rule: '', defaultRule: '' })
+const status = ref({ endpoint: '', key: '', enabled: false, tools: [] })
 
 let copyTimer = null
 const flash = (which) => {
@@ -172,7 +146,6 @@ const load = async () => {
     const res = await mcpApi.status()
     if (!res?.success) throw new Error(res?.message || '加载失败')
     status.value = { tools: [], ...res.data }
-    rule.value = res.data.rule || ''
   } catch (err) {
     error.value = 'MCP 状态加载失败：' + errText(err)
   } finally {
@@ -205,22 +178,6 @@ const rotate = async () => {
       reveal.value = true
       ui.success(res.message)
     } else ui.error(res.message || '没生成')
-  } catch (err) {
-    ui.error('失败：' + errText(err))
-  } finally {
-    busy.value = false
-  }
-}
-
-const saveRule = async () => {
-  busy.value = true
-  try {
-    // 口径就是 system_settings 里的一条普通设置，不另开写入口
-    const res = await settingApi.save({ name: 'aiTagRule', content: rule.value })
-    if (res.success) {
-      status.value.rule = rule.value
-      ui.success('口径已保存，下一次工具调用就会带上')
-    } else ui.error(res.message || '没保存')
   } catch (err) {
     ui.error('失败：' + errText(err))
   } finally {

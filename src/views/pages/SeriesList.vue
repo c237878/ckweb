@@ -119,7 +119,7 @@ const selectedIds = ref([])
 
 const filters = ref({ country: '', sortBy: '' })
 
-const pageSize = computed(() => app.pageSize)
+const pageSize = computed(() => app.personPageSize)
 
 // 关键词单独不入库：下次进来仍是半截搜索很烦
 const hasActiveFilter = computed(

@@ -72,9 +72,9 @@ const routes = [
     component: LikeList
   },
   {
-    // 词表属于配置，收进设置页的「标签与片商」分区；老书签不能点开来是 404
+    // 词表属于配置，收进设置页的「片商」分区（题材标签已撤除）；老书签不能点开来是 404
     path: '/metadata',
-    redirect: { path: '/settings', query: { group: 'tags' } }
+    redirect: { path: '/settings', query: { group: 'studios' } }
   },
   {
     path: '/settings',

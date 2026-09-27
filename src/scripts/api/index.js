@@ -102,16 +102,9 @@ export const videoApi = {
   getRecentlyLiked: (count) => api.get('/video/recently-liked', { params: { count } }),
   getTopLiked: (count) => api.get('/video/top-liked', { params: { count } }),
   renameToCode: () => api.post('/video/rename-to-code'),
-  /** 整组替换标签（人工路径，允许顺手建新标签；AI 走 tagApi.propose） */
-  setTags: (id, names) => api.put(`/video/${id}/tags`, { names }),
   setLinks: (id, links) => api.put(`/video/${id}/links`, { links }),
   /** 只改原名与发行日期；整份 PUT /video/{id} 会连封面路径一起按传入值写，不敢用它 */
   setMeta: (id, body) => api.put(`/video/${id}/meta`, body),
-  joinGroup: (id, body) => api.post(`/video/${id}/groups`, body),
-  leaveGroup: (id, groupId) => api.delete(`/video/${id}/groups/${groupId}`),
-  setGroupPosition: (id, groupId, position) => api.put(`/video/${id}/groups/${groupId}/position`, { position }),
-  renameGroup: (groupId, name) => api.put(`/video/groups/${groupId}`, { name }),
-  deleteGroup: (groupId) => api.delete(`/video/groups/${groupId}`),
 }
 
 // 抓取通道：去哪查 / 怎么抽 / 要多礼貌，全在设置页里配
@@ -138,24 +131,6 @@ export const studioApi = {
   add: (data) => api.post('/studio', data),
   update: (id, data) => api.put(`/studio/${id}`, data),
   remove: (id) => api.delete(`/studio/${id}`)
-}
-
-// 题材标签：词表 + AI 候选队列
-export const tagApi = {
-  getList: (params) => api.get('/tag', { params }),
-  getVideos: (id, params) => api.get(`/tag/${id}/videos`, { params }),
-  add: (data) => api.post('/tag', data),
-  update: (id, data) => api.put(`/tag/${id}`, data),
-  remove: (id) => api.delete(`/tag/${id}`),
-  /** 批量删标签：一个事务里逐个摘挂接，语义与单条删除一致 */
-  batchDelete: (ids) => api.post('/tag/batch-delete', { ids }),
-  merge: (id, into) => api.post(`/tag/${id}/merge`, { into }),
-  suggestions: (params) => api.get('/tag/suggestions', { params }),
-  propose: (data) => api.post('/tag/suggestions', data),
-  /** 同一个候选词一次处理完：action = 'approve' | 'merge' | 'reject'，merge 才需要 tagId */
-  resolve: (name, action, tagId = null) => api.post('/tag/suggestions/by-name', { name, action, tagId }),
-  /** 逐条驳回只用于"这个词留着，但这一部片不算" */
-  reject: (id) => api.post(`/tag/suggestions/${id}/reject`)
 }
 
 // 演员相关API

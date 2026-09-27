@@ -29,7 +29,7 @@
                         <span class="tag tag--muted">{{ video.fileSize?formatSize(video.fileSize):'无文件' }}</span>
                     </div>
                     <!-- 信息区统一成「定宽标签 + 值」两列一行的清单，标签一律不带冒号。
-                         顺序按关联度分三档：这一版片源 → 内容与合辑 → 档案（含演员年龄） -->
+                         两档：这一版片源（字幕 / 水印 / 分辨率）→ 档案（含演员年龄） -->
                     <div class="kv-list">
                         <div class="kv">
                             <span class="kv__k">字幕</span>
@@ -74,49 +74,6 @@
                                     title="读这个视频文件的容器头量宽高（只读文件，不改文件；字幕和广告水印由你自己标）"
                                     @click="scanThis"
                                 >{{ scanning ? '扫描中…' : '扫描' }}</button>
-                            </div>
-                        </div>
-                        <div class="kv">
-                            <span class="kv__k">标签</span>
-                            <div class="kv__v kv__v--ctl">
-                                <TokenPicker
-                                    v-model="tagPicked"
-                                    :options="tagOptions"
-                                    placeholder="选择或输入题材标签"
-                                    chip-class="tag--info"
-                                    @change="saveTags"
-                                />
-                            </div>
-                        </div>
-                        <!-- 合辑导航：一部片是几部片子剪在一起时，从这里跳别部，不用回列表搜 -->
-                        <div v-for="g in groups" :key="g.id" class="kv">
-                            <span class="kv__k">合辑</span>
-                            <div class="kv__v">
-                                <router-link
-                                    v-for="p in g.peers"
-                                    :key="p.id"
-                                    class="tag group-peer"
-                                    :class="{ 'is-current': p.id === video.id }"
-                                    :to="`/video/${p.id}`"
-                                >{{ p.code || p.name }}</router-link>
-                                <button type="button" class="tag media-option" @click="leaveGroup(g.id)">移出本组</button>
-                            </div>
-                        </div>
-                        <div class="kv">
-                            <span class="kv__k">加入合辑</span>
-                            <div class="kv__v">
-                                <template v-if="joining">
-                                    <input
-                                        v-model="groupName"
-                                        class="input meta-input"
-                                        placeholder="合辑名，回车加入"
-                                        @keyup.enter="joinGroup"
-                                        @keyup.esc="joining = false"
-                                    />
-                                    <button type="button" class="tag media-option" @click="joinGroup">加入</button>
-                                    <button type="button" class="tag media-option" @click="joining = false">取消</button>
-                                </template>
-                                <button v-else type="button" class="tag media-option" @click="joining = true">加入合辑…</button>
                             </div>
                         </div>
                         <!-- 以下都是只读档案，填写在「编辑」对话框里：详情页是看片的地方，
@@ -223,8 +180,6 @@ import {
     SUBTITLE_STATES, WATERMARK_STATES, SUBTITLE_OPTIONS, WATERMARK_OPTIONS,
     subtitleClass, watermarkClass
 } from '@/scripts/constants'
-import { tagApi } from '@/scripts/api'
-import TokenPicker from '@/views/components/TokenPicker.vue'
 import { loadCkplayer } from '@/scripts/utils/ckplayer'
 
 const route = useRoute()
@@ -355,64 +310,8 @@ const markSource = async (dim, value) => {
 
 const scanning = ref(false)
 
-// ---------------------------------------------------------------- 元数据：原名 / 发行日期 / 片商 / 标签 / 合辑
+// ---------------------------------------------------------------- 元数据：原名 / 发行日期 / 片商
 
-const tagPicked = ref([])
-const tagOptions = ref([])
-const groups = ref([])
-
-/**
- * 详情回来的一次性状态灌进三个可编辑控件。
- * 只在加载时调用，不做双向绑定：绑了的话用户改到一半、后台刷新会把半截输入冲掉。
- */
-const applyMeta = (v) => {
-    tagPicked.value = (v.tags || []).map((t) => ({ id: t.id, name: t.name }))
-    groups.value = v.groups || []
-}
-
-/** 词表整个拉到前端过滤：片商几百、标签几百，比每敲一个字问一次后端便宜 */
-const loadVocab = async () => {
-    try {
-        const t = await tagApi.getList({ pageSize: 500 })
-        if (t.success) tagOptions.value = t.data || []
-    } catch (err) {
-        console.error('加载词表失败:', err)
-    }
-}
-
-const saveTags = async (list) => {
-    try {
-        const res = await videoApi.setTags(video.value.id, list.map((x) => x.name))
-        if (!res.success) { ui.error(res.message || '没保存'); return }
-        await loadVideo()
-        await loadVocab()
-        ui.success(res.message)
-    } catch (err) { ui.error('保存失败：' + errText(err)) }
-}
-
-// 合辑名用行内输入，不用 window.prompt：prompt 是系统浅色框，而且没法校验
-const joining = ref(false)
-const groupName = ref('')
-
-const joinGroup = async () => {
-    const name = groupName.value.trim()
-    if (!name) return
-    joining.value = false
-    groupName.value = ''
-    try {
-        const res = await videoApi.joinGroup(video.value.id, { name })
-        if (res.success) { await loadVideo(); ui.success(res.message) } else ui.error(res.message || '没成功')
-    } catch (err) { ui.error('没成功：' + errText(err)) }
-}
-
-const leaveGroup = async (groupId) => {
-    const go = await ui.confirm({ title: '移出合辑', message: '只是把本片从这个合辑里摘出来，合辑和里面的其他影片都不动。', confirmLabel: '移出' })
-    if (!go) return
-    try {
-        const res = await videoApi.leaveGroup(video.value.id, groupId)
-        if (res.success) { await loadVideo(); ui.success(res.message) } else ui.error(res.message || '没成功')
-    } catch (err) { ui.error('没成功：' + errText(err)) }
-}
 const scanThis = async () => {
     if (!video.value?.id || scanning.value) return
     scanning.value = true
@@ -641,8 +540,6 @@ const loadVideo = async () => {
             video.value = res.data.video || res.data
             actors.value = res.data.actors || []
             likeCount.value = res.data.likeCount || 0
-            applyMeta(video.value)
-
             // 初始化 ckplayer
             nextTick(async () => {
                 await initCkplayer()
@@ -1012,24 +909,6 @@ const handleLike = async () => {
     overflow-wrap: anywhere;
 }
 
-/* 标签选择器占满整条值列，输入框才和编辑对话框里的「所属系列」一样宽 */
-.kv__v--ctl {
-    align-items: flex-start;
-}
-
-.kv__v--ctl :deep(.picker) {
-    flex: 1;
-    min-width: 0;
-}
-
-/* 加入合辑的行内输入：定高走 token，宽度跟着值列走，别用全局 .input 的 100% */
-.meta-input {
-    flex: 1;
-    min-width: 160px;
-    height: var(--ctl-h-sm);
-    font-size: var(--f-sm);
-}
-
 /* 片源标记 */
 .media-option {
     border-color: var(--border);
@@ -1059,18 +938,6 @@ const handleLike = async () => {
 
 .actor-age::before {
     content: ' · ';
-}
-
-/* 合辑导航：当前这部高亮，其余可点跳转 */
-.group-peer {
-    cursor: pointer;
-}
-
-.group-peer.is-current {
-    border-color: currentColor;
-    color: var(--accent);
-    font-weight: 600;
-    pointer-events: none;
 }
 
 /* ==================== 右侧面板 ==================== */

@@ -373,9 +373,12 @@ onMounted(async () => {
   width: 84px;
 }
 
+/* 全局 img 有 max-width:100%，窄屏下表格把封面列压窄时定高会把图片压扁，
+   所以宽度可缩、高度交给宽高比（与卡片封面同一个 token） */
 .row-cover {
   width: 84px;
-  height: 56px;
+  height: auto;
+  aspect-ratio: var(--ratio-cover);
   object-fit: cover;
   border-radius: var(--r1);
   cursor: pointer;
@@ -386,7 +389,7 @@ onMounted(async () => {
   display: grid;
   place-items: center;
   width: 84px;
-  height: 56px;
+  aspect-ratio: var(--ratio-cover);
   border-radius: var(--r1);
   background: var(--bg-elev-2);
   color: var(--text-faint);

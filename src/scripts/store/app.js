@@ -25,6 +25,8 @@ export const useAppStore = defineStore('app', {
   state: () => ({
     siteName: '影视网站',
     pageSize: 12,
+    /** 系列 / 演员单独配的每页数量；0 表示没配过，走 getter 回落到 pageSize */
+    pageSizeSetting: 0,
     homeCategoryCount: 12,
     theme: readTheme(),
     loaded: false,
@@ -33,7 +35,12 @@ export const useAppStore = defineStore('app', {
 
   getters: {
     /** 主题切换按钮的提示文案 */
-    themeLabel: (state) => (state.theme === 'dark' ? '切换到亮色' : '切换到暗色')
+    themeLabel: (state) => (state.theme === 'dark' ? '切换到亮色' : '切换到暗色'),
+    /**
+     * 系列与演员列表的每页数量。卡片比影片小得多，一屏想看到的数量不是一回事，
+     * 但大多数人不会去动这个设置，所以没单独配过时回落到影片的每页数量。
+     */
+    personPageSize: (state) => (state.pageSizeSetting > 0 ? state.pageSizeSetting : state.pageSize)
   },
 
   actions: {
@@ -59,6 +66,8 @@ export const useAppStore = defineStore('app', {
         }
         const size = parseInt(map.pageSize, 10)
         this.pageSize = size > 0 ? size : 12
+        const personSize = parseInt(map.personPageSize, 10)
+        this.pageSizeSetting = personSize > 0 ? personSize : 0
         const homeSize = parseInt(map.homePageCategoryCount, 10)
         this.homeCategoryCount = homeSize > 0 ? homeSize : 12
         this.loaded = true

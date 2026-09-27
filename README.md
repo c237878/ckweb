@@ -117,7 +117,9 @@ v4 迁移把含 `http` 的简介逐条抽出（382 位演员 → 528 行，379 �
 **comics** — `id` `name` `author` `description` `url` `cover_path` `directory` `status`(0 连载中 / 1 完结) `ctime` `utime`
 **comic_chapters** — `id` `comic_id` `title` `directory` `sort_order` `image_count` `ctime`
 **scan_directories** — `id` `path` `category`(`视频`/`封面`/`字幕`) `ctime` `utime`
-**system_settings** — 名称/值 KV：`siteName` `pageSize` `posterDir` `homePageCategories` `homePageCategoryCount`
+**system_settings** — 名称/值 KV：`siteName` `pageSize` `personPageSize` `posterDir` `homePageCategories` `homePageCategoryCount` `countries` `categories` `mcpApiKey`
+**studios** — `id` `name`(UNIQUE) `country` `link` `ctime` `utime`；**studio_aliases** `(studio_id, alias)`；影片侧只有一列 `videos.studioid`
+**video_links** — `id` `video_id` `kind` `url`，影片的外部档案地址，与 `actor_links` 同构
 **friend_links** — `id` `name` `link` `logo` `description` `sortorder` `ctime` `utime`
 
 > schema v2 删除了取证确认零引用的 `videos.added_at`、`videos.utime`、`actors.avatar_path`、
@@ -466,9 +468,9 @@ JSON 接口，不去解析网页排版。抓回来的是事实字段（日期、
 - `force=true`（全站重扫）只在后端与接口文档里留着，界面不摆按钮：换过文件的正常走法是在详情页
   点「重置」清掉这一条，它就成了「未扫描」，下一次「扫描片源」自然把它带上（分辨率筛选里也有「未扫描」一档方便清点）。
 
-### 影片元数据结构（v8 原名 / 标签 / 合辑 / 档案链接；v9 片商收成单值）
+### 影片元数据结构（v9 片商收成单值；v10 撤除标签与合辑）
 
-对齐 TMDB 的结构位，但只落**能自己填上**的那几个；`media_images`、拆 `videos/video_files`
+对齐 TMDB 的结构位，但只落**用得起来**的那几个；`media_images`、拆 `videos/video_files`
 两条实测无数据支撑（每个番号恰好一张封面、重复番号 0 条），没做。
 
 - `videos.original_name` / `release_date`：现在的 `name` 其实是**中文译名**，不改列名（牵动一片代码），
@@ -482,41 +484,25 @@ JSON 接口，不去解析网页排版。抓回来的是事实字段（日期、
   所以实体与别名表留着，只是关系收成外键列。
   **保存时顺手补同系列**：`FillSeriesStudios` 把这家片商写进同系列**还没填片商**的影片（已有片商的绝不动，
   系列里混进别家时那些结论得留着），补了几部回在消息里，界面直接显示。清空只清自己。
-- **标签走受控词表**：`tags` + `tag_aliases` + `video_tags(video_id, tag_id, source)`。
-  `source` 分 `manual` / `ai`，这样"AI 打过还没复核"的能筛出来。
-  **AI 不许直接建标签**：`POST /api/tag/suggestions` 只能进 `tag_suggestions` 待审队列，
-  由人工「批准」（转正式标签）、「并入」（挂成已有标签的别名，下次这个词自动归一）或「驳回」。
-  放开词表的结局是"巨乳/爆乳/大胸"各管一摊，两年后按标签浏览废掉——所以口子收在接口上而不是提示词里。
-  待审是**按词处理不是按条处理**（`POST /api/tag/suggestions/by-name`）：同一个词常被几部片各提一条，
-  人判断的是"这个词要不要进词表"，与它来自哪部片无关，所以一次批准就把每一部都打上；
-  界面上一个词一行，只有"这个词留着、这一部不算"才用行内的单条驳回。
-- **关联合辑是分组不是连线**：`video_groups` + `video_group_items(group_id, video_id, position)`。
-  一个文件是几部片子剪在一起时它们天然是一组（两两连线 5 部要 10 条边），`position` 给上/中/下顺序，
-  一部片可同时属于多个组。与 `videos.seriesid` 不冲突：系列是官方续作线，组是他自己剪的合辑。
-  详情页每个组渲染成一排可点胶囊，当前这部高亮。
+  管理页在 设置 → 片商（`StudioManager.vue`，v10 起词表只剩这一份），对话框里正名 / 别名 / 国家 / 官网
+  四个字段一起给：国家取自「地区与分类」那份规范清单，官网缺协议会补 `https://`，否则点开来会跳回本站。
+  影片编辑里片商是**单选可搜**，与「所属系列」用同一个 `ComboBox`——同形就该同控件。
+- **题材标签与关联合辑整体撤除（v10）**：`tags` / `tag_aliases` / `video_tags` / `tag_suggestions` /
+  `video_groups` / `video_group_items` 六张表连同控制器、筛选、详情页区块、MCP 的打标工具一起删掉。
+  理由不是实现有问题，是收益撑不起成本：标签这套东西的前提是"有人按标签浏览"，而词表要人维护、
+  AI 提的候选要人审、近义词要人并入，每天在做的只有一个人；合辑则是库里一组都没建过。
+  撤除前有 pre-migration 快照（`/Volumes/disk1/Data/backup/ckplayer_*_pre-migration.db`），要回滚用它。
+  当年那三条设计结论（受控词表、AI 不许建词、按词批处理不按行）写在 git 历史与提交说明里，
+  将来若重做，仍然照那三条走。
 - `video_links`：影片的外部档案地址，与 `actor_links` 同构、共用 `Utils/Links` 的校验与归类。
   它同时是将来抓取的首选定位键——自己的数据已经指向档案时，抓取不用再搜一遍也不会认错片。
-- 词表管理在设置里**占两个分区**：「题材标签」（内含 词表 / AI 候选待审 两个标签，后者带角标）
-  与「片商」。`/metadata` 老地址重定向到标签那一个，顶部菜单不再为它留位置。
-  `MetaLists.vue` 收 `tabs` 属性决定这一份露出哪几个词表，只剩一个时标签条自动不渲染。
-- 标签支持**批量删除**（`POST /api/tag/batch-delete`）：行首勾选 + 表头全选本页，勾上才出现
-  「删除选中（N）」。AI 跑完一轮要清场时一次点十几个，逐条删不现实；确认框里算清
-  影响面（哪几个词、共多少部影片会失去这些挂接）再动手。删除仍走 `PurgeTag`，与单条删语义一致。
-- 片商走对话框，正名 / 别名 / 国家 / 官网四个字段一起给（国家取自「地区与分类」那份规范清单，
-  官网缺协议会补 `https://`，否则点开来会跳回本站）。删除都会连带摘掉影片上的挂接。
-- 片商在影片编辑里是**单选可搜**，与「所属系列」用同一个 `ComboBox`（同形就该同控件）；
-  词表里没有的先去 设置 → 片商 加。多选的场景只剩标签，所以
-  `views/components/TokenPicker.vue` 现在只服务标签：输入即过滤正名与别名，定高与 `.input` 同档
-  （`--ctl-h`），浮层走全局 `.dropdown-menu` 并复用 `autoFitDropdown` ——
-  编辑对话框的 `.dialog__body` 会裁掉溢出部分，不自适应就点不到下半截。
-  下拉自己画：用 `<datalist>` 会弹系统浅色面板，暗色主题下像另一个网站。
 - 详情页播放器下方统一成**一份两列清单**（`.kv-list`：定宽标签列 + 值列），标签一律不带冒号、
-  字号统一 `--f-sm`；顺序按关联度分三档：片源（字幕 / 广告水印 / 分辨率）→ 内容（标签 / 合辑）
-  → 档案（原名 / 发行 / 片商 / 系列 / 演员）。类名别叫 `.facts`，那是卡片属性行的全局类，会串味。
+  字号统一 `--f-sm`；两档顺序：片源（字幕 / 广告水印 / 分辨率）→ 档案（原名 / 发行 / 片商 / 系列 / 演员）。
+  类名别叫 `.facts`，那是卡片属性行的全局类，会串味。
 - **演员年龄**：`ageAt(发行日期, 出生日期)`（`scripts/utils/format.js`）算的是"发行时多大"，
   两边都精确到月日才按生日是否未到减 1，缺日期或算出负数一律不显示。渲染成演员名字后面
   一段 `· 24 岁` 的次要文本（`--f-xs` + `--text-faint`），不额外占行也不抢链接的视觉重心。
-- 列表页新增「按片商」「按标签」两个筛选，值传 id。
+- 列表页筛选：影片列表有「按片商」（值传 id），题材标签那个筛选已随功能一起撤掉。
 
 **抓取通道目前不通**：av-wiki.net 已上 Imunify360 反爬，我们那套请求头被直接拒
 （`Access denied by Imunify360 bot-protection`），**已上线的演员头像/资料抓取同样受影响**；
@@ -561,28 +547,19 @@ JSON-RPC 2.0 手写（`initialize` / `tools/list` / `tools/call` / `notification
 不引 SDK —— 面就这几个方法，加依赖换来的是版本漂移和一层不受控的 HTTP 栈。
 `GET/DELETE /mcp` 按规范回 405（服务端不推事件流），通知回 202 空体。
 
-六个工具：`video_list`（含 `noTags` 捞没打过标的）、`video_get`、`tag_list`、`tag_propose`、
-`studio_list`、`vocab_counts`。筛选参数里的标签与片商**接受正名、别名或 id**，
-认不出直接报错——模型手上只有名字，硬要它先查一轮 id 只是白费往返。
+四个工具，**全部只读**：`video_list`（可 `noStudio` / `unscanned` / `unrated` 直接捞缺数据的片）、
+`video_get`、`studio_list`、`vocab_counts`（一屏库况：多少部没填片商、没量分辨率、没标片源，
+演员缺生日几位）。筛选参数里的片商**接受正名、别名或 id**，认不出直接报错——
+模型手上只有名字，硬要它先查一轮 id 只是白费往返。
 
 三条收口：
 
 - **整站免鉴权，只有这里加一道**。密钥存 `system_settings.mcpApiKey`，那行是空的分身就等于没开门
-  （全 401）。生成与查看在 设置 → AI 接口，端点地址、客户端配置片段、工具清单、打标口径
-  全在那一屏，每块都能一键复制。
-- **AI 建不出标签**。`tag_propose` 里词表已有的（正名或别名都算）直接挂、`source` 记 `ai`；
-  没收录的词只进 `tag_suggestions` 待审。代码里压根不写 `tags` 的 INSERT，
-  所以再怎么调用都扩不了词表——提示词会被改，接口不会。
+  （全 401）。生成与查看在 设置 → AI 接口，端点地址、客户端配置片段、工具清单都在那一屏，每块都能一键复制。
+- **这个面上没有写入口**。AI 看得懂整个库，改不动整个库；要落库的动作一律走界面里人点过的那条路。
+  （原先有 `tag_propose` 这条受控写入口，随题材标签一起在 v10 撤除。）
 - **参数错按工具内错误回**（`isError: true` + 一句中文原因），不报 JSON-RPC 错误：
   SDK 会把后者当服务端故障，模型就再也读不到"你少传了 videoId"这种可自救的信息。
-
-打标口径存在 `system_settings.aiTagRule`（就是条普通设置，界面走 `/api/systemsetting` 保存，
-不另开写入口），每次 `tools/list` 都拼在 `tag_propose` 的说明上。默认口径允许**推导**：
-片名不必出现原词，「爆乳」可归到已有的「巨乳」，「儿子的同学」可推成「友人母」，标签数量也不限。
-
-推导一放宽，"提个近义词"就成了新风险，所以归一这件事不只写在提示词里：`tag_propose` 对认不出的词
-会回 `similar`（词表里字符重叠度最高的三个正名），模型看到 `爆乳 → ["巨乳"]` 就该改用它而不是进队列。
-只做提示、绝不自动挂——"算不算同一类"是语义判断，接口不替人拍板。
 
 ### 重复演员合并（`views/components/ActorMergeDialog.vue`）
 
@@ -625,12 +602,16 @@ JSON-RPC 2.0 手写（`initialize` / `tools/list` / `tools/call` / `notification
 窄屏（<900px）时标签变成顶部一行可横滑的标签条。
 
 当前分区（`GROUPS` 就是这个顺序）：**站点与首页**（网站名称、每页数量、首页展示分类与条数）
-→ **图片目录** → **扫描目录** → **地区与分类**（即原来的「数据源」）→ **题材标签** → **片商**
+→ **图片目录** → **扫描目录** → **地区与分类**（即原来的「数据源」）→ **片商**
 → **抓取通道** → **AI 接口** → **友情链接**。
 
-**配置类功能不进顶部菜单**：词表原先是 `/metadata` + 导航「词表」，现在整页嵌进设置
-（`MetaLists.vue` 收 `embedded` 属性，独立成页时才有自己的页头），顶部菜单只剩浏览页。
+**配置类功能不进顶部菜单**：词表原先是 `/metadata` + 导航「词表」，现在嵌进设置
+（`StudioManager.vue` 收 `embedded` 属性，独立成页时才有自己的页头），顶部菜单只剩浏览页。
 `/metadata` 保留为重定向，老书签不会 404。
+
+**每页数量分两档**：`pageSize` 管影片列表，`personPageSize` 管系列与演员列表
+（卡片比影片小得多，一屏想看到的数量不是一个量级）。后者留空时 getter 回落到前者，
+所以不配也不会变行为——store 里是 `personPageSize` getter，页面不要自己读原始设置。
 
 **地区与分类**分区管 `countries` / `categories` 两份清单：影片、系列、演员的地区和影片的分类，
 可选值全部来自这里（后端 `Utils.Options.CommaList`），编辑页只能选不能造词，
