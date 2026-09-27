@@ -152,8 +152,9 @@ export const tagApi = {
   merge: (id, into) => api.post(`/tag/${id}/merge`, { into }),
   suggestions: (params) => api.get('/tag/suggestions', { params }),
   propose: (data) => api.post('/tag/suggestions', data),
-  approve: (id, tagId) => api.post(`/tag/suggestions/${id}/approve`, { tagId: tagId || null }),
-  moveTo: (id, tagId) => api.post(`/tag/suggestions/${id}/merge`, { tagId }),
+  /** 同一个候选词一次处理完：action = 'approve' | 'merge' | 'reject'，merge 才需要 tagId */
+  resolve: (name, action, tagId = null) => api.post('/tag/suggestions/by-name', { name, action, tagId }),
+  /** 逐条驳回只用于"这个词留着，但这一部片不算" */
   reject: (id) => api.post(`/tag/suggestions/${id}/reject`)
 }
 

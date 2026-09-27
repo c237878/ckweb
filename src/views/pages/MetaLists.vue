@@ -87,24 +87,39 @@
       </tbody>
     </table>
 
-    <!-- AI 候选队列：批准 / 并入 / 驳回三个动作，词表只由这三下决定 -->
+    <!-- AI 候选队列：一个词一行。同一个词常常是几部片各提一条，
+         逐条批准要点好几次，而判断只是"这个词要不要进词表" -->
     <div v-else>
-      <div v-if="!suggestions.length" class="empty"><p>待审队列是空的</p></div>
-      <table v-else class="grid-table">
+      <div v-if="!groups.length" class="empty"><p>待审队列是空的</p></div>
+      <table v-else class="grid-table grid-table--sugg">
         <thead>
-          <tr><th>候选词</th><th>来自哪部片</th><th>依据</th><th class="ops">处理</th></tr>
+          <tr><th>候选词</th><th>提它的片</th><th>依据</th><th class="ops">处理</th></tr>
         </thead>
         <tbody>
-          <tr v-for="sg in suggestions" :key="sg.id">
-            <td><strong>{{ sg.name }}</strong></td>
-            <td class="dim">
-              <router-link v-if="sg.videoId" :to="`/video/${sg.videoId}`" class="link">{{ sg.videoCode || sg.videoName || '该片' }}</router-link>
+          <tr v-for="g in groups" :key="g.name">
+            <td class="word"><strong>{{ g.name }}</strong></td>
+            <td class="films">
+              <span v-for="r in g.rows" :key="r.id" class="film" :title="r.note || ''">
+                <router-link :to="`/video/${r.videoId}`" class="link">{{ r.videoCode || r.videoName || '该片' }}</router-link>
+                <button type="button" class="film__drop" :aria-label="`只驳回 ${r.videoCode || '该片'} 这一条`" @click="rejectOne(r)">&times;</button>
+              </span>
             </td>
-            <td class="dim">{{ sg.note || '—' }}</td>
+            <td class="dim">{{ g.notes.join(' / ') || '—' }}</td>
             <td class="ops">
-              <button class="btn btn--sm" :disabled="busy" @click="approve(sg)">批准为新标签</button>
-              <SelectList v-model="mergeTarget[sg.id]" :options="rows2Options" all-label="并入…" label="并入已有标签" @change="mergeInto(sg)" />
-              <button class="btn btn--sm btn--ghost" :disabled="busy" @click="reject(sg)">驳回</button>
+              <div class="ops-row">
+                <button class="btn btn--sm" :disabled="busy" @click="resolve(g, 'approve')">
+                  批准（{{ g.rows.length }} 部）
+                </button>
+                <button class="btn btn--sm btn--ghost" :disabled="busy" @click="resolve(g, 'reject')">驳回</button>
+              </div>
+              <SelectList
+                v-model="mergeTarget[g.name]"
+                :options="rows2Options"
+                all-label="并入已有标签…"
+                :label="`把「${g.name}」并入已有标签`"
+                class="ops-merge"
+                @change="mergeInto(g)"
+              />
             </td>
           </tr>
         </tbody>
@@ -224,7 +239,7 @@ const loadSuggestions = async () => {
     const res = await tagApi.suggestions({ status: 'pending' })
     if (res.success) {
       suggestions.value = res.data || []
-      pendingCount.value = suggestions.value.length
+      pendingCount.value = new Set((res.data || []).map((x) => x.name)).size
     }
     // 并入下拉要用词表，切到这一页时顺手拉一份
     if (!rows.value.length) {
@@ -302,26 +317,41 @@ const askMerge = async (from) => {
   if (res.success) load()
 }
 
-const approve = async (sg) => {
+/** 一个词一行：同名候选合并成一组，依据去重后并排显示 */
+const groups = computed(() => {
+  const map = new Map()
+  for (const r of suggestions.value) {
+    if (!map.has(r.name)) map.set(r.name, { name: r.name, rows: [], notes: [] })
+    const g = map.get(r.name)
+    g.rows.push(r)
+    if (r.note && !g.notes.includes(r.note)) g.notes.push(r.note)
+  }
+  return [...map.values()]
+})
+
+/** 批准 / 并入 / 全部驳回都按词提交，一次点完这个词 */
+const resolve = async (g, action, tagId = null) => {
   busy.value = true
   try {
-    const res = await tagApi.approve(sg.id, null)
+    const res = await tagApi.resolve(g.name, action, tagId)
     ui[res.success ? 'success' : 'error'](res.message || '没成功')
     if (res.success) loadSuggestions()
+  } catch (err) {
+    ui.error('失败：' + errText(err))
   } finally {
     busy.value = false
   }
 }
 
-const mergeInto = async (sg) => {
-  const target = mergeTarget.value[sg.id]
+const mergeInto = (g) => {
+  const target = mergeTarget.value[g.name]
   if (!target) return
-  const res = await tagApi.moveTo(sg.id, target)
-  ui[res.success ? 'success' : 'error'](res.message || '没成功')
-  if (res.success) { mergeTarget.value[sg.id] = ''; loadSuggestions() }
+  mergeTarget.value[g.name] = ''
+  resolve(g, 'merge', target)
 }
 
-const reject = async (sg) => {
+/** 词留着，只把这一部片从队列里摘掉 */
+const rejectOne = async (sg) => {
   const res = await tagApi.reject(sg.id)
   ui[res.success ? 'success' : 'error'](res.message || '没成功')
   if (res.success) loadSuggestions()
@@ -390,7 +420,7 @@ onMounted(async () => {
   await load()
   // 角标要在别的标签页也看得见，所以进页面先摸一次待审数
   const s = await tagApi.suggestions({ status: 'pending' }).catch(() => null)
-  if (s?.success) pendingCount.value = (s.data || []).length
+  if (s?.success) pendingCount.value = new Set((s.data || []).map((x) => x.name)).size
 })
 </script>
 
@@ -486,6 +516,68 @@ onMounted(async () => {
 }
 
 .link:hover { color: var(--accent); }
+
+/* 候选队列表格：依据那段话很长，默认自动布局会把"候选词"挤成一字一行，
+   所以列宽写死（table-layout: fixed），只让依据列吃剩余宽度 */
+.grid-table--sugg {
+  table-layout: fixed;
+}
+
+.grid-table--sugg th:nth-child(1),
+.grid-table--sugg td:nth-child(1) { width: 88px; }
+
+.grid-table--sugg th:nth-child(2),
+.grid-table--sugg td:nth-child(2) { width: 200px; }
+
+.grid-table--sugg th:last-child,
+.grid-table--sugg td:last-child { width: 176px; }
+
+.word {
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+
+/* 一个候选词来自哪几部片：放不下自动换行，每条后面带一个只摘它自己的 × */
+.films {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s1) var(--s2);
+  color: var(--text-dim);
+}
+
+.film {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.film__drop {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--rp);
+  color: var(--text-faint);
+  font-size: var(--f-md);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.film__drop:hover {
+  color: var(--danger);
+  background: var(--bg-hover);
+}
+
+/* 处理列：两个按钮一行，并入的下拉单独一行（它是整宽的，挤在一起会撑破列） */
+.ops-row {
+  display: flex;
+  gap: var(--s1);
+}
+
+.ops-merge {
+  display: block;
+  margin-top: var(--s1);
+}
 
 .input--sm {
   height: var(--ctl-h-xs);
