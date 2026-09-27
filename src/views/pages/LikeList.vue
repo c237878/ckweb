@@ -405,4 +405,70 @@ onMounted(async () => {
 .col-name-cell:hover {
   text-decoration: underline;
 }
+
+/* 窄屏：84px 的缩略图挤占正文却根本看不清内容，整列去掉（进详情走名称那一格，入口没少）。
+   去掉后剩下的列横向仍排不进 390px —— 表格会自动把名称压成一字一行，所以改成每行两段的栅格：
+   名称独占一行拿满宽度，番号/类型/时间压成第二行的次要信息 */
+@media (max-width: 899px) {
+  .col-cover {
+    display: none;
+  }
+
+  .table,
+  .table tbody {
+    display: block;
+  }
+
+  .table thead {
+    display: none;
+  }
+
+  .table tbody tr {
+    display: grid;
+    grid-template-columns: auto minmax(0, auto) minmax(0, auto) minmax(0, auto) minmax(0, auto);
+    grid-template-areas:
+      "check name name name act"
+      "check code type time act";
+    gap: var(--s1) var(--s3);
+    align-items: center;
+    padding: var(--s3);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .table tbody tr:last-child {
+    border-bottom: none;
+  }
+
+  .table tbody td {
+    padding: 0;
+    border-bottom: none;
+  }
+
+  .col-check {
+    grid-area: check;
+  }
+
+  .col-name-cell {
+    grid-area: name;
+    min-width: 0;
+  }
+
+  .col-code {
+    grid-area: code;
+  }
+
+  .col-type {
+    grid-area: type;
+  }
+
+  .col-time {
+    grid-area: time;
+    font-size: var(--f-xs);
+  }
+
+  .col-actions {
+    grid-area: act;
+    width: auto;
+  }
+}
 </style>
