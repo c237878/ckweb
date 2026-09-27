@@ -433,6 +433,36 @@ JSON 接口，不去解析网页排版。抓回来的是事实字段（日期、
 - 每抓成一位写一行日志（演员 ID、我们的名字、抓了什么、档案名与 slug）：批量跑的时候，
   这是唯一能回看"这些数据是从哪个档案抓来的"的地方。
 
+### 老师图鉴抓取：生日与别名（`ckapi/Utils/LaoshiWiki.cs` + `Services/LaoshiScraper.cs`）
+
+`laoshi.ink` 是纯静态 HTML 的女优资料站（Cloudflare 前置，686 份档案），**只有人物、没有任何影片信息**
+（页脚明写不提供视频、封面、番号、下载）。站上字段既在可见的 `.spot-fact-table`
+（`<span>标签</span><strong>值</strong>`）里，也在 `<script type="application/ld+json">` 的 `Person` 节点里：
+别名与头像读 JSON-LD，出生日期只有事实表有，所以两处都读。
+
+**这条源只补三样**：`actors.birthdate`、`actor_aliases`（日文名 / 罗马音 / 曾用名）、头像。
+**简介明确不接** —— 那站冷门页的"简介"是「某某是日本演艺人物榜第 700 位收录人物，
+当前页面仅整理公开基础资料」这类榜单套话，写进 `bio` 不如留空。
+
+- **档案地址是 `actor-001` 这种不透明编号，名字拼不出 URL**，所以先取一次 `/actresses/` 索引页
+  （1 个请求换 686 条 姓名→编号）。索引**只在内存里活 30 分钟、不落库**：
+  站方 `/terms` 明写不得批量抓取，把对方整份档案结构搬进自己库里是比抓取更大的动作。
+  抓取日志里仍会记下档案编号，事后能回看这个人是从哪份档案补的。
+- **候选集先用索引过一道**（`CandidatesAsync`）：1481 位缺东西的人里只有约 370 位在站上有档案，
+  而批量任务的间隔是按"每一位候选"付的 —— 不过滤就是让 8 秒的刹车踩在根本不会发请求的人身上。
+- **别名只写没人占用的写法**：`actor_aliases` 同时是"重复演员候选"的依据，
+  某个写法已经是别人的姓名或别名就不塞进去，免得凭空造出一对假候选。
+  也没走 `Aliases.Normalize`：那条规则按空白再拆一次，会把 `Yua Mikami` 拆成两条。
+- **占位符过滤**：站上缺的字段写成「待补充」「暂未确认」，`LaoshiWiki.Fact` 一律当没有；
+  日期两种格式都见过（`1988 年 5 月 24 日` 与 `1970-10-06`），共用 `ScrapeChannelService.JapaneseDate`。
+- **头像按中文名直链**：`/assets/img/celebrities/jav/<姓名>.jpg`，不碰详情页也能拿到，无防盗链。
+- 礼貌参数比 av-wiki 保守一个数量级：通道里种的是 **间隔 8 秒、每日 40 位、连续 3 次失败冷却 4 小时**
+  （av-wiki 是 1.5 秒 / 300 次 / 2 小时）。全量跑约 370 位要分 10 天，这是故意的。
+- 抓取按钮的**来源下拉框**在演员列表页（批量）与演员详情页相册工具条（单位）各一个，
+  取值见 `constants.js` 的 `ACTOR_SOURCES`，必须与后端实现 `IActorSource` 的类的 `Key` 一致；
+  两个源补的字段不同，tooltip 文案在 `ACTOR_SCRAPE_TIPS` 里各写一句。选择记在 localStorage，
+  一轮跑不完（配额会先刹车）下次进来还是同一个源。
+
 ### 片源扫描：只量分辨率（`ckapi/Utils/MediaProbe.cs` + `Services/SourceScanner.cs`）
 
 4798 条影片手动填分辨率不现实，也不需要装 ffmpeg——**直接读 MP4 的盒（box）结构**就够了：
@@ -531,7 +561,8 @@ javcup 详情字段是混淆 JS，javlibrary / javdb 从这台机器连不上。
 - **试抓只读不写**（`POST /scrape/channel/{id}/test`）。改完地址与规则当场就能看到抽出了什么，
   不用改一版部署一次；它算真请求所以也计配额。落库走 `/{id}/apply`，`ifEmptyOnly` 的规则只填空值。
 
-内置的 av-wiki 女优档案是表里种下的第一条通道（`fetch_kind=builtin`），
+表里种下两条内置通道（`fetch_kind=builtin`）：av-wiki 女优档案与老师图鉴女优档案，
+按 `fetch_url` 里的域名认谁是谁（`FirstFor(entity, host)`），配额与熔断各算各的。
 **批量抓取头像/资料现在也走这道闸门**：`ScrapeJob` 原来写死 `Task.Delay(300)`，
 现在每条之前先问通道能不能问、按 `min_interval_ms` 等、把结果回报给熔断，
 被拦或配额用满就带着原因停下这一轮（界面上看得到原因）。

@@ -143,12 +143,12 @@ export const actorApi = {
   syncImages: (id) => api.post(id ? `/actor/${id}/images/sync` : '/actor/images/sync'),
   /** 指定列表页那张脸用哪张图 */
   setPrimaryImage: (id, fileName) => api.put(`/actor/${id}/image/primary`, { fileName }),
-  /** 给一位演员从 av-wiki 抓头像（只补头像，拿不准就什么都不做，返回里会说明原因） */
-  fetchAvatar: (id) => api.post(`/actor/${id}/avatar/fetch`),
-  /** 给一位演员抓资料：出生日期与简介，只填当前空着的字段 */
-  fetchProfile: (id) => api.post(`/actor/${id}/profile/fetch`),
-  /** 全站抓取：任务在服务端后台跑，what = avatar | profile | all */
-  startScrape: (what = 'all') => api.post('/actor/scrape/fetch', { what }),
+  /** 给一位演员抓头像（只补头像，拿不准就什么都不做，返回里会说明原因）；src 见 ACTOR_SOURCES */
+  fetchAvatar: (id, src) => api.post(`/actor/${id}/avatar/fetch`, null, { params: { src } }),
+  /** 给一位演员抓资料：av-wiki 是生日与简介，老师图鉴是生日与别名，都只填当前空着的字段 */
+  fetchProfile: (id, src) => api.post(`/actor/${id}/profile/fetch`, null, { params: { src } }),
+  /** 全站抓取：任务在服务端后台跑，what = avatar | profile | all，src 决定问哪个档案源 */
+  startScrape: (what = 'all', src) => api.post('/actor/scrape/fetch', { what, src }),
   scrapeStatus: () => api.get('/actor/scrape/status'),
   stopScrape: () => api.delete('/actor/scrape/fetch'),
   /** 疑似重复演员候选（按线索强度排序） */

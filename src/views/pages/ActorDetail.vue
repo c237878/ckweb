@@ -300,8 +300,9 @@ const scrape = async (fn, fallback) => {
   }
 }
 
-const fetchAvatar = () => scrape(actorApi.fetchAvatar, '没抓到')
-const fetchProfile = () => scrape(actorApi.fetchProfile, '没抓到资料')
+// 来源由相册里那个下拉框带上来：两个档案源补的字段不一样
+const fetchAvatar = (src) => scrape((id) => actorApi.fetchAvatar(id, src), '没抓到')
+const fetchProfile = (src) => scrape((id) => actorApi.fetchProfile(id, src), '没抓到资料')
 
 const loadAll = async () => {
   loading.value = true

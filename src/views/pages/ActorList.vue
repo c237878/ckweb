@@ -15,12 +15,18 @@
           >
             {{ syncing ? '同步中…' : '同步照片' }}
           </button>
-          <!-- 两个入口共用同一个后台任务：同一时刻只允许一个在跑，谁在跑谁变「停止」 -->
+          <!-- 来源先选，两个入口共用同一个后台任务：同一时刻只允许一个在跑，谁在跑谁变「停止」 -->
+          <SelectList
+            v-model="grabSrc"
+            :options="ACTOR_SOURCES"
+            label="抓取来源"
+            title="两个档案源收的东西不一样：av-wiki 有头像与简介，老师图鉴有别名与更全的生日"
+          />
           <button
             class="btn btn--sm"
             :class="{ 'btn--ghost': grabRunning }"
             :disabled="grabRunning && grab.whatKey !== 'avatar'"
-            :title="grabRunning ? '正在处理的那一位会做完，然后停下' : '按姓名与曾用名去 av-wiki 找头像：只有唯一命中、且名字对得上才抓；查重候选里的演员会跳过'"
+            :title="grabRunning ? '正在处理的那一位会做完，然后停下' : grabTips.avatar"
             @click="grabRunning ? stopGrab() : startGrab('avatar')"
           >
             {{ grabRunning && grab.whatKey === 'avatar' ? '停止抓取' : '抓取头像' }}
@@ -29,7 +35,7 @@
             class="btn btn--sm"
             :class="{ 'btn--ghost': grabRunning }"
             :disabled="grabRunning && grab.whatKey !== 'profile'"
-            title="从 av-wiki 的档案页取出生日期与简介：只填当前空着的字段，你写过的简介不会被覆盖"
+            :title="grabRunning ? '正在处理的那一位会做完，然后停下' : grabTips.profile"
             @click="grabRunning ? stopGrab() : startGrab('profile')"
           >
             {{ grabRunning && grab.whatKey === 'profile' ? '停止抓取' : '抓取资料' }}
@@ -128,7 +134,7 @@ import { ref, onBeforeUnmount, onMounted, computed, watch } from 'vue'
 import { actorApi } from '@/scripts/api'
 import { useAppStore } from '@/scripts/store/app'
 import { useUiStore, errText } from '@/scripts/store/ui'
-import { SORT_OPTIONS } from '@/scripts/constants'
+import { SORT_OPTIONS, ACTOR_SOURCES, ACTOR_SCRAPE_TIPS } from '@/scripts/constants'
 import { debounce } from '@/scripts/utils/debounce'
 import AddActorDialog from '@/views/components/AddActorDialog.vue'
 import ActorMergeDialog from '@/views/components/ActorMergeDialog.vue'
@@ -302,6 +308,10 @@ let grabTimer = null
 let grabWatching = false
 
 const grabRunning = computed(() => !!grab.value?.running)
+// 来源记在 localStorage：一轮跑不完（每日配额会先刹车），下次进来还得是同一个源
+const grabSrc = ref(localStorage.getItem('actor_scrape_src') || 'avwiki')
+watch(grabSrc, (v) => localStorage.setItem('actor_scrape_src', v))
+const grabTips = computed(() => ACTOR_SCRAPE_TIPS[grabSrc.value] || ACTOR_SCRAPE_TIPS.avwiki)
 const fmtEta = (sec) => (sec >= 60 ? `约剩 ${Math.round(sec / 60)} 分钟` : `约剩 ${sec} 秒`)
 const grabText = computed(() => {
   const s = grab.value
@@ -351,7 +361,7 @@ const startGrabPoll = () => {
 
 const startGrab = async (what) => {
   try {
-    const res = await actorApi.startScrape(what)
+    const res = await actorApi.startScrape(what, grabSrc.value)
     if (!res.success) {
       ui.warn(res.message || '没能启动')
       return

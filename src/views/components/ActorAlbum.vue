@@ -4,12 +4,13 @@
     <div class="album__actions">
       <!-- 没照片的时候最需要抓的恰恰是这两个按钮，所以空态里也要给全 -->
       <template v-if="scrapeable">
+        <SelectList v-model="src" :options="ACTOR_SOURCES" label="抓取来源" title="两个档案源收的东西不一样：av-wiki 有头像与简介，老师图鉴有别名与更全的生日" />
         <button
           type="button"
           class="btn btn--sm"
           :disabled="fetching"
-          title="按姓名与曾用名去 av-wiki 的档案页找头像：只有唯一命中、且名字对得上才抓，拿不准就跳过"
-          @click="emit('fetch-avatar')"
+          :title="tips.avatar"
+          @click="emit('fetch-avatar', src)"
         >
           {{ fetching ? '抓取中…' : '抓头像' }}
         </button>
@@ -17,8 +18,8 @@
           type="button"
           class="btn btn--sm"
           :disabled="fetching"
-          title="从 av-wiki 的档案页取出生日期与简介；已经填过的不覆盖"
-          @click="emit('fetch-profile')"
+          :title="tips.profile"
+          @click="emit('fetch-profile', src)"
         >
           {{ fetching ? '抓取中…' : '抓资料' }}
         </button>
@@ -99,12 +100,13 @@
           设为头像
         </button>
         <template v-if="scrapeable">
+          <SelectList v-model="src" :options="ACTOR_SOURCES" label="抓取来源" title="两个档案源收的东西不一样：av-wiki 有头像与简介，老师图鉴有别名与更全的生日" />
           <button
             type="button"
             class="btn btn--sm btn--ghost"
             :disabled="fetching"
-            title="按姓名与曾用名去 av-wiki 的档案页找头像：只有唯一命中、且名字对得上才抓，拿不准就跳过"
-            @click="emit('fetch-avatar')"
+            :title="tips.avatar"
+            @click="emit('fetch-avatar', src)"
           >
             {{ fetching ? '抓取中…' : '抓头像' }}
           </button>
@@ -112,8 +114,8 @@
             type="button"
             class="btn btn--sm btn--ghost"
             :disabled="fetching"
-            title="从 av-wiki 的档案页取出生日期与简介；已经填过的不覆盖"
-            @click="emit('fetch-profile')"
+            :title="tips.profile"
+            @click="emit('fetch-profile', src)"
           >
             {{ fetching ? '抓取中…' : '抓资料' }}
           </button>
@@ -165,6 +167,10 @@
 
 <script setup>
 import { computed, nextTick, ref, watch } from 'vue'
+import { ACTOR_SOURCES, ACTOR_SCRAPE_TIPS } from '@/scripts/constants'
+import SelectList from '@/views/components/SelectList.vue'
+
+const SRC_KEY = 'actor_scrape_src'
 
 /**
  * 演员相册：详情页头部右侧那一格。
@@ -184,11 +190,16 @@ const props = defineProps({
   emptyText: { type: String, default: '还没有照片' },
   syncing: { type: Boolean, default: false },
   fetching: { type: Boolean, default: false },
-  /** av-wiki 只收日本女优；国家不是日本的人，抓取按钮直接不出现 */
+  /** 档案源只收日本女优；国家不是日本的人，抓取按钮直接不出现 */
   scrapeable: { type: Boolean, default: true }
 })
 
 const emit = defineEmits(['sync', 'set-primary', 'fetch-avatar', 'fetch-profile'])
+
+// 来源选一次就记住：一位演员的资料常常两个源都要问一遍
+const src = ref(localStorage.getItem(SRC_KEY) || 'avwiki')
+watch(src, (v) => localStorage.setItem(SRC_KEY, v))
+const tips = computed(() => ACTOR_SCRAPE_TIPS[src.value] || ACTOR_SCRAPE_TIPS.avwiki)
 
 // 扇面上摆 ±3 张。再多留几格缓冲是为了让卡片有"滑进来"的落点而不是凭空出现；
 // 几百张图全建节点没意义，所以按窗口切片
