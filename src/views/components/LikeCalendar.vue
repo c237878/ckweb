@@ -179,14 +179,15 @@ const pastYearCount = computed(() => {
   return list.reduce((sum, item) => sum + (item.count || 0), 0)
 })
 
-// 距离上次点赞过去多少天
+// 距离上次点赞过去多少天：按"隔了几个整天"算，昨天=0、前天=1，
+// 所以差值要减 1；当天点赞会算成 -1，夹到 0
 const daysSinceLastLike = computed(() => {
   if (!stats.value.lastLikeDate) return null
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const lastDate = new Date(stats.value.lastLikeDate)
   lastDate.setHours(0, 0, 0, 0)
-  return Math.floor((today - lastDate) / 86400000)
+  return Math.max(0, Math.floor((today - lastDate) / 86400000) - 1)
 })
 
 // 当月1号是星期几（0=周日），用于补前面的空格
