@@ -2,26 +2,17 @@
   <div v-if="!count" class="album album--empty">
     <span class="album__empty-text">{{ emptyText }}</span>
     <div class="album__actions">
-      <!-- 没照片的时候最需要抓的恰恰是这两个按钮，所以空态里也要给全 -->
+      <!-- 没照片的时候最需要抓的恰恰是这个按钮，所以空态里也要给全 -->
       <template v-if="scrapeable">
         <SelectList v-model="src" :options="ACTOR_SOURCES" label="抓取来源" title="两个档案源收的东西不一样：av-wiki 有头像与简介，老师图鉴有别名与更全的生日" />
         <button
           type="button"
           class="btn btn--sm"
           :disabled="fetching"
-          :title="tips.avatar"
-          @click="emit('fetch-avatar', src)"
+          :title="tips.all"
+          @click="emit('fetch-meta', src)"
         >
-          {{ fetching ? '抓取中…' : '抓头像' }}
-        </button>
-        <button
-          type="button"
-          class="btn btn--sm"
-          :disabled="fetching"
-          :title="tips.profile"
-          @click="emit('fetch-profile', src)"
-        >
-          {{ fetching ? '抓取中…' : '抓资料' }}
+          {{ fetching ? '抓取中…' : '抓头像与资料' }}
         </button>
       </template>
       <button type="button" class="btn btn--sm" :disabled="syncing" @click="sync">
@@ -105,19 +96,10 @@
             type="button"
             class="btn btn--sm btn--ghost"
             :disabled="fetching"
-            :title="tips.avatar"
-            @click="emit('fetch-avatar', src)"
+            :title="tips.all"
+            @click="emit('fetch-meta', src)"
           >
-            {{ fetching ? '抓取中…' : '抓头像' }}
-          </button>
-          <button
-            type="button"
-            class="btn btn--sm btn--ghost"
-            :disabled="fetching"
-            :title="tips.profile"
-            @click="emit('fetch-profile', src)"
-          >
-            {{ fetching ? '抓取中…' : '抓资料' }}
+            {{ fetching ? '抓取中…' : '抓头像与资料' }}
           </button>
         </template>
         <button type="button" class="btn btn--sm btn--ghost" :disabled="syncing" @click="sync">
@@ -194,7 +176,7 @@ const props = defineProps({
   scrapeable: { type: Boolean, default: true }
 })
 
-const emit = defineEmits(['sync', 'set-primary', 'fetch-avatar', 'fetch-profile'])
+const emit = defineEmits(['sync', 'set-primary', 'fetch-meta'])
 
 // 来源选一次就记住：一位演员的资料常常两个源都要问一遍
 const src = ref(localStorage.getItem(SRC_KEY) || 'avwiki')

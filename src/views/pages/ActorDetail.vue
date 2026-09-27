@@ -51,8 +51,7 @@
           empty-text="这位演员还没有照片"
           @sync="syncImages"
           @set-primary="setPrimary"
-          @fetch-avatar="fetchAvatar"
-          @fetch-profile="fetchProfile"
+          @fetch-meta="fetchMeta"
         />
       </section>
 
@@ -301,8 +300,7 @@ const scrape = async (fn, fallback) => {
 }
 
 // 来源由相册里那个下拉框带上来：两个档案源补的字段不一样
-const fetchAvatar = (src) => scrape((id) => actorApi.fetchAvatar(id, src), '没抓到')
-const fetchProfile = (src) => scrape((id) => actorApi.fetchProfile(id, src), '没抓到资料')
+const fetchMeta = (src) => scrape((id) => actorApi.fetchMeta(id, src), '没抓到')
 
 const loadAll = async () => {
   loading.value = true

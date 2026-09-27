@@ -162,9 +162,13 @@ v4 迁移把含 `http` 的简介逐条抽出（382 位演员 → 528 行，379 �
 > `POST /{id}/reset-file-size` 会连带把两维与分辨率一起清空——换了文件等于这条没结论了。
 
 ### /api/Actor
-`GET /` · `GET /{id}` · `POST /` · `PUT /{id}` · `DELETE /{id}` · `GET /countries` · `GET /{id}/videos` · `POST /images/sync` · `POST /{id}/images/sync` · `PUT /{id}/image/primary` · `POST /{id}/avatar/fetch` · `POST /{id}/profile/fetch` · `POST /scrape/fetch` · `GET /scrape/status` · `DELETE /scrape/fetch` · `GET /{id}/poster/{fileName}` · `GET /{id}/thumb/{s|m}/{fileName}` · `GET /duplicates` · `POST /merge`
+`GET /` · `GET /{id}` · `POST /` · `PUT /{id}` · `DELETE /{id}` · `GET /countries` · `GET /{id}/videos` · `POST /images/sync` · `POST /{id}/images/sync` · `PUT /{id}/image/primary` · `POST /{id}/meta/fetch` · `POST /scrape/fetch` · `GET /scrape/status` · `DELETE /scrape/fetch` · `GET /{id}/poster/{fileName}` · `GET /{id}/thumb/{s|m}/{fileName}` · `GET /duplicates` · `POST /merge`
 > 图片清单不再单独请求：`GET /{id}` 的 `data.images` 里就带着（来自 `actor_images`）。
 > 列表每行带 `avatar`（主图文件名，没有照片则为 null）——脸只出现在演员列表页这一处。
+> `GET /` 支持 `keyword` `country` `sortBy` 与两个"有没有"筛选：`hasPortrait`、`hasBirthdate`
+> （bool，不传=不限）。演员列表页的「头像不限 / 有 / 无」「生日不限 / 有 / 无」两个下拉就是它们，
+> 判"有没有脸"用 `EXISTS (actor_images)`：实测有图的 1083 位全都有主图，两种口径当前等价。
+> 抓取按钮配的 `?src=` 见 `ACTOR_SOURCES`，不传时走 av-wiki。
 > `GET /{id}/videos` 支持 `page` `pageSize` `subtitle` `watermark` `resolution` `hasFile`，筛选在服务端完成后再分页。
 
 ### /api/Series
@@ -414,19 +418,21 @@ JSON 接口，不去解析网页排版。抓回来的是事实字段（日期、
   省时间只是顺带（1598 位里约 97 位非日本被跳过）；主要是不给错配留机会 ——
   一个中国网红的名字恰好撞上某个日文 tag，就会把别人的脸和简介安到她身上，而这种错法长期没人会去核对。
   单演员入口在任何网络请求之前先挡，返回可直接展示的原因；
-  详情接口带 `scrapeable`，不合格的人页面上两个抓取按钮直接不出现。
+  详情接口带 `scrapeable`，不合格的人页面上那个抓取按钮直接不出现。
   `'日本'` 是 设置 → 地区与分类 里的规范取值，在那里改名要同步改这里。
 - **还在查重候选里的一律跳过**（先合并再抓，免得同一张脸、同一段简介在两个名字下各存一份）。
 - 站间节流 300ms；连续 3 次站点失败就中止本轮，不跟限流硬碰。
 - 全站抓取是**服务端后台任务**（`Services/ScrapeJob.cs`）：`POST /scrape/fetch {what}` 启动并立刻返回，
-  `GET /scrape/status` 给进度（processed / total / hit / percent / etaSeconds / what / whatKey / note），
-  `DELETE /scrape/fetch` 请求停止。列表页「抓取头像」「抓取资料」两个入口共用这一个任务：
-  同一时刻只跑一种，另一种自动禁用，在跑的那种变成「停止抓取」。
+  `GET /scrape/status` 给进度（processed / total / hit / percent / etaSeconds / what / note），
+  `DELETE /scrape/fetch` 请求停止。**列表页与详情页都只有一个抓取按钮**（`抓取头像与资料`）：
+  两个按钮查的是同一份档案，拆开点等于往同一个站点问两遍，所以单位入口收成
+  `POST /actor/{id}/meta/fetch`（Want.All），批量入口固定发 `what=all`。
+  同一时刻只跑一个任务，在跑时按钮变成「停止抓取」。
   每 2 秒轮一次，**离开页面、关浏览器都不影响它继续跑**，回来还能看到进度。
   进程内单例（这活儿是往别人站点上问话，并行没意义）；重启后端只丢进度不丢成果，
   已抓的文件与已填的字段都在，重跑会自动跳过填好的人。
 - 进度条只在任务运行时存在，跑完即收起、结果改由一条提示承载；ETA 用已跑出的平均速度估，
-  样本不足 3 位不给数，免得开局乱跳。界面判断"在跑哪种"用 `whatKey`，不去比对中文标签。
+  样本不足 3 位不给数，免得开局乱跳。
 - 一个坑留档：`CancellationTokenSource` 一旦 `Cancel` 就不可复用，
   做成 `readonly` 字段会让"停止过一次之后再也启动不起来"（第二次任务在第一圈就退出）。
   每次 `Start` 换一个新源、并把它的局部引用传给循环体。
@@ -459,6 +465,7 @@ JSON 接口，不去解析网页排版。抓回来的是事实字段（日期、
 - 礼貌参数比 av-wiki 保守一个数量级：通道里种的是 **间隔 8 秒、每日 40 位、连续 3 次失败冷却 4 小时**
   （av-wiki 是 1.5 秒 / 300 次 / 2 小时）。全量跑约 370 位要分 10 天，这是故意的。
 - 抓取按钮的**来源下拉框**在演员列表页（批量）与演员详情页相册工具条（单位）各一个，
+  与「抓头像与资料」并排；一位演员一次点击就把头像、生日、别名全补齐。
   取值见 `constants.js` 的 `ACTOR_SOURCES`，必须与后端实现 `IActorSource` 的类的 `Key` 一致；
   两个源补的字段不同，tooltip 文案在 `ACTOR_SCRAPE_TIPS` 里各写一句。选择记在 localStorage，
   一轮跑不完（配额会先刹车）下次进来还是同一个源。
@@ -533,6 +540,10 @@ JSON 接口，不去解析网页排版。抓回来的是事实字段（日期、
   两边都精确到月日才按生日是否未到减 1，缺日期或算出负数一律不显示。渲染成演员名字后面
   一段 `· 24 岁` 的次要文本（`--f-xs` + `--text-faint`），不额外占行也不抢链接的视觉重心。
 - 列表页筛选：影片列表有「按片商」（值传 id），题材标签那个筛选已随功能一起撤掉。
+- **设置 → 片商的列表固定按正名升序**（原先按名下影片数排，新加的、还没挂片的片商
+  会被挤到最后一页，找不到）；SQLite 没有拼音排序，中文名按码位序，与演员/系列列表同一套口径。
+- **影片详情页的片商填了官网就是外链**（`GET /video/{id}` 顺带 `st.link as studio_link`，
+  卡片查询没这一列时 `Str` 返回 null），与系列/演员同用 `.actor-link` 的样式；没填官网就只是文本。
 
 **抓取通道目前不通**：av-wiki.net 已上 Imunify360 反爬，我们那套请求头被直接拒
 （`Access denied by Imunify360 bot-protection`），**已上线的演员头像/资料抓取同样受影响**；
@@ -560,6 +571,10 @@ javcup 详情字段是混淆 JS，javlibrary / javdb 从这台机器连不上。
   然后一路把剩下几千次全敲完 —— 这次被封就是这么来的。
 - **试抓只读不写**（`POST /scrape/channel/{id}/test`）。改完地址与规则当场就能看到抽出了什么，
   不用改一版部署一次；它算真请求所以也计配额。落库走 `/{id}/apply`，`ifEmptyOnly` 的规则只填空值。
+
+- **状态一键切换**：通道列表的操作列第一个就是「停用 / 启用」（`POST /scrape/channel/{id}/toggle`）。
+  单独一个接口而不是让前端回整份配置——编辑对话框改一半没保存时，开关不该顺手把 rules 写回去。
+  停用后 `Check` 直接把这条通道拦掉，抓取遇到它跳过，配置与规则原样留着。
 
 表里种下两条内置通道（`fetch_kind=builtin`）：av-wiki 女优档案与老师图鉴女优档案，
 按 `fetch_url` 里的域名认谁是谁（`FirstFor(entity, host)`），配额与熔断各算各的。

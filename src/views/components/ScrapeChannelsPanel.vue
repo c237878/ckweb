@@ -31,6 +31,14 @@
           <td class="num">{{ c.usedToday }}/{{ c.dailyQuota }}</td>
           <td class="num">{{ (c.minIntervalMs / 1000).toFixed(1) }}s</td>
           <td class="ops">
+            <!-- 站点翻脸时先一键关掉，比进对话框翻一圈快；配置原样留着 -->
+            <button
+              class="btn btn--sm btn--ghost"
+              :title="c.enabled ? '停用：抓取遇到这条通道直接跳过，配置与规则都留着' : '启用：恢复向这个站点发请求'"
+              @click="toggle(c)"
+            >
+              {{ c.enabled ? '停用' : '启用' }}
+            </button>
             <button class="btn btn--sm btn--ghost" @click="edit(c)">编辑</button>
             <button class="btn btn--sm btn--ghost" @click="test(c)">试抓</button>
             <button
@@ -262,6 +270,12 @@ const remove = async (c) => {
   if (!go) return
   const res = await scrapeApi.deleteChannel(c.id)
   ui[res.success ? 'success' : 'error'](res.message || '已删除')
+  load()
+}
+
+const toggle = async (c) => {
+  const res = await scrapeApi.toggleChannel(c.id)
+  ui[res.success ? 'success' : 'error'](res.message || '没改成')
   load()
 }
 

@@ -22,23 +22,14 @@
             label="抓取来源"
             title="两个档案源收的东西不一样：av-wiki 有头像与简介，老师图鉴有别名与更全的生日"
           />
+          <!-- 一个按钮一次问完：两个源查的都是同一份档案，拆成头像/资料等于问两遍站点 -->
           <button
             class="btn btn--sm"
             :class="{ 'btn--ghost': grabRunning }"
-            :disabled="grabRunning && grab.whatKey !== 'avatar'"
-            :title="grabRunning ? '正在处理的那一位会做完，然后停下' : grabTips.avatar"
-            @click="grabRunning ? stopGrab() : startGrab('avatar')"
+            :title="grabRunning ? '正在处理的那一位会做完，然后停下' : grabTips.all"
+            @click="grabRunning ? stopGrab() : startGrab()"
           >
-            {{ grabRunning && grab.whatKey === 'avatar' ? '停止抓取' : '抓取头像' }}
-          </button>
-          <button
-            class="btn btn--sm"
-            :class="{ 'btn--ghost': grabRunning }"
-            :disabled="grabRunning && grab.whatKey !== 'profile'"
-            :title="grabRunning ? '正在处理的那一位会做完，然后停下' : grabTips.profile"
-            @click="grabRunning ? stopGrab() : startGrab('profile')"
-          >
-            {{ grabRunning && grab.whatKey === 'profile' ? '停止抓取' : '抓取资料' }}
+            {{ grabRunning ? '停止抓取' : '抓取头像与资料' }}
           </button>
           <button class="btn btn--sm" title="列出共享曾用名或本名互指的演员，逐组决定要不要合并" @click="showMerge = true">
             查重
@@ -81,6 +72,20 @@
         placeholder="搜索演员姓名或别名..."
         @keyup.enter="applyFilter"
         @input="debouncedSearch"
+      />
+      <SelectList
+        v-model="filters.hasPortrait"
+        :options="HAS_OPTIONS"
+        all-label="头像不限"
+        label="按有没有头像筛选"
+        @change="applyFilter"
+      />
+      <SelectList
+        v-model="filters.hasBirthdate"
+        :options="HAS_OPTIONS"
+        all-label="生日不限"
+        label="按有没有出生日期筛选"
+        @change="applyFilter"
       />
       <SelectList
         v-model="filters.sortBy"
@@ -134,7 +139,7 @@ import { ref, onBeforeUnmount, onMounted, computed, watch } from 'vue'
 import { actorApi } from '@/scripts/api'
 import { useAppStore } from '@/scripts/store/app'
 import { useUiStore, errText } from '@/scripts/store/ui'
-import { SORT_OPTIONS, ACTOR_SOURCES, ACTOR_SCRAPE_TIPS } from '@/scripts/constants'
+import { SORT_OPTIONS, ACTOR_SOURCES, ACTOR_SCRAPE_TIPS, HAS_OPTIONS } from '@/scripts/constants'
 import { debounce } from '@/scripts/utils/debounce'
 import AddActorDialog from '@/views/components/AddActorDialog.vue'
 import ActorMergeDialog from '@/views/components/ActorMergeDialog.vue'
@@ -162,7 +167,7 @@ const selectedIds = ref([])
 const syncing = ref(false)
 const showMerge = ref(false)
 
-const filters = ref({ country: '', sortBy: '' })
+const filters = ref({ country: '', hasPortrait: '', hasBirthdate: '', sortBy: '' })
 
 const pageSize = computed(() => app.personPageSize)
 
@@ -217,6 +222,8 @@ const loadActors = async () => {
       keyword: keyword.value
     }
     if (filters.value.country) params.country = filters.value.country
+    if (filters.value.hasPortrait) params.hasPortrait = filters.value.hasPortrait
+    if (filters.value.hasBirthdate) params.hasBirthdate = filters.value.hasBirthdate
     if (filters.value.sortBy) params.sortBy = filters.value.sortBy
 
     const res = await actorApi.getList(params)
@@ -271,7 +278,7 @@ const handleSelect = (actor) => {
 
 const handleReset = () => {
   keyword.value = ''
-  filters.value = { country: '', sortBy: '' }
+  filters.value = { country: '', hasPortrait: '', hasBirthdate: '', sortBy: '' }
   applyFilter()
 }
 
@@ -359,9 +366,9 @@ const startGrabPoll = () => {
   grabTimer = setInterval(pollGrab, 2000)
 }
 
-const startGrab = async (what) => {
+const startGrab = async () => {
   try {
-    const res = await actorApi.startScrape(what, grabSrc.value)
+    const res = await actorApi.startScrape('all', grabSrc.value)
     if (!res.success) {
       ui.warn(res.message || '没能启动')
       return

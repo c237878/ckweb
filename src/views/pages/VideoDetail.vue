@@ -88,7 +88,12 @@
                         </div>
                         <div v-if="video.studioName" class="kv">
                             <span class="kv__k">片商</span>
-                            <div class="kv__v">{{ video.studioName }}</div>
+                            <div class="kv__v">
+                                <!-- 填了官网才成链接：站外地址一律新标签 + noreferrer -->
+                                <a v-if="video.studioLink" class="actor-link" :href="video.studioLink"
+                                   target="_blank" rel="noreferrer">{{ video.studioName }}</a>
+                                <template v-else>{{ video.studioName }}</template>
+                            </div>
                         </div>
                         <div v-if="video.seriesName" class="kv">
                             <span class="kv__k">系列</span>

@@ -113,6 +113,7 @@ export const scrapeApi = {
   saveChannel: (body) => api.put('/scrape/channel', body),
   deleteChannel: (id) => api.delete(`/scrape/channel/${id}`),
   resetChannel: (id) => api.post(`/scrape/channel/${id}/reset`),
+  toggleChannel: (id) => api.post(`/scrape/channel/${id}/toggle`),
   testChannel: (id, params) => api.post(`/scrape/channel/${id}/test`, null, { params }),
   applyChannel: (id, entityId) => api.post(`/scrape/channel/${id}/apply`, null, { params: { entityId } })
 }
@@ -143,10 +144,11 @@ export const actorApi = {
   syncImages: (id) => api.post(id ? `/actor/${id}/images/sync` : '/actor/images/sync'),
   /** 指定列表页那张脸用哪张图 */
   setPrimaryImage: (id, fileName) => api.put(`/actor/${id}/image/primary`, { fileName }),
-  /** 给一位演员抓头像（只补头像，拿不准就什么都不做，返回里会说明原因）；src 见 ACTOR_SOURCES */
-  fetchAvatar: (id, src) => api.post(`/actor/${id}/avatar/fetch`, null, { params: { src } }),
-  /** 给一位演员抓资料：av-wiki 是生日与简介，老师图鉴是生日与别名，都只填当前空着的字段 */
-  fetchProfile: (id, src) => api.post(`/actor/${id}/profile/fetch`, null, { params: { src } }),
+  /**
+   * 给一位演员补档：头像 + 资料一次问完（同一份档案问两遍没意义）。
+   * 拿不准就什么都不做，返回里会说明原因；src 见 ACTOR_SOURCES。
+   */
+  fetchMeta: (id, src) => api.post(`/actor/${id}/meta/fetch`, null, { params: { src } }),
   /** 全站抓取：任务在服务端后台跑，what = avatar | profile | all，src 决定问哪个档案源 */
   startScrape: (what = 'all', src) => api.post('/actor/scrape/fetch', { what, src }),
   scrapeStatus: () => api.get('/actor/scrape/status'),

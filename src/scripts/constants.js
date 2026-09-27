@@ -143,11 +143,15 @@ export const ACTOR_SOURCES = [
 /** 每个源、每个按钮各一句说明：两个源取的东西不一样，tooltip 不能写成同一句 */
 export const ACTOR_SCRAPE_TIPS = {
   avwiki: {
-    avatar: '按姓名与曾用名去 av-wiki 的档案页找头像：只有唯一命中、且名字对得上才抓，拿不准就跳过',
-    profile: '从 av-wiki 的档案页取出生日期与简介；已经填过的不覆盖'
+    all: '按姓名与曾用名去 av-wiki 查一次档案，头像、出生日期、简介一次补齐：只有唯一命中、且名字对得上才抓；已经填过的不覆盖'
   },
   laoshi: {
-    avatar: '按姓名去老师图鉴（laoshi.ink）找头像：档案编号唯一命中才抓',
-    profile: '从老师图鉴的档案页取出生日期与别名（日文名 / 罗马音）；简介不接，那站冷门页写的是榜单套话'
+    all: '按姓名去老师图鉴（laoshi.ink）查一次档案，头像、出生日期、别名（日文名 / 罗马音）一次补齐；简介不接，那站冷门页写的是榜单套话'
   }
 }
+
+/** 演员列表"有没有"类筛选：三态，空串表示不限；值由后端 bool? 参数接 */
+export const HAS_OPTIONS = [
+  { value: 'true', label: '有' },
+  { value: 'false', label: '无' }
+]
