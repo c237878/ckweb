@@ -564,7 +564,12 @@ JSON-RPC 2.0 手写（`initialize` / `tools/list` / `tools/call` / `notification
   SDK 会把后者当服务端故障，模型就再也读不到"你少传了 videoId"这种可自救的信息。
 
 打标口径存在 `system_settings.aiTagRule`（就是条普通设置，界面走 `/api/systemsetting` 保存，
-不另开写入口），每次 `tools/list` 都拼在 `tag_propose` 的说明上。默认口径是"按中文片名总结特色标签"。
+不另开写入口），每次 `tools/list` 都拼在 `tag_propose` 的说明上。默认口径允许**推导**：
+片名不必出现原词，「爆乳」可归到已有的「巨乳」，「儿子的同学」可推成「友人母」，标签数量也不限。
+
+推导一放宽，"提个近义词"就成了新风险，所以归一这件事不只写在提示词里：`tag_propose` 对认不出的词
+会回 `similar`（词表里字符重叠度最高的三个正名），模型看到 `爆乳 → ["巨乳"]` 就该改用它而不是进队列。
+只做提示、绝不自动挂——"算不算同一类"是语义判断，接口不替人拍板。
 
 ### 重复演员合并（`views/components/ActorMergeDialog.vue`）
 
