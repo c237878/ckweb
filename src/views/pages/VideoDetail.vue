@@ -786,11 +786,13 @@ const handlePictureInPicture = async () => {
 
 const onEditSave = async (formData) => {
     try {
-        await videoApi.update(video.value.id, formData)
+        const res = await videoApi.update(video.value.id, formData)
+        // 业务失败是 200 + success:false，不判就会"没存上还说已保存"；失败时留在弹窗里好改
+        if (!res?.success) return ui.error(res?.message || '保存失败')
         showEditDialog.value = false
         editingVideo.value = null
         await loadVideo()
-        ui.success('已保存')
+        ui.success(res.message || '已保存')
     } catch (error) {
         console.error('保存失败:', error)
         ui.error('保存失败：' + errText(error))

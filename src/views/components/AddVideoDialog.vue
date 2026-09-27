@@ -68,7 +68,7 @@
             :options="studioOptions"
             placeholder="选择或输入片商名称"
           />
-          <p class="hint">词表里没有的名字会顺手建一家；改名、合并、补别名去 设置 → 标签与片商。</p>
+          <p class="hint">词表里没有的名字会顺手建一家；同系列还没填片商的会一起补上（已有片商的不动）。改名、合并去 设置 → 标签与片商。</p>
         </div>
 
         <div class="row row--two">

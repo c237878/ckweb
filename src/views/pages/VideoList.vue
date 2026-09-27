@@ -523,14 +523,17 @@ const batchDelete = async () => {
   }
 }
 
+/** 保存失败要留在弹窗里：后端对"发行日期格式不对"这类业务失败回的是 200 + success:false，
+    不判 success 就会明明没存上却提示"已保存" */
 const handleSaveVideo = async (formData) => {
   try {
-    if (formData.id) await videoApi.update(formData.id, formData)
-    else await videoApi.add(formData)
+    const res = formData.id ? await videoApi.update(formData.id, formData) : await videoApi.add(formData)
+    if (!res?.success) return ui.error(res?.message || '保存失败')
     showAddDialog.value = false
     editingVideo.value = null
     await Promise.all([loadVideos(), loadMeta()])
-    ui.success('已保存')
+    // 消息里可能带"同系列另外 N 部也补上了片商"，别把它吞成一句"已保存"
+    ui.success(res.message || '已保存')
   } catch (err) {
     console.error('保存失败:', err)
     ui.error('保存失败：' + errText(err))
@@ -539,9 +542,10 @@ const handleSaveVideo = async (formData) => {
 
 const handleSaveContinue = async (formData) => {
   try {
-    await videoApi.add(formData)
+    const res = await videoApi.add(formData)
+    if (!res?.success) return ui.error(res?.message || '添加失败')
     await Promise.all([loadVideos(), loadMeta()])
-    ui.success('已添加')
+    ui.success(res.message || '已添加')
   } catch (err) {
     console.error('保存失败:', err)
     ui.error('保存失败：' + errText(err))
