@@ -61,16 +61,6 @@
           </div>
         </div>
 
-        <div class="field">
-          <label class="field__label">片商</label>
-          <TokenPicker
-            v-model="studioPicked"
-            :options="studioOptions"
-            placeholder="选择或输入片商名称"
-          />
-          <p class="hint">词表里没有的名字会顺手建一家；同系列还没填片商的会一起补上（已有片商的不动）。改名、合并去 设置 → 标签与片商。</p>
-        </div>
-
         <div class="row row--two">
           <!-- 地区 / 分类的可选值来自系统设置的规范列表，这里只做选择；
                要新增取值去 设置 → 地区与分类 -->
@@ -85,6 +75,7 @@
           </label>
         </div>
 
+        <!-- 系列与片商同形：一部片各只有一个，所以都是单选可搜的 ComboBox -->
         <label class="field">
           <span class="field__label">所属系列</span>
           <ComboBox
@@ -94,6 +85,17 @@
             all-label="（无系列）"
           />
         </label>
+
+        <div class="field">
+          <label class="field__label">片商</label>
+          <ComboBox
+            v-model="form.studioId"
+            :options="studioOptions"
+            placeholder="选择或输入片商名称"
+            all-label="（无片商）"
+          />
+          <p class="hint">词表里没有的片商先去 设置 → 片商 添加；这里填上后，同系列还没片商的会一起补上（已有的不动）。</p>
+        </div>
 
         <!-- 视频路径：手动输入 + 自动填充 + 上传 -->
         <div class="field">
@@ -272,7 +274,6 @@ import { autoFitDropdown } from '@/scripts/utils/dropdownFit'
 import Dialog from './Dialog.vue'
 import ComboBox from './ComboBox.vue'
 import SelectList from './SelectList.vue'
-import TokenPicker from './TokenPicker.vue'
 import { toOptions } from '@/scripts/utils/options'
 
 const props = defineProps({
@@ -315,6 +316,7 @@ const form = ref({
   category: '',
   country: '',
   seriesId: '',
+  studioId: '',
   filePath: '',
   coverPath: '',
   fileSize: null,
@@ -322,8 +324,7 @@ const form = ref({
   releaseDate: ''
 })
 
-// 片商是 M:N，不在这份 form 里（form 是"一列一值"的形状），单独一个数组随 payload 一起交
-const studioPicked = ref([])
+// 片商与系列同形：一部片一个值，所以直接进 form，选项形状也与 seriesOptions 一致
 const studioOptions = ref([])
 
 const loadStudios = async () => {
@@ -643,7 +644,8 @@ watch(() => props.visible, async (val) => {
       originalName: video.originalName || '',
       releaseDate: video.releaseDate || ''
     }
-    studioPicked.value = (video.studios || []).map((x) => ({ id: x.id, name: x.name }))
+    // 片商是一部片的一个值，直接回填 id；选项列表已由 loadStudios 拿全
+    form.value.studioId = video.studioId || ''
     selectedActors.value = detail.data.actors || []
     // 编辑值不在已有选项里时，直接落到手填输入框，免得看起来像没选
   } catch (e) {
@@ -653,10 +655,10 @@ watch(() => props.visible, async (val) => {
 
 const resetForm = () => {
   form.value = {
-    name: '', code: '', category: '', country: '', seriesId: '',
+    name: '', code: '', category: '', country: '', seriesId: '', studioId: '',
     filePath: '', coverPath: '', fileSize: null, originalName: '', releaseDate: ''
   }
-  studioPicked.value = []
+
   resetActors()
 }
 
@@ -684,7 +686,7 @@ const handleSave = () => {
     fileSize: form.value.fileSize,
     originalName: form.value.originalName,
     releaseDate: form.value.releaseDate,
-    studios: studioPicked.value.map((x) => ({ id: x.id, name: x.name })),
+    studioId: form.value.studioId,
     actorIds: selectedActors.value.map((a) => a.id)
   })
 }
@@ -705,7 +707,7 @@ const handleSaveContinue = () => {
     fileSize: form.value.fileSize,
     originalName: form.value.originalName,
     releaseDate: form.value.releaseDate,
-    studios: studioPicked.value.map((x) => ({ id: x.id, name: x.name })),
+    studioId: form.value.studioId,
     actorIds: selectedActors.value.map((a) => a.id)
   })
   // 清空番号、视频路径、封面路径、演员
@@ -715,7 +717,7 @@ const handleSaveContinue = () => {
   form.value.fileSize = null
   form.value.originalName = ''
   form.value.releaseDate = ''
-  studioPicked.value = []
+
   resetActors()
 }
 

@@ -2,9 +2,9 @@
   <div class="meta-lists" :class="embedded ? 'meta-lists--embedded' : 'page'">
     <div class="meta-lists__head">
       <h1 v-if="!embedded" class="page-title">词表管理</h1>
-      <div class="tabs" role="tablist">
+      <div v-if="shownTabs.length > 1" class="tabs" role="tablist">
         <button
-          v-for="t in TABS"
+          v-for="t in shownTabs"
           :key="t.key"
           role="tab"
           class="tag tab"
@@ -23,6 +23,14 @@
       <template v-if="tab === 'tag'">
         <input v-model="newName" class="input grow" placeholder="新标签名" @keyup.enter="create" />
         <button class="btn btn--sm btn--primary" :disabled="!newName.trim() || busy" @click="create">添加</button>
+        <button
+          v-if="picked.length"
+          class="btn btn--sm btn--danger"
+          :disabled="busy"
+          @click="removePicked"
+        >
+ 删除选中（{{ picked.length }}）
+</button>
       </template>
       <button v-else class="btn btn--sm btn--primary" @click="openStudio(null)">添加片商</button>
       <input
@@ -38,10 +46,24 @@
     <!-- 标签词表 -->
     <table v-if="tab === 'tag'" class="grid-table">
       <thead>
-        <tr><th>标签</th><th>别名</th><th class="num">影片</th><th class="num">AI 打的</th><th class="ops">操作</th></tr>
+        <tr>
+          <th class="chk">
+            <input
+              type="checkbox"
+              aria-label="全选本页"
+              :checked="allOnPage"
+              :indeterminate.prop="someOnPage && !allOnPage"
+              @change="toggleAll"
+            />
+          </th>
+          <th>标签</th><th>别名</th><th class="num">影片</th><th class="num">AI 打的</th><th class="ops">操作</th>
+        </tr>
       </thead>
       <tbody>
-        <tr v-for="t in rows" :key="t.id">
+        <tr v-for="t in rows" :key="t.id" :class="{ 'is-picked': picked.includes(t.id) }">
+          <td class="chk">
+            <input type="checkbox" :aria-label="`选择标签 ${t.name}`" :checked="picked.includes(t.id)" @change="togglePick(t)" />
+          </td>
           <td>
             <input v-if="editing === t.id" v-model="editName" class="input input--sm" @keyup.enter="saveEdit(t)" />
             <span v-else>{{ t.name }}</span>
@@ -192,8 +214,15 @@ import SelectList from '@/views/components/SelectList.vue'
 import ChipListEditor from '@/views/components/ChipListEditor.vue'
 import Dialog from '@/views/components/Dialog.vue'
 
-/** 嵌进设置页时不要自己的页头与页面级留白，只留标签条和表格 */
-defineProps({ embedded: { type: Boolean, default: false } })
+/**
+ * 嵌进设置页时不要自己的页头与页面级留白，只留标签条和表格。
+ * tabs 决定这一份露出哪几个词表：设置里「题材标签」与「片商」是两个分区，
+ * 各自只挂自己那一份，所以片商那边传 ['studio']，标签那边传 ['tag','pending']。
+ */
+const props = defineProps({
+  embedded: { type: Boolean, default: false },
+  tabs: { type: Array, default: () => ['tag', 'studio', 'pending'] }
+})
 
 const TABS = [
   { key: 'tag', label: '题材标签' },
@@ -204,7 +233,8 @@ const TABS = [
 const app = useAppStore()
 const ui = useUiStore()
 
-const tab = ref('tag')
+const shownTabs = computed(() => TABS.filter((t) => props.tabs.includes(t.key)))
+const tab = ref(shownTabs.value[0]?.key || 'tag')
 const rows = ref([])
 const suggestions = ref([])
 const pendingCount = ref(0)
@@ -216,6 +246,8 @@ const editing = ref('')
 const editName = ref('')
 const busy = ref(false)
 const mergeTarget = ref({})
+// 批量删标签的勾选集：跨页留着（翻页不该把人刚勾的清空），切标签页或删完才清
+const picked = ref([])
 
 const pageSize = computed(() => app.pageSize)
 const rows2Options = computed(() => rows.value.map((t) => ({ value: t.id, label: t.name })))
@@ -257,7 +289,47 @@ const switchTab = (key) => {
   tab.value = key
   page.value = 1
   editing.value = ''
+  picked.value = []
   load()
+}
+
+const pageIds = computed(() => rows.value.map((r) => r.id))
+const allOnPage = computed(() => pageIds.value.length > 0 && pageIds.value.every((id) => picked.value.includes(id)))
+const someOnPage = computed(() => pageIds.value.some((id) => picked.value.includes(id)))
+
+const togglePick = (row) => {
+  picked.value = picked.value.includes(row.id)
+    ? picked.value.filter((id) => id !== row.id)
+    : [...picked.value, row.id]
+}
+
+const toggleAll = () => { picked.value = allOnPage.value ? [] : [...pageIds.value] }
+
+/** 一次删十几个是常态（AI 跑完一轮要清场），所以影响面在确认框里算清楚再动手 */
+const removePicked = async () => {
+  const chosen = rows.value.filter((r) => picked.value.includes(r.id))
+  const films = chosen.reduce((n, r) => n + (r.videoCount || 0), 0)
+  const names = chosen.slice(0, 6).map((r) => r.name).join('、') + (chosen.length > 6 ? ` 等 ${chosen.length} 个` : '')
+  const go = await ui.confirm({
+    title: `删除 ${chosen.length} 个标签`,
+    message: `${names} 会从词表里消失，${films} 部影片上的这些挂接也一并摘掉（按标签浏览会少这些入口）。这一步不能撤销。`,
+    confirmLabel: '删除',
+    danger: true
+  })
+  if (!go) return
+  busy.value = true
+  try {
+    const res = await tagApi.batchDelete(picked.value)
+    if (res.success) {
+      picked.value = []
+      ui.success(res.message)
+      load()
+    } else ui.error(res.message || '删除失败')
+  } catch (err) {
+    ui.error('失败：' + errText(err))
+  } finally {
+    busy.value = false
+  }
 }
 
 const create = async () => {
@@ -498,6 +570,18 @@ onMounted(async () => {
 }
 
 .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* 勾选列：窄、居中，尺寸与卡片上的选择框同一档 */
+.chk { width: 34px; text-align: center; }
+
+.chk input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+tr.is-picked td { background: var(--bg-elev-2); }
 
 .has-ai { color: var(--warn); }
 

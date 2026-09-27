@@ -129,9 +129,9 @@
                             <span class="kv__k">发行</span>
                             <div class="kv__v">{{ video.releaseDate }}</div>
                         </div>
-                        <div v-if="studios.length" class="kv">
+                        <div v-if="video.studioName" class="kv">
                             <span class="kv__k">片商</span>
-                            <div class="kv__v">{{ studios.map((x) => x.name).join(' · ') }}</div>
+                            <div class="kv__v">{{ video.studioName }}</div>
                         </div>
                         <div v-if="video.seriesName" class="kv">
                             <span class="kv__k">系列</span>
@@ -360,14 +360,12 @@ const scanning = ref(false)
 const tagPicked = ref([])
 const tagOptions = ref([])
 const groups = ref([])
-const studios = ref([])
 
 /**
  * 详情回来的一次性状态灌进三个可编辑控件。
  * 只在加载时调用，不做双向绑定：绑了的话用户改到一半、后台刷新会把半截输入冲掉。
  */
 const applyMeta = (v) => {
-    studios.value = v.studios || []
     tagPicked.value = (v.tags || []).map((t) => ({ id: t.id, name: t.name }))
     groups.value = v.groups || []
 }

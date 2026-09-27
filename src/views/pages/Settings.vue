@@ -189,21 +189,38 @@
           <ScrapeChannelsPanel />
         </section>
 
-        <!-- 词表：原先独立成 /metadata 挂在顶部菜单，但它属于配置，收进设置复用同一个组件 -->
+        <!-- 词表：原先独立成 /metadata 挂在顶部菜单，但它属于配置，收进设置复用同一个组件。
+             标签与片商各占一个分区——两份词表管的东西不一样，混在一个标签条里来回找不如分开点 -->
         <section
-          v-else-if="activeGroup === 'vocab'"
-          id="panel-vocab"
+          v-else-if="activeGroup === 'tags'"
+          id="panel-tags"
           class="panel settings-group"
           role="tabpanel"
-          aria-labelledby="tab-vocab"
+          aria-labelledby="tab-tags"
           tabindex="-1"
         >
-          <h2 class="section-title">标签与片商</h2>
+          <h2 class="section-title">题材标签</h2>
           <p class="panel-desc">
-            两份词表只在这里增删：题材标签管影片的内容特征，片商管谁发行的。
+            标签只描述影片的内容特征，一部片可以挂好几个。词表只在这里增删；
             AI 只能提候选，批准、并入、驳回都由你点。
           </p>
-          <MetaLists embedded />
+          <MetaLists embedded :tabs="['tag', 'pending']" />
+        </section>
+
+        <section
+          v-else-if="activeGroup === 'studios'"
+          id="panel-studios"
+          class="panel settings-group"
+          role="tabpanel"
+          aria-labelledby="tab-studios"
+          tabindex="-1"
+        >
+          <h2 class="section-title">片商</h2>
+          <p class="panel-desc">
+            片商是发行一部片的那家，一部片只有一个，所以影片编辑里它和「所属系列」一样是单选。
+            别名让搜索与抓取归一，国家取自「地区与分类」，官网是它自己的站点。
+          </p>
+          <MetaLists embedded :tabs="['studio']" />
         </section>
 
         <!-- AI 接口：端点、密钥、工具清单与打标口径，整块在组件里 -->
@@ -393,7 +410,8 @@ const GROUPS = [
   { id: 'media', label: '图片目录', desc: '艳图与演员海报使用的图片目录；影片扫描目录见「扫描目录」。' },
   { id: 'dirs', label: '扫描目录', desc: '导入影片、封面、字幕时从哪里找文件。' },
   { id: 'taxonomy', label: '地区与分类' },
-  { id: 'vocab', label: '标签与片商' },
+  { id: 'tags', label: '题材标签' },
+  { id: 'studios', label: '片商' },
   { id: 'channels', label: '抓取通道', desc: '外部站点的查询地址、字段抽取规则，以及限速 / 每日配额 / 连续失败熔断。' },
   { id: 'mcp', label: 'AI 接口' },
   { id: 'links', label: '友情链接', desc: '显示在页脚，按排序数字从小到大排列。' }

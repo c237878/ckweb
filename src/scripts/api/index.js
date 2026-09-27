@@ -102,8 +102,6 @@ export const videoApi = {
   getRecentlyLiked: (count) => api.get('/video/recently-liked', { params: { count } }),
   getTopLiked: (count) => api.get('/video/top-liked', { params: { count } }),
   renameToCode: () => api.post('/video/rename-to-code'),
-  /** 整组替换片商：items 里给 id 用已有的，只给 name 就自动归一/新建 */
-  setStudios: (id, items) => api.put(`/video/${id}/studios`, { items }),
   /** 整组替换标签（人工路径，允许顺手建新标签；AI 走 tagApi.propose） */
   setTags: (id, names) => api.put(`/video/${id}/tags`, { names }),
   setLinks: (id, links) => api.put(`/video/${id}/links`, { links }),
@@ -149,6 +147,8 @@ export const tagApi = {
   add: (data) => api.post('/tag', data),
   update: (id, data) => api.put(`/tag/${id}`, data),
   remove: (id) => api.delete(`/tag/${id}`),
+  /** 批量删标签：一个事务里逐个摘挂接，语义与单条删除一致 */
+  batchDelete: (ids) => api.post('/tag/batch-delete', { ids }),
   merge: (id, into) => api.post(`/tag/${id}/merge`, { into }),
   suggestions: (params) => api.get('/tag/suggestions', { params }),
   propose: (data) => api.post('/tag/suggestions', data),

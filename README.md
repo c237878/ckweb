@@ -40,7 +40,7 @@ cd ckweb && npm install && npm run dev
 ### 表
 
 **videos** — 影片
-`id` `name` `category`(单一分类文本) `code`(番号) `country` `seriesid`→video_series `file_path` `file_size` `cover_path`(**磁盘绝对路径，不是 Base64**) `subtitle_state` `watermark_state` `res_w` `res_h` `scan_time` `sort_order` `ctime`
+`id` `name` `category`(单一分类文本) `code`(番号) `country` `seriesid`→video_series `studioid`→studios `file_path` `file_size` `cover_path`(**磁盘绝对路径，不是 Base64**) `subtitle_state` `watermark_state` `res_w` `res_h` `scan_time` `sort_order` `ctime`
 > 入库时间就是 `ctime`。接口里的 `addedAt` 字段也取自 `ctime`，但前端目前没有任何地方渲染它。
 
 **片源两维（schema v6 起）** — 原先 `media_attr_flags` 一格要同时表达"字幕在不在"和"画面有没有广告"，
@@ -466,7 +466,7 @@ JSON 接口，不去解析网页排版。抓回来的是事实字段（日期、
 - `force=true`（全站重扫）只在后端与接口文档里留着，界面不摆按钮：换过文件的正常走法是在详情页
   点「重置」清掉这一条，它就成了「未扫描」，下一次「扫描片源」自然把它带上（分辨率筛选里也有「未扫描」一档方便清点）。
 
-### 影片元数据结构（v8：原名 / 片商 / 标签 / 合辑 / 档案链接）
+### 影片元数据结构（v8 原名 / 标签 / 合辑 / 档案链接；v9 片商收成单值）
 
 对齐 TMDB 的结构位，但只落**能自己填上**的那几个；`media_images`、拆 `videos/video_files`
 两条实测无数据支撑（每个番号恰好一张封面、重复番号 0 条），没做。
@@ -475,9 +475,13 @@ JSON 接口，不去解析网页排版。抓回来的是事实字段（日期、
   语义写在这里与界面上。发行日期沿用生日那套口径：只收 `2024` / `2024-03` / `2024-03-15`，不补零。
   改这两列走 **`PUT /api/video/{id}/meta`**，不走整份 `PUT /video/{id}`——后者会把
   `cover_path` 等字段按传入值一起写，漏传就清空，只想改个发行日期不该冒这个险。
-- **片商是实体不是字符串**：`studios` + `studio_aliases` + `video_studios(video_id, studio_id, role)`。
-  `role` 只认 `maker`（制作商）/ `label`（发行商）/ 空串，一部片常同时挂两家。
-  存成 `videos` 上的一列文本等于用字符串当外键——「麦当娜 / Madonna / マドンナ」会被当成三家。
+- **片商是实体不是字符串，但一部片只有一家**：`studios` + `studio_aliases`，影片侧是
+  `videos.studioid`（v9 起，与 `seriesid` 同形）。原来照 TMDB 做成 `video_studios(video_id, studio_id, role)`
+  多对多，预设"制作商 + 发行商"会常见；实际填下来 27 部有片商的没有一部挂过两家、`role` 全是空串，
+  多对多换来的只有"界面得假装单选"。存成文本列同样不行——「麦当娜 / Madonna / マドンナ」会被当成三家，
+  所以实体与别名表留着，只是关系收成外键列。
+  **保存时顺手补同系列**：`FillSeriesStudios` 把这家片商写进同系列**还没填片商**的影片（已有片商的绝不动，
+  系列里混进别家时那些结论得留着），补了几部回在消息里，界面直接显示。清空只清自己。
 - **标签走受控词表**：`tags` + `tag_aliases` + `video_tags(video_id, tag_id, source)`。
   `source` 分 `manual` / `ai`，这样"AI 打过还没复核"的能筛出来。
   **AI 不许直接建标签**：`POST /api/tag/suggestions` 只能进 `tag_suggestions` 待审队列，
@@ -492,13 +496,19 @@ JSON 接口，不去解析网页排版。抓回来的是事实字段（日期、
   详情页每个组渲染成一排可点胶囊，当前这部高亮。
 - `video_links`：影片的外部档案地址，与 `actor_links` 同构、共用 `Utils/Links` 的校验与归类。
   它同时是将来抓取的首选定位键——自己的数据已经指向档案时，抓取不用再搜一遍也不会认错片。
-- 词表管理在**设置 → 标签与片商**（`/metadata` 老地址做了重定向，不再占顶部菜单一个位置）。
-  三个标签：题材标签、片商、AI 候选待审（带角标数）。标签支持改名/删除/并入已有；
-  片商走对话框，正名 / 别名 / 国家 / 官网四个字段一起给（国家取自「地区与分类」那份规范清单，
+- 词表管理在设置里**占两个分区**：「题材标签」（内含 词表 / AI 候选待审 两个标签，后者带角标）
+  与「片商」。`/metadata` 老地址重定向到标签那一个，顶部菜单不再为它留位置。
+  `MetaLists.vue` 收 `tabs` 属性决定这一份露出哪几个词表，只剩一个时标签条自动不渲染。
+- 标签支持**批量删除**（`POST /api/tag/batch-delete`）：行首勾选 + 表头全选本页，勾上才出现
+  「删除选中（N）」。AI 跑完一轮要清场时一次点十几个，逐条删不现实；确认框里算清
+  影响面（哪几个词、共多少部影片会失去这些挂接）再动手。删除仍走 `PurgeTag`，与单条删语义一致。
+- 片商走对话框，正名 / 别名 / 国家 / 官网四个字段一起给（国家取自「地区与分类」那份规范清单，
   官网缺协议会补 `https://`，否则点开来会跳回本站）。删除都会连带摘掉影片上的挂接。
-- 挑选控件是 `views/components/TokenPicker.vue`（片商与标签共用）：输入即过滤正名与别名，
-  定高与「所属系列」同一档（`.input` 的 `--ctl-h`），浮层走全局 `.dropdown-menu` 并复用
-  `autoFitDropdown` —— 编辑对话框的 `.dialog__body` 会裁掉溢出部分，不自适应就点不到下半截。
+- 片商在影片编辑里是**单选可搜**，与「所属系列」用同一个 `ComboBox`（同形就该同控件）；
+  词表里没有的先去 设置 → 片商 加。多选的场景只剩标签，所以
+  `views/components/TokenPicker.vue` 现在只服务标签：输入即过滤正名与别名，定高与 `.input` 同档
+  （`--ctl-h`），浮层走全局 `.dropdown-menu` 并复用 `autoFitDropdown` ——
+  编辑对话框的 `.dialog__body` 会裁掉溢出部分，不自适应就点不到下半截。
   下拉自己画：用 `<datalist>` 会弹系统浅色面板，暗色主题下像另一个网站。
 - 详情页播放器下方统一成**一份两列清单**（`.kv-list`：定宽标签列 + 值列），标签一律不带冒号、
   字号统一 `--f-sm`；顺序按关联度分三档：片源（字幕 / 广告水印 / 分辨率）→ 内容（标签 / 合辑）
@@ -615,7 +625,7 @@ JSON-RPC 2.0 手写（`initialize` / `tools/list` / `tools/call` / `notification
 窄屏（<900px）时标签变成顶部一行可横滑的标签条。
 
 当前分区（`GROUPS` 就是这个顺序）：**站点与首页**（网站名称、每页数量、首页展示分类与条数）
-→ **图片目录** → **扫描目录** → **地区与分类**（即原来的「数据源」）→ **标签与片商**
+→ **图片目录** → **扫描目录** → **地区与分类**（即原来的「数据源」）→ **题材标签** → **片商**
 → **抓取通道** → **AI 接口** → **友情链接**。
 
 **配置类功能不进顶部菜单**：词表原先是 `/metadata` + 导航「词表」，现在整页嵌进设置
