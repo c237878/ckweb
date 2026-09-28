@@ -23,12 +23,15 @@
 
     <table class="grid-table">
       <thead>
-        <tr><th>片商</th><th>别名</th><th>国家</th><th>官网</th><th class="num">影片</th><th class="ops">操作</th></tr>
+        <tr>
+            <th>片商</th><th class="col-alias">别名</th><th>国家</th><th>官网</th>
+            <th class="num">影片</th><th class="ops">操作</th>
+        </tr>
       </thead>
       <tbody>
         <tr v-for="s in rows" :key="s.id">
           <td>{{ s.name }}</td>
-          <td class="dim">{{ s.aliases.join('、') || '—' }}</td>
+          <td class="dim col-alias">{{ s.aliases.join('、') || '—' }}</td>
           <td class="dim">{{ s.country || '—' }}</td>
           <td>
             <a v-if="s.link" class="link" :href="s.link" target="_blank" rel="noreferrer">官网</a>
@@ -302,4 +305,20 @@ onMounted(() => {
 }
 
 .link:hover { color: var(--accent); }
+
+/* 窄屏下别名整列收起来：它是这张表里最宽的一列（一串日文长名），
+   挤得右边的「操作」直接被面板边缘裁掉、删除点不到。
+   别名在编辑框里看得到也改得了，收掉的只是这一处的显示 */
+@media (max-width: 899px) {
+  .col-alias {
+    display: none;
+  }
+
+  /* 表头与短值都别拆成两行：列本来就窄，"国/家"、"日/本"竖着排比列宽更难看。
+     片商名长，仍允许换行 */
+  .grid-table th,
+  .grid-table td:not(:first-child) {
+    white-space: nowrap;
+  }
+}
 </style>
