@@ -165,10 +165,12 @@ v4 迁移把含 `http` 的简介逐条抽出（382 位演员 → 528 行，379 �
 `GET /` · `GET /{id}` · `POST /` · `PUT /{id}` · `DELETE /{id}` · `GET /countries` · `GET /{id}/videos` · `POST /images/sync` · `POST /{id}/images/sync` · `PUT /{id}/image/primary` · `POST /{id}/meta/fetch` · `POST /scrape/fetch` · `GET /scrape/status` · `DELETE /scrape/fetch` · `GET /{id}/poster/{fileName}` · `GET /{id}/thumb/{s|m}/{fileName}` · `GET /duplicates` · `POST /merge`
 > 图片清单不再单独请求：`GET /{id}` 的 `data.images` 里就带着（来自 `actor_images`）。
 > 列表每行带 `avatar`（主图文件名，没有照片则为 null）——脸只出现在演员列表页这一处。
-> `GET /` 支持 `keyword` `country` `sortBy` 与两个"有没有"筛选：`hasPortrait`、`hasBirthdate`
-> （bool，不传=不限）。演员列表页的「头像不限 / 有 / 无」「生日不限 / 有 / 无」两个下拉就是它们，
-> 判"有没有脸"用 `EXISTS (actor_images)`：实测有图的 1083 位全都有主图，两种口径当前等价。
-> 抓取按钮配的 `?src=` 见 `ACTOR_SOURCES`，不传时走 av-wiki。
+> `GET /` 支持 `keyword` `country` `sortBy` 与两个筛选：`hasPortrait`（bool，三态）、
+> `birthYear`（`none` = 没有生日，或四位年份）。判"有没有脸"用 `EXISTS (actor_images)`：
+> 实测有图的 1083 位全都有主图，两种口径当前等价。生日存的可能是一元、`YYYY-MM` 或全日期，
+> 所以年份统一取 `SUBSTR(birthdate, 1, 4)` 比；年份下拉的取值来自 `GET /actor/birth-years`
+> （库里真出现过的，升序，45 个）——给一个 1900-2100 的空区间不如只列有的。
+> 抓取按钮配的 `?src=` 来自 `GET /actor/scrape/sources`，不传时走 av-wiki。
 > `GET /{id}/videos` 支持 `page` `pageSize` `subtitle` `watermark` `resolution` `hasFile`，筛选在服务端完成后再分页。
 
 ### /api/Series
@@ -574,7 +576,15 @@ javcup 详情字段是混淆 JS，javlibrary / javdb 从这台机器连不上。
 
 - **状态一键切换**：通道列表的操作列第一个就是「停用 / 启用」（`POST /scrape/channel/{id}/toggle`）。
   单独一个接口而不是让前端回整份配置——编辑对话框改一半没保存时，开关不该顺手把 rules 写回去。
-  停用后 `Check` 直接把这条通道拦掉，抓取遇到它跳过，配置与规则原样留着。
+- **停用 = 从抓取入口消失**：`GET /actor/scrape/sources` 只列通道存在且启用的源，
+  演员列表与详情相册的来源下拉框用它（`utils/scrapeSources.js` 一份状态两处用，
+  选过哪个记在 localStorage）。停用的源还摆在列表里让人选，选完只能吃一句拒绝。
+  冷却中与配额用满的源**仍然在列表里** —— 那是一会儿就自己好的状态，藏起来会让人以为源没了。
+- **单位抓取也过闸门**（`ScrapeJob.FetchOneAsync`）：先看开关/冷却/配额，等够最小间隔再问，
+  抓完把结果回报给通道。之前只有批量走闸门，手工点既不计配额也不受间隔约束；
+  批量 `Start` 同样先问一次开关，免得起一个第一圈就会自己停下来的任务。
+- 按「停止抓取」收尾时不再报"任务异常中断"：等间隔时被叫停抛的是 `OperationCanceledException`，
+  以前它落到兜底 catch 里，一条正常的停止被说成了事故。
 
 表里种下两条内置通道（`fetch_kind=builtin`）：av-wiki 女优档案与老师图鉴女优档案，
 按 `fetch_url` 里的域名认谁是谁（`FirstFor(entity, host)`），配额与熔断各算各的。

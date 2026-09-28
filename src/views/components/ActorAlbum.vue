@@ -4,7 +4,7 @@
     <div class="album__actions">
       <!-- 没照片的时候最需要抓的恰恰是这个按钮，所以空态里也要给全 -->
       <template v-if="scrapeable">
-        <SelectList v-model="src" :options="ACTOR_SOURCES" label="抓取来源" title="两个档案源收的东西不一样：av-wiki 有头像与简介，老师图鉴有别名与更全的生日" />
+        <SelectList v-model="src" :options="sources" label="抓取来源" title="两个档案源收的东西不一样：av-wiki 有头像与简介，老师图鉴有别名与更全的生日" />
         <button
           type="button"
           class="btn btn--sm"
@@ -91,7 +91,7 @@
           设为头像
         </button>
         <template v-if="scrapeable">
-          <SelectList v-model="src" :options="ACTOR_SOURCES" label="抓取来源" title="两个档案源收的东西不一样：av-wiki 有头像与简介，老师图鉴有别名与更全的生日" />
+          <SelectList v-model="src" :options="sources" label="抓取来源" title="两个档案源收的东西不一样：av-wiki 有头像与简介，老师图鉴有别名与更全的生日" />
           <button
             type="button"
             class="btn btn--sm btn--ghost"
@@ -148,11 +148,10 @@
 </template>
 
 <script setup>
-import { computed, nextTick, ref, watch } from 'vue'
-import { ACTOR_SOURCES, ACTOR_SCRAPE_TIPS } from '@/scripts/constants'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { ACTOR_SCRAPE_TIPS } from '@/scripts/constants'
+import { useScrapeSources } from '@/scripts/utils/scrapeSources'
 import SelectList from '@/views/components/SelectList.vue'
-
-const SRC_KEY = 'actor_scrape_src'
 
 /**
  * 演员相册：详情页头部右侧那一格。
@@ -178,9 +177,9 @@ const props = defineProps({
 
 const emit = defineEmits(['sync', 'set-primary', 'fetch-meta'])
 
-// 来源选一次就记住：一位演员的资料常常两个源都要问一遍
-const src = ref(localStorage.getItem(SRC_KEY) || 'avwiki')
-watch(src, (v) => localStorage.setItem(SRC_KEY, v))
+// 来源清单来自后端：通道被停用的那个源不会出现在这里
+const { src, sources, load } = useScrapeSources()
+onMounted(load)
 const tips = computed(() => ACTOR_SCRAPE_TIPS[src.value] || ACTOR_SCRAPE_TIPS.avwiki)
 
 // 扇面上摆 ±3 张。再多留几格缓冲是为了让卡片有"滑进来"的落点而不是凭空出现；

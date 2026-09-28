@@ -130,17 +130,14 @@ export const linkKindLabel = (kind) =>
   LINK_KIND_OPTIONS.find((o) => o.value === kind)?.label || kind
 
 /**
- * 演员档案源：抓取按钮「来源」下拉框的取值。
- * 必须与后端 Services 里实现 IActorSource 的类同名（ActorScraper.Key / LaoshiScraper.Key），
- * 两边不一致时后端会直接回「没有这个抓取来源」。加第三个源本来就是改代码的事，
- * 所以不再为这个列表多开一个接口。
+ * 抓取来源下拉框的兜底清单（接口没回来时至少还能用默认那个）。
+ * key 必须与后端实现 IActorSource 的类同名（ActorScraper.Key / LaoshiScraper.Key），
+ * 正常情况下来自 GET /api/actor/scrape/sources —— 通道被停用的源那边已经过滤掉了，
+ * 停用的东西还摆在列表里让人选，选完只能吃一句拒绝。
  */
-export const ACTOR_SOURCES = [
-  { value: 'avwiki', label: 'av-wiki' },
-  { value: 'laoshi', label: '老师图鉴' }
-]
+export const ACTOR_SOURCE_FALLBACK = [{ value: 'avwiki', label: 'av-wiki' }]
 
-/** 每个源、每个按钮各一句说明：两个源取的东西不一样，tooltip 不能写成同一句 */
+/** 每个源一句说明：两个源取的东西不一样，tooltip 不能写成同一句 */
 export const ACTOR_SCRAPE_TIPS = {
   avwiki: {
     all: '按姓名与曾用名去 av-wiki 查一次档案，头像、出生日期、简介一次补齐：只有唯一命中、且名字对得上才抓；已经填过的不覆盖'

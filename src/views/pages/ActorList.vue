@@ -18,7 +18,7 @@
           <!-- 来源先选，两个入口共用同一个后台任务：同一时刻只允许一个在跑，谁在跑谁变「停止」 -->
           <SelectList
             v-model="grabSrc"
-            :options="ACTOR_SOURCES"
+            :options="grabSources"
             label="抓取来源"
             title="两个档案源收的东西不一样：av-wiki 有头像与简介，老师图鉴有别名与更全的生日"
           />
@@ -81,10 +81,10 @@
         @change="applyFilter"
       />
       <SelectList
-        v-model="filters.hasBirthdate"
-        :options="HAS_OPTIONS"
+        v-model="filters.birthYear"
+        :options="yearOptions"
         all-label="生日不限"
-        label="按有没有出生日期筛选"
+        label="按出生年份筛选"
         @change="applyFilter"
       />
       <SelectList
@@ -139,7 +139,8 @@ import { ref, onBeforeUnmount, onMounted, computed, watch } from 'vue'
 import { actorApi } from '@/scripts/api'
 import { useAppStore } from '@/scripts/store/app'
 import { useUiStore, errText } from '@/scripts/store/ui'
-import { SORT_OPTIONS, ACTOR_SOURCES, ACTOR_SCRAPE_TIPS, HAS_OPTIONS } from '@/scripts/constants'
+import { SORT_OPTIONS, ACTOR_SCRAPE_TIPS, HAS_OPTIONS } from '@/scripts/constants'
+import { useScrapeSources } from '@/scripts/utils/scrapeSources'
 import { debounce } from '@/scripts/utils/debounce'
 import AddActorDialog from '@/views/components/AddActorDialog.vue'
 import ActorMergeDialog from '@/views/components/ActorMergeDialog.vue'
@@ -159,6 +160,13 @@ const keyword = ref('')
 const page = ref(1)
 const total = ref(0)
 const countries = ref([])
+// 只列库里真出现过的出生年份，升序；"无生日"排最前，因为筛它的人多半是在找补档对象。
+// 标签带"年"字：选中后触发按钮上只剩一个光秃秃的"1990"，挨着排序框看会不知道是什么
+const birthYears = ref([])
+const yearOptions = computed(() => [
+  { value: 'none', label: '无生日' },
+  ...birthYears.value.map((y) => ({ value: y, label: `${y} 年` }))
+])
 const loading = ref(true)
 const error = ref('')
 const showDialog = ref(false)
@@ -167,7 +175,7 @@ const selectedIds = ref([])
 const syncing = ref(false)
 const showMerge = ref(false)
 
-const filters = ref({ country: '', hasPortrait: '', hasBirthdate: '', sortBy: '' })
+const filters = ref({ country: '', hasPortrait: '', birthYear: '', sortBy: '' })
 
 const pageSize = computed(() => app.personPageSize)
 
@@ -190,11 +198,13 @@ onMounted(async () => {
   const saved = loadFilterState(STORAGE_KEY)
   if (saved?.filters) filters.value = { ...filters.value, ...saved.filters }
   if (saved?.page) page.value = saved.page
+  // 上一版这个位置是"生日有没有"的三态筛选，现在换成按年份筛，旧值直接丢掉
+  delete filters.value.hasBirthdate
 
   await app.init()
   // 旧版排序值是驼峰（likeCount），换成 constants 里的小写值，避免下拉框对不上
   if (filters.value.sortBy) filters.value.sortBy = String(filters.value.sortBy).toLowerCase()
-  await Promise.all([loadCountries(), loadActors()])
+  await Promise.all([loadCountries(), loadBirthYears(), loadSources(), loadActors()])
   // 任务可能在别的页面甚至上次会话里就被启动过，进来先问一次进度
   await pollGrab()
   if (grab.value?.running) startGrabPoll()
@@ -212,6 +222,15 @@ const loadCountries = async () => {
   }
 }
 
+const loadBirthYears = async () => {
+  try {
+    const res = await actorApi.getBirthYears()
+    if (res.success && res.data) birthYears.value = res.data
+  } catch (err) {
+    console.warn('加载出生年份列表失败:', err)
+  }
+}
+
 const loadActors = async () => {
   loading.value = true
   error.value = ''
@@ -223,7 +242,7 @@ const loadActors = async () => {
     }
     if (filters.value.country) params.country = filters.value.country
     if (filters.value.hasPortrait) params.hasPortrait = filters.value.hasPortrait
-    if (filters.value.hasBirthdate) params.hasBirthdate = filters.value.hasBirthdate
+    if (filters.value.birthYear) params.birthYear = filters.value.birthYear
     if (filters.value.sortBy) params.sortBy = filters.value.sortBy
 
     const res = await actorApi.getList(params)
@@ -278,7 +297,7 @@ const handleSelect = (actor) => {
 
 const handleReset = () => {
   keyword.value = ''
-  filters.value = { country: '', hasPortrait: '', hasBirthdate: '', sortBy: '' }
+  filters.value = { country: '', hasPortrait: '', birthYear: '', sortBy: '' }
   applyFilter()
 }
 
@@ -315,9 +334,8 @@ let grabTimer = null
 let grabWatching = false
 
 const grabRunning = computed(() => !!grab.value?.running)
-// 来源记在 localStorage：一轮跑不完（每日配额会先刹车），下次进来还得是同一个源
-const grabSrc = ref(localStorage.getItem('actor_scrape_src') || 'avwiki')
-watch(grabSrc, (v) => localStorage.setItem('actor_scrape_src', v))
+// 来源清单来自后端接口：通道被停用的源不出现（停用了还摆在列表里，选完只能吃一句拒绝）
+const { src: grabSrc, sources: grabSources, load: loadSources } = useScrapeSources()
 const grabTips = computed(() => ACTOR_SCRAPE_TIPS[grabSrc.value] || ACTOR_SCRAPE_TIPS.avwiki)
 const fmtEta = (sec) => (sec >= 60 ? `约剩 ${Math.round(sec / 60)} 分钟` : `约剩 ${sec} 秒`)
 const grabText = computed(() => {

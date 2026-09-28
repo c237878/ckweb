@@ -140,6 +140,10 @@ export const actorApi = {
   getDetail: (id) => api.get(`/actor/${id}`),
   getVideos: (id, params) => api.get(`/actor/${id}/videos`, { params }),
   getCountries: () => api.get('/actor/countries'),
+  /** 库里出现过的出生年份（升序），生日下拉框用它 */
+  getBirthYears: () => api.get('/actor/birth-years'),
+  /** 可选的抓取来源：通道被停用的那个不会出现 */
+  scrapeSources: () => api.get('/actor/scrape/sources'),
   /** 把艳图目录里的图片扫进 actor_images；不传 id 就是扫全部演员。清单本身由详情接口带出 */
   syncImages: (id) => api.post(id ? `/actor/${id}/images/sync` : '/actor/images/sync'),
   /** 指定列表页那张脸用哪张图 */
