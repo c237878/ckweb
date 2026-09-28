@@ -31,7 +31,14 @@
         <slot name="extra-actions"></slot>
         <slot name="actions">
           <button type="button" class="btn" @click="handleCancel">{{ cancelText }}</button>
-          <button type="button" class="btn btn--primary" @click="handleConfirm">{{ confirmText }}</button>
+          <button
+            type="button"
+            class="btn btn--primary"
+            :disabled="confirmDisabled"
+            @click="handleConfirm"
+          >
+{{ confirmText }}
+</button>
         </slot>
       </div>
     </div>
@@ -68,7 +75,9 @@ const props = defineProps({
   confirmText: { type: String, default: '保存' },
   cancelText: { type: String, default: '取消' },
   /** 点遮罩是否关闭。表单类对话框保持 true，行为与迁移前一致 */
-  closeOnBackdrop: { type: Boolean, default: true }
+  closeOnBackdrop: { type: Boolean, default: true },
+  /** 数据没到位时先别让人保存：填进去的会被后到的回填覆盖 */
+  confirmDisabled: { type: Boolean, default: false }
 })
 
 const emit = defineEmits(['update:visible', 'confirm', 'cancel'])

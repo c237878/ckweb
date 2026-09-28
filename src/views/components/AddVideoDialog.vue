@@ -3,11 +3,17 @@
     :visible="visible"
     :title="editingVideo ? '编辑影片' : '添加影片'"
     size="wide"
+    :confirm-disabled="loading"
     @confirm="handleSave"
     @cancel="handleCancel"
   >
     <template #content>
-      <div class="form">
+      <!-- 词表与影片详情是异步来的：以前打开就能填，回填一到把刚填的内容整份冲掉，
+           人不知道自己写的话没了，按保存交上去的还是被覆盖后的那份。
+           所以数据到位之前整张表单锁住（fieldset[disabled] 连按钮一起禁），保存键也按不住 -->
+      <p v-if="loading" class="loading-note" role="status">正在加载词表与影片数据…</p>
+      <fieldset class="form-shell" :disabled="loading">
+        <div class="form">
         <div class="field">
           <label for="av-code">番号</label>
           <div class="row">
@@ -252,14 +258,16 @@
         <!-- 隐藏的文件选择器：只为按钮触发，不进 Tab 顺序 -->
         <input ref="videoFileInputRef" type="file" accept="video/*" class="file-picker" @change="onVideoFileSelected" />
         <input ref="coverFileInputRef" type="file" accept="image/*" class="file-picker" @change="onCoverFileSelected" />
-      </div>
+        </div>
+      </fieldset>
     </template>
 
     <template #extra-actions>
-      <button v-if="editingVideo" type="button" class="btn btn--danger btn--sm foot-left" @click="handleDelete">
+      <!-- 这两个在 fieldset 外面，得自己挡住 -->
+      <button v-if="editingVideo" type="button" class="btn btn--danger btn--sm foot-left" :disabled="loading" @click="handleDelete">
         删除
       </button>
-      <button v-else type="button" class="btn btn--sm foot-left" @click="handleSaveContinue">连续添加</button>
+      <button v-else type="button" class="btn btn--sm foot-left" :disabled="loading" @click="handleSaveContinue">连续添加</button>
     </template>
   </Dialog>
 </template>
@@ -303,6 +311,10 @@ const showCoverDirDropdown = ref(false)
 const customVideoDir = ref('')
 const customCoverDir = ref('')
 const uploading = ref(false)
+/** 打开到"数据都填进表单"之间的这段时间：期间整张表单锁住，不让人白填 */
+const loading = ref(false)
+// 每次打开一个序号：关掉再开下一条时，上一条的回填还在路上，落下来会串台
+let openSeq = 0
 const uploadTarget = ref('')
 const uploadProgress = ref(0)
 const uploadingFileName = ref('')
@@ -580,6 +592,7 @@ const removeActor = (actorId) => {
    --------------------------------------------------------------- */
 
 const generateCode = async () => {
+  if (loading.value) return
   codeLoading.value = true
   try {
     const res = await videoApi.getAutoCode()
@@ -620,17 +633,23 @@ const loadActorList = async () => {
 
 watch(() => props.visible, async (val) => {
   if (!val) return
+  const seq = ++openSeq
+  const stale = () => seq !== openSeq
+
   showVideoDirDropdown.value = false
   showCoverDirDropdown.value = false
   resetActors()
+  loading.value = true
 
-  await Promise.all([loadMeta(), loadActorList(), loadScanDirectories(), loadStudios()])
-  if (!props.editingVideo) {
-    resetForm()
-    return
-  }
   try {
+    await Promise.all([loadMeta(), loadActorList(), loadScanDirectories(), loadStudios()])
+    if (stale()) return
+    if (!props.editingVideo) {
+      resetForm()
+      return
+    }
     const detail = await videoApi.getDetail(props.editingVideo.id)
+    if (stale()) return
     if (!detail.success || !detail.data) return
     const { video } = detail.data
     form.value = {
@@ -650,6 +669,9 @@ watch(() => props.visible, async (val) => {
     // 编辑值不在已有选项里时，直接落到手填输入框，免得看起来像没选
   } catch (e) {
     console.error('加载影片详情失败', e)
+  } finally {
+    // 只有本次打开的收尾才解锁：串台的旧请求不该把新一次的表单放开
+    if (!stale()) loading.value = false
   }
 })
 
@@ -670,6 +692,7 @@ const resetActors = () => {
 }
 
 const handleSave = () => {
+  if (loading.value) return
   if (!form.value.name.trim()) {
     ui.warn('请输入影片名称')
     return
@@ -692,6 +715,7 @@ const handleSave = () => {
 }
 
 const handleSaveContinue = () => {
+  if (loading.value) return
   if (!form.value.name.trim()) {
     ui.warn('请输入影片名称')
     return
@@ -726,11 +750,34 @@ const handleCancel = () => {
 }
 
 const handleDelete = () => {
+  if (loading.value) return
   emit('delete', props.editingVideo?.id)
 }
 </script>
 
 <style scoped>
+/* fieldset 只是"一次性锁住整块控件"的壳，不带自己的边框与内边距。
+   min-width:0 是必须的：fieldset 的默认 min-width 是 min-content，会把对话框撑宽。
+   pointer-events 也要关：fieldset[disabled] 只管表单控件，
+   演员候选那种 li@mousedown 不在管辖范围内。滚动在 .dialog__body 上，不受影响 */
+.form-shell {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.form-shell:disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.loading-note {
+  margin: 0 0 var(--s3);
+  font-size: var(--f-sm);
+  color: var(--text-dim);
+}
+
 .form {
   display: flex;
   flex-direction: column;
