@@ -32,20 +32,19 @@
                          两档：这一版片源（字幕 / 水印 / 分辨率）→ 档案（含演员年龄） -->
                     <div class="kv-list">
                         <!-- 已经有结论就只留结论：四颗胶囊并排是"还没标"时的样子，
-                             看片时那一屏只需要答案。点这颗结论胶囊 = 清掉重标 -->
+                             看片时那一屏只需要答案。标错了不在这里改 —— 走右上角「重置」，
+                             它把两维与分辨率一起清空，回到没标过的状态重填 -->
                         <div class="kv">
                             <span class="kv__k">字幕</span>
                             <div class="kv__v">
-                                <button
+                                <span
                                     v-if="video.subtitleState !== 'unknown'"
-                                    type="button"
-                                    class="tag media-option is-on"
+                                    class="tag"
                                     :class="subtitleClass(video.subtitleState)"
-                                    :title="`${SUBTITLE_STATES[video.subtitleState]?.long} · 点错了就点这里清掉重标`"
-                                    @click="markSource('subtitle', video.subtitleState)"
+                                    :title="SUBTITLE_STATES[video.subtitleState]?.long"
                                 >
 {{ subtitleText(video.subtitleState) }}
-</button>
+</span>
                                 <template v-else>
                                     <button
                                         v-for="opt in SUBTITLE_MARK_OPTIONS"
@@ -64,16 +63,14 @@
                         <div class="kv">
                             <span class="kv__k">广告水印</span>
                             <div class="kv__v">
-                                <button
+                                <span
                                     v-if="video.watermarkState !== 'unknown'"
-                                    type="button"
-                                    class="tag media-option is-on"
+                                    class="tag"
                                     :class="watermarkClass(video.watermarkState)"
-                                    :title="`${WATERMARK_STATES[video.watermarkState]?.long} · 点错了就点这里清掉重标`"
-                                    @click="markSource('watermark', video.watermarkState)"
+                                    :title="WATERMARK_STATES[video.watermarkState]?.long"
                                 >
 {{ watermarkText(video.watermarkState) }}
-</button>
+</span>
                                 <template v-else>
                                     <button
                                         v-for="opt in WATERMARK_MARK_OPTIONS"
@@ -952,14 +949,6 @@ const handleLike = async () => {
     border-color: var(--border);
     color: var(--text-dim);
     cursor: pointer;
-}
-
-/* 当前结论那颗：描边取自己的文字色（有语气的 tag--* 会带出色来），再加一圈同色内描边，
-   这样"选中的是哪颗"不只有颜色一个线索 */
-.media-option.is-on {
-    border-color: currentColor;
-    box-shadow: inset 0 0 0 1px currentColor;
-    font-weight: 600;
 }
 
 .media-unknown {
