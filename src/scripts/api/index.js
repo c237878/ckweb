@@ -129,6 +129,8 @@ export const studioApi = {
   getList: (params) => api.get('/studio', { params }),
   getDetail: (id) => api.get(`/studio/${id}`),
   getVideos: (id, params) => api.get(`/studio/${id}/videos`, { params }),
+  /** 词表里实际用过的国家（筛选用；表单那份取自「地区与分类」规范清单） */
+  getCountries: () => api.get('/studio/countries'),
   add: (data) => api.post('/studio', data),
   update: (id, data) => api.put(`/studio/${id}`, data),
   remove: (id) => api.delete(`/studio/${id}`)

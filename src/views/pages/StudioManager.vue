@@ -8,9 +8,16 @@
         v-model="keyword"
         class="input grow"
         type="search"
-        placeholder="搜索名称或别名…"
-        @keyup.enter="load"
-        @input="debouncedLoad"
+        placeholder="搜索名称、别名或官网域名…"
+        @keyup.enter="applyFilter"
+        @input="debouncedFilter"
+      />
+      <SelectList
+        v-model="country"
+        :options="countryFilterOptions"
+        all-label="全部国家"
+        label="按国家筛选"
+        @change="applyFilter"
       />
     </div>
 
@@ -36,7 +43,8 @@
       </tbody>
     </table>
     <p v-if="!rows.length" class="empty">
-      <span>{{ keyword ? '没有匹配的片商' : '还没有片商' }}</span>
+      <span>{{ keyword || country ? '没有符合条件的片商' : '还没有片商' }}</span>
+      <button v-if="keyword || country" class="btn btn--sm btn--ghost" @click="clearFilters">清除筛选</button>
     </p>
 
     <Pagination v-model:page="page" :page-size="pageSize" :total="total" @change="load" />
@@ -115,13 +123,22 @@ const rows = ref([])
 const total = ref(0)
 const page = ref(1)
 const keyword = ref('')
+const country = ref('')
 const busy = ref(false)
+// 只列词表里真用过的国家（当前是日本 / 中国）：把整张地区清单搬过来会有一堆点开是空结果
+const usedCountries = ref([])
+const countryFilterOptions = computed(() => usedCountries.value.map((c) => ({ value: c, label: c })))
 
 const pageSize = computed(() => app.pageSize)
 
 const load = async () => {
   try {
-    const res = await studioApi.getList({ page: page.value, pageSize: pageSize.value, keyword: keyword.value })
+    const res = await studioApi.getList({
+      page: page.value,
+      pageSize: pageSize.value,
+      keyword: keyword.value,
+      country: country.value
+    })
     if (res.success) {
       rows.value = res.data || []
       total.value = res.total || 0
@@ -131,7 +148,28 @@ const load = async () => {
   }
 }
 
-const debouncedLoad = debounce(load, 400)
+/** 换了关键词或国家都回到第一页：停在第 3 页改筛选条件，看到的是空结果 */
+const applyFilter = () => {
+  page.value = 1
+  load()
+}
+
+const debouncedFilter = debounce(applyFilter, 400)
+
+const clearFilters = () => {
+  keyword.value = ''
+  country.value = ''
+  applyFilter()
+}
+
+const loadCountries = async () => {
+  try {
+    const res = await studioApi.getCountries()
+    if (res.success) usedCountries.value = res.data || []
+  } catch (err) {
+    console.error('加载片商国家列表失败:', err)
+  }
+}
 
 /* ---------------------------------------------------------------
    片商表单
@@ -205,7 +243,10 @@ const askDelete = async (row) => {
   if (res.success) load()
 }
 
-onMounted(load)
+onMounted(() => {
+  loadCountries()
+  load()
+})
 </script>
 
 <style scoped>
