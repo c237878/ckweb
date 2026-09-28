@@ -61,7 +61,7 @@
               v-model="form.releaseDate"
               class="input"
               type="text"
-              placeholder="2024-03-15，只到年月就写 2024-03"
+              placeholder="2024-03-15，也可只写 2024-03"
               maxlength="10"
             />
           </div>
@@ -94,13 +94,13 @@
 
         <div class="field">
           <label class="field__label">片商</label>
+          <!-- 输入提示走 placeholder，下面不再挂一行小字 -->
           <ComboBox
             v-model="form.studioId"
             :options="studioOptions"
-            placeholder="选择或输入片商名称"
+            placeholder="选择或输入片商，没有的去 设置 → 片商 添加"
             all-label="（无片商）"
           />
-          <p class="hint">词表里没有的片商先去 设置 → 片商 添加。</p>
           <!-- 只有"选了片商 + 属于某个系列"时这颗勾才有意义：没系列的话后端直接返回 0，
                摆一个不会发生作用的开关比不摆更糟 -->
           <template v-if="form.studioId && form.seriesId">
