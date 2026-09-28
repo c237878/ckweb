@@ -223,6 +223,16 @@
             片商是发行一部片的那家，一部片只有一个，所以影片编辑里它和「所属系列」一样是单选。
             别名让搜索与抓取归一，国家取自「地区与分类」，官网是它自己的站点。
           </p>
+          <!-- 同系列自动补片商的总闸：填片商大多是一系列连着填，默认顺手一起补；
+               但改某一部片的片商时不想牵连别的，就关掉这一票 -->
+          <label class="switch-row">
+            <input v-model="seriesSync" type="checkbox" :disabled="savingSync" @change="saveSeriesSync" />
+            <span>同系列自动补片商</span>
+          </label>
+          <p class="hint">
+            开启时，给一部片设片商会顺手补到同系列还没填片商的那些
+            （已有片商的不动，且只补日本 av）；关闭时只改当前这一部。
+          </p>
           <StudioManager embedded />
         </section>
 
@@ -387,7 +397,7 @@
 <script setup>
 import { computed, nextTick, onMounted, ref } from 'vue'
 import api, { settingApi, friendLinkApi, scanDirectoryApi, taxonomyApi } from '@/scripts/api'
-import { useAppStore } from '@/scripts/store/app'
+import { useAppStore, settingOn } from '@/scripts/store/app'
 import { useUiStore } from '@/scripts/store/ui'
 import TaxonomyTable from '@/views/components/TaxonomyTable.vue'
 import ScrapeChannelsPanel from '@/views/components/ScrapeChannelsPanel.vue'
@@ -477,6 +487,29 @@ const loadAll = async () => {
 }
 
 /** 一次 GET /api/systemsetting 拿全部设置：缺键就是"没配过"，不算失败 */
+/** 开关直接落库并刷新 store：影片编辑对话框的提示文案要看它的脸色 */
+const seriesSync = ref(true)
+const savingSync = ref(false)
+
+const saveSeriesSync = async () => {
+  savingSync.value = true
+  try {
+    const res = await settingApi.save({ name: 'seriesStudioSync', content: seriesSync.value ? '1' : '0' })
+    if (!res.success) {
+      seriesSync.value = !seriesSync.value
+      say('没能保存这个开关：' + (res.message || '未知错误'), 'error')
+      return
+    }
+    await app.refresh()
+    say(seriesSync.value ? '已开启：设片商时会一起补同系列' : '已关闭：设片商只改当前这一部')
+  } catch (err) {
+    seriesSync.value = !seriesSync.value
+    say('没能保存这个开关：' + (err.message || err), 'error')
+  } finally {
+    savingSync.value = false
+  }
+}
+
 const loadSettings = async () => {
   loadingSettings.value = true
   try {
@@ -485,6 +518,7 @@ const loadSettings = async () => {
     const map = {}
     ;(res.data || []).forEach((row) => { map[row.name] = row.content })
     settingsList.value.forEach((item) => { if (map[item.id]) item.value = map[item.id] })
+    seriesSync.value = settingOn(map.seriesStudioSync)
   } catch (error) {
     console.error('加载设置失败:', error)
     loadError.value = '系统设置加载失败，请确认后端服务可用'
@@ -936,6 +970,23 @@ const deleteFriendLink = async (item) => {
 .hint {
   font-size: var(--f-xs);
   color: var(--text-dim);
+}
+
+/* 开关行：间距交给 gap，方块尺寸与抓取通道表单里的复选框一致 */
+.switch-row {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  align-self: start;
+  font-size: var(--f-sm);
+  cursor: pointer;
+}
+
+.switch-row input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
 }
 
 .feedback {

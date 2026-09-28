@@ -11,6 +11,15 @@ const readTheme = () => {
   }
 }
 
+/**
+ * 布尔型设置的取值口径：库里存的是字符串，且这行可能压根不存在
+ * （后加的开关），所以"没写"要按默认值算，只有明确写了 0/false/off 才算关。
+ */
+export const settingOn = (raw, dflt = true) => {
+  if (raw === undefined || raw === null || String(raw).trim() === '') return dflt
+  return !['0', 'false', 'off'].includes(String(raw).trim().toLowerCase())
+}
+
 const applyTheme = (theme) => {
   if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light')
   else document.documentElement.removeAttribute('data-theme')
@@ -28,6 +37,8 @@ export const useAppStore = defineStore('app', {
     /** 系列 / 演员单独配的每页数量；0 表示没配过，走 getter 回落到 pageSize */
     pageSizeSetting: 0,
     homeCategoryCount: 12,
+    /** 设片商时要不要顺手补到同系列还没填片商的影片。缺省开：这行设置是后加的 */
+    seriesStudioSync: true,
     theme: readTheme(),
     loaded: false,
     _pending: null
@@ -70,6 +81,7 @@ export const useAppStore = defineStore('app', {
         this.pageSizeSetting = personSize > 0 ? personSize : 0
         const homeSize = parseInt(map.homePageCategoryCount, 10)
         this.homeCategoryCount = homeSize > 0 ? homeSize : 12
+        this.seriesStudioSync = settingOn(map.seriesStudioSync)
         this.loaded = true
       } catch (error) {
         console.error('加载站点设置失败:', error)

@@ -100,7 +100,11 @@
             placeholder="选择或输入片商名称"
             all-label="（无片商）"
           />
-          <p class="hint">词表里没有的片商先去 设置 → 片商 添加；这里填上后，同系列还没片商的会一起补上（已有的不动）。</p>
+          <p class="hint">
+            词表里没有的片商先去 设置 → 片商 添加；
+            <template v-if="app.seriesStudioSync">这里填上后，同系列还没片商的会一起补上（已有的不动，只补日本 av）。</template>
+            <template v-else>「同系列自动补片商」当前是关的，这里只改这一部。</template>
+          </p>
         </div>
 
         <!-- 视频路径：手动输入 + 自动填充 + 上传 -->
@@ -276,6 +280,7 @@
 import { computed, nextTick, ref, watch, onUnmounted } from 'vue'
 import { videoApi, actorApi, scanDirectoryApi, uploadApi, studioApi } from '@/scripts/api'
 import { useUiStore, errText } from '@/scripts/store/ui'
+import { useAppStore } from '@/scripts/store/app'
 import { formatSize } from '@/scripts/utils/format'
 import { debounce } from '@/scripts/utils/debounce'
 import { autoFitDropdown } from '@/scripts/utils/dropdownFit'
@@ -290,6 +295,8 @@ const props = defineProps({
 })
 
 const ui = useUiStore()
+// 「同系列自动补片商」开关的当前状态：提示文案得跟它说的一样，不然填完才知道没补
+const app = useAppStore()
 
 const emit = defineEmits(['save', 'save-continue', 'cancel', 'delete'])
 
