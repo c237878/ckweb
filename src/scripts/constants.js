@@ -53,6 +53,15 @@ const toOptions = (states) =>
 export const SUBTITLE_OPTIONS = toOptions(SUBTITLE_STATES)
 export const WATERMARK_OPTIONS = toOptions(WATERMARK_STATES)
 
+/**
+ * 详情页用来"标"的选项：不含「未标记」。
+ * 未标记不是一个结论，选它等于撤销 —— 撤销走"点当前那颗胶囊"，
+ * 所以列出来只会让人误以为这是一种可填的值。
+ * 列表页的筛选下拉仍然用上面那份（那里"未标记"是要找的人群）。
+ */
+export const SUBTITLE_MARK_OPTIONS = SUBTITLE_OPTIONS.filter((o) => o.value !== 'unknown')
+export const WATERMARK_MARK_OPTIONS = WATERMARK_OPTIONS.filter((o) => o.value !== 'unknown')
+
 /** 分辨率档位，与后端 Utils/SourceStates.cs 的 Resolutions 键一一对应 */
 export const RESOLUTION_OPTIONS = [
   { value: '2160', label: '4K 及以上' },

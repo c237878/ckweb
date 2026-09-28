@@ -31,49 +31,82 @@
                     <!-- 信息区统一成「定宽标签 + 值」两列一行的清单，标签一律不带冒号。
                          两档：这一版片源（字幕 / 水印 / 分辨率）→ 档案（含演员年龄） -->
                     <div class="kv-list">
+                        <!-- 已经有结论就只留结论：四颗胶囊并排是"还没标"时的样子，
+                             看片时那一屏只需要答案。点这颗结论胶囊 = 清掉重标 -->
                         <div class="kv">
                             <span class="kv__k">字幕</span>
                             <div class="kv__v">
                                 <button
-                                    v-for="opt in SUBTITLE_OPTIONS"
-                                    :key="opt.value"
+                                    v-if="video.subtitleState !== 'unknown'"
                                     type="button"
-                                    class="tag media-option"
-                                    :class="[subtitleClass(opt.value), { 'is-on': video.subtitleState === opt.value }]"
-                                    :title="SUBTITLE_STATES[opt.value]?.long"
-                                    :aria-pressed="video.subtitleState === opt.value"
-                                    @click="markSource('subtitle', opt.value)"
-                                >{{ opt.label }}</button>
+                                    class="tag media-option is-on"
+                                    :class="subtitleClass(video.subtitleState)"
+                                    :title="`${SUBTITLE_STATES[video.subtitleState]?.long} · 点错了就点这里清掉重标`"
+                                    @click="markSource('subtitle', video.subtitleState)"
+                                >
+{{ subtitleText(video.subtitleState) }}
+</button>
+                                <template v-else>
+                                    <button
+                                        v-for="opt in SUBTITLE_MARK_OPTIONS"
+                                        :key="opt.value"
+                                        type="button"
+                                        class="tag media-option"
+                                        :class="subtitleClass(opt.value)"
+                                        :title="SUBTITLE_STATES[opt.value]?.long"
+                                        @click="markSource('subtitle', opt.value)"
+                                    >
+{{ opt.label }}
+</button>
+                                </template>
                             </div>
                         </div>
-                        <!-- 再点一次当前值就是清掉这一维，所以不做单独的"清除"按钮 -->
                         <div class="kv">
                             <span class="kv__k">广告水印</span>
                             <div class="kv__v">
                                 <button
-                                    v-for="opt in WATERMARK_OPTIONS"
-                                    :key="opt.value"
+                                    v-if="video.watermarkState !== 'unknown'"
                                     type="button"
-                                    class="tag media-option"
-                                    :class="[watermarkClass(opt.value), { 'is-on': video.watermarkState === opt.value }]"
-                                    :title="WATERMARK_STATES[opt.value]?.long"
-                                    :aria-pressed="video.watermarkState === opt.value"
-                                    @click="markSource('watermark', opt.value)"
-                                >{{ opt.label }}</button>
+                                    class="tag media-option is-on"
+                                    :class="watermarkClass(video.watermarkState)"
+                                    :title="`${WATERMARK_STATES[video.watermarkState]?.long} · 点错了就点这里清掉重标`"
+                                    @click="markSource('watermark', video.watermarkState)"
+                                >
+{{ watermarkText(video.watermarkState) }}
+</button>
+                                <template v-else>
+                                    <button
+                                        v-for="opt in WATERMARK_MARK_OPTIONS"
+                                        :key="opt.value"
+                                        type="button"
+                                        class="tag media-option"
+                                        :class="watermarkClass(opt.value)"
+                                        :title="WATERMARK_STATES[opt.value]?.long"
+                                        @click="markSource('watermark', opt.value)"
+                                    >
+{{ opt.label }}
+</button>
+                                </template>
                             </div>
                         </div>
                         <div class="kv">
                             <span class="kv__k">分辨率</span>
                             <div class="kv__v">
                                 <span v-if="video.resH" class="tag tag--info">{{ video.resW }}×{{ video.resH }}</span>
-                                <span v-else class="media-unknown">未扫描</span>
-                                <button
-                                    type="button"
-                                    class="tag media-option"
-                                    :disabled="scanning"
-                                    title="读这个视频文件的容器头量宽高（只读文件，不改文件；字幕和广告水印由你自己标）"
-                                    @click="scanThis"
-                                >{{ scanning ? '扫描中…' : '扫描' }}</button>
+                                <template v-else>
+                                    <span class="media-unknown">未扫描</span>
+                                    <!-- 量出来就不再摆这颗按钮：重复扫只会得到同一个数，
+                                         真要重量的先换文件（重置片源会连分辨率一起清空） -->
+                                    <button
+                                        type="button"
+                                        class="tag media-option"
+                                        :disabled="scanning"
+                                        title="读这个视频文件的容器头量宽高（只读文件，不改文件；字幕和广告水印由你自己标）"
+                                        @click="scanThis"
+                                    >
+{{ scanning ? '扫描中…' : '扫描' }}
+</button>
+                                </template>
                             </div>
                         </div>
                         <!-- 以下都是只读档案，填写在「编辑」对话框里：详情页是看片的地方，
@@ -182,8 +215,8 @@ import AddVideoDialog from '@/views/components/AddVideoDialog.vue'
 import VideoCard from '@/views/components/VideoCard.vue'
 import { formatSize, ageAt } from '@/scripts/utils/format'
 import {
-    SUBTITLE_STATES, WATERMARK_STATES, SUBTITLE_OPTIONS, WATERMARK_OPTIONS,
-    subtitleClass, watermarkClass
+    SUBTITLE_STATES, WATERMARK_STATES, SUBTITLE_MARK_OPTIONS, WATERMARK_MARK_OPTIONS,
+    subtitleClass, watermarkClass, subtitleText, watermarkText
 } from '@/scripts/constants'
 import { loadCkplayer } from '@/scripts/utils/ckplayer'
 
