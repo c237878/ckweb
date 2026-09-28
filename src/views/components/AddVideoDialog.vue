@@ -100,11 +100,16 @@
             placeholder="选择或输入片商名称"
             all-label="（无片商）"
           />
-          <p class="hint">
-            词表里没有的片商先去 设置 → 片商 添加；
-            <template v-if="app.seriesStudioSync">这里填上后，同系列还没片商的会一起补上（已有的不动，只补日本 av）。</template>
-            <template v-else>「同系列自动补片商」当前是关的，这里只改这一部。</template>
-          </p>
+          <p class="hint">词表里没有的片商先去 设置 → 片商 添加。</p>
+          <!-- 只有"选了片商 + 属于某个系列"时这颗勾才有意义：没系列的话后端直接返回 0，
+               摆一个不会发生作用的开关比不摆更糟 -->
+          <template v-if="form.studioId && form.seriesId">
+            <label class="switch-row">
+              <input v-model="syncSeries" type="checkbox" />
+              <span>同系列还没片商的一起补上</span>
+            </label>
+            <p class="hint">只补日本 av，且已经有片商的不动；不勾就只改这一部。</p>
+          </template>
         </div>
 
         <!-- 视频路径：手动输入 + 自动填充 + 上传 -->
@@ -280,7 +285,6 @@
 import { computed, nextTick, ref, watch, onUnmounted } from 'vue'
 import { videoApi, actorApi, scanDirectoryApi, uploadApi, studioApi } from '@/scripts/api'
 import { useUiStore, errText } from '@/scripts/store/ui'
-import { useAppStore } from '@/scripts/store/app'
 import { formatSize } from '@/scripts/utils/format'
 import { debounce } from '@/scripts/utils/debounce'
 import { autoFitDropdown } from '@/scripts/utils/dropdownFit'
@@ -295,8 +299,6 @@ const props = defineProps({
 })
 
 const ui = useUiStore()
-// 「同系列自动补片商」开关的当前状态：提示文案得跟它说的一样，不然填完才知道没补
-const app = useAppStore()
 
 const emit = defineEmits(['save', 'save-continue', 'cancel', 'delete'])
 
@@ -318,6 +320,8 @@ const showCoverDirDropdown = ref(false)
 const customVideoDir = ref('')
 const customCoverDir = ref('')
 const uploading = ref(false)
+/** 这一趟要不要顺手补同系列。每次打开都回到"补"：它是默认动作，不是用户偏好 */
+const syncSeries = ref(true)
 /** 打开到"数据都填进表单"之间的这段时间：期间整张表单锁住，不让人白填 */
 const loading = ref(false)
 // 每次打开一个序号：关掉再开下一条时，上一条的回填还在路上，落下来会串台
@@ -645,6 +649,7 @@ watch(() => props.visible, async (val) => {
 
   showVideoDirDropdown.value = false
   showCoverDirDropdown.value = false
+  syncSeries.value = true
   resetActors()
   loading.value = true
 
@@ -717,6 +722,7 @@ const handleSave = () => {
     originalName: form.value.originalName,
     releaseDate: form.value.releaseDate,
     studioId: form.value.studioId,
+    syncSeriesStudio: syncSeries.value,
     actorIds: selectedActors.value.map((a) => a.id)
   })
 }
@@ -739,6 +745,7 @@ const handleSaveContinue = () => {
     originalName: form.value.originalName,
     releaseDate: form.value.releaseDate,
     studioId: form.value.studioId,
+    syncSeriesStudio: syncSeries.value,
     actorIds: selectedActors.value.map((a) => a.id)
   })
   // 清空番号、视频路径、封面路径、演员
@@ -767,6 +774,23 @@ const handleDelete = () => {
    min-width:0 是必须的：fieldset 的默认 min-width 是 min-content，会把对话框撑宽。
    pointer-events 也要关：fieldset[disabled] 只管表单控件，
    演员候选那种 li@mousedown 不在管辖范围内。滚动在 .dialog__body 上，不受影响 */
+/* 勾选项：间距交给 gap，方块尺寸与全站复选框一致 */
+.switch-row {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  align-self: start;
+  font-size: var(--f-sm);
+  cursor: pointer;
+}
+
+.switch-row input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
 .form-shell {
   border: 0;
   margin: 0;
