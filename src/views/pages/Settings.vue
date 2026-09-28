@@ -155,7 +155,7 @@
           </div>
 
           <ul v-else-if="friendLinkList.length" class="rows">
-            <li v-for="item in friendLinkList" :key="item.id" class="row">
+            <li v-for="(item, i) in friendLinkList" :key="item.id" class="row">
               <div class="row-main">
                 <span class="row-title">{{ item.name }}</span>
                 <div class="row-tags">
@@ -165,6 +165,25 @@
                 </div>
               </div>
               <div class="row-actions">
+                <!-- 排序以前只能手填数字，改一位要把后面挨个重填；上下调一个位置就够 -->
+                <button
+                  class="btn btn--sm btn--ghost"
+                  :disabled="i === 0 || movingLink"
+                  :aria-label="`上移 ${item.name}`"
+                  title="上移一位"
+                  @click="moveFriendLink(item, 'up')"
+                >
+                  &uarr;
+                </button>
+                <button
+                  class="btn btn--sm btn--ghost"
+                  :disabled="i === friendLinkList.length - 1 || movingLink"
+                  :aria-label="`下移 ${item.name}`"
+                  title="下移一位"
+                  @click="moveFriendLink(item, 'down')"
+                >
+                  &darr;
+                </button>
                 <button class="btn btn--sm" @click="openEditFriendLinkDialog(item)">编辑</button>
                 <button class="btn btn--sm btn--danger" @click="deleteFriendLink(item)">删除</button>
               </div>
@@ -397,7 +416,7 @@ const GROUPS = [
   { id: 'studios', label: '片商' },
   { id: 'channels', label: '抓取通道', desc: '外部站点的查询地址、字段抽取规则，以及限速 / 每日配额 / 连续失败熔断。' },
   { id: 'mcp', label: 'AI 接口' },
-  { id: 'links', label: '友情链接', desc: '显示在页脚，按排序数字从小到大排列。' }
+  { id: 'links', label: '友情链接', desc: '显示在页脚：用每行的 ↑ ↓ 调位置，也可以直接改排序数字。' }
 ]
 
 /** content 一律按字符串提交（后端存的就是字符串），所以这里不能用 v-model.number */
@@ -704,6 +723,28 @@ const openEditFriendLinkDialog = (item) => {
   }
   friendLinkFormError.value = ''
   showFriendLinkDialog.value = true
+}
+
+const movingLink = ref(false)
+
+/** 移一位：后端会把整列重排成 1..N，所以移完必须重新拉一次清单（页脚也要跟着换序） */
+const moveFriendLink = async (item, dir) => {
+  if (movingLink.value) return
+  movingLink.value = true
+  try {
+    const res = await friendLinkApi.move(item.id, dir)
+    if (!res.success) {
+      say(res.message || '没移动', 'error')
+      return
+    }
+    await loadFriendLinkList()
+    window.dispatchEvent(new CustomEvent('friendLinksUpdated'))
+  } catch (err) {
+    console.error('移动链接失败:', err)
+    say('移动失败：' + (err.message || err), 'error')
+  } finally {
+    movingLink.value = false
+  }
 }
 
 function closeFriendLinkDialog() {

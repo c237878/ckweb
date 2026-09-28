@@ -225,7 +225,9 @@ export const friendLinkApi = {
   getList: () => api.get('/FriendLink'),
   add: (data) => api.post('/FriendLink', data),
   update: (id, data) => api.put(`/FriendLink/${id}`, data),
-  delete: (id) => api.delete(`/FriendLink/${id}`)
+  delete: (id) => api.delete(`/FriendLink/${id}`),
+  /** 上移 / 下移一位：dir = 'up' | 'down'，后端按显示顺序整体重排 */
+  move: (id, dir) => api.post(`/FriendLink/${id}/move`, null, { params: { dir } })
 }
 
 export default api

@@ -184,7 +184,11 @@ v4 迁移把含 `http` 的简介逐条抽出（382 位演员 → 528 行，379 �
 `/api/Like` `GET /list` · `DELETE /{id}` · `POST /batch-delete` ；
 `/api/SystemSetting` `GET /` · `GET /{name}` · `POST /` · `DELETE /{id}` ；
 `/api/ScanDirectory` `GET /` · `GET /{id}` · `POST /` · `PUT /{id}` · `DELETE /{id}` · `POST /check` ；
-`/api/FriendLink` `GET /` · `POST /` · `PUT /{id}` · `DELETE /{id}` ；
+`/api/FriendLink` `GET /` · `POST /` · `PUT /{id}` · `DELETE /{id}` · `POST /{id}/move?dir=up|down`
+> 友情链接的 `sortorder` 以前只能手填数字（真库里是 1..29 还带两条并列的 5），调一位要把后面挨个重填。
+> `move` 的做法是按当前显示顺序（`sortorder, id`）把这一条挪一格，然后**整列重排成 1..N、只写变了的那几行**；
+> 不做"交换两条的 sortorder"，因为并列时交换等于没交换。首/末越界与非法 dir 都回原因，不改数据。
+> 设置 → 友情链接 每行的 ↑ ↓ 就是它，移动后重新拉清单并派发 `friendLinksUpdated` 让页脚换序。；
 `/api/Highlights` `GET /posters`（读 `highlight_images`） · `POST /images/sync` · `GET /poster/{fileName}`（原图） · `GET /thumb/{s|m}/{fileName}` ；
 `/api/Upload` `POST /video` · `POST /cover` ；
 `/mcp` （JSON-RPC 2.0，需 `X-API-Key`）· `/api/mcp/status` · `/api/mcp/key`
