@@ -150,31 +150,44 @@
       @delete="handleDeleteVideo"
     />
 
-    <!-- 校验文件名结果：原先塞在一个 alert 里显示 20 行文本 -->
+    <!-- 校验文件名：改名会动盘上真实文件，所以分两步 —— 先预检列出"要动哪几个"，
+         看清了再点「执行改名」。后端默认就是预检（dryRun），这里不传 false 就一个字节都不动 -->
     <div v-if="renameResult" class="overlay" @click.self="renameResult = null">
       <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="rename-title">
         <div class="dialog__head">
-          <h3 class="dialog__title" id="rename-title">校验文件名</h3>
+          <h3 class="dialog__title" id="rename-title">{{ renameResult.dryRun ? '校验文件名（预检）' : '校验文件名（已执行）' }}</h3>
           <button class="dialog__close" aria-label="关闭" @click="renameResult = null">&times;</button>
         </div>
         <div class="dialog__body">
           <p class="summary">
-            重命名 {{ renameResult.renamed }} 条 · 跳过 {{ renameResult.skipped }} 条 · 失败 {{ renameResult.failed }} 条
+            {{ renameResult.renamed }} 处{{ renameResult.dryRun ? '要改' : '已改' }} ·
+            跳过 {{ renameResult.skipped }} · 失败 {{ renameResult.failed }}
           </p>
           <ul class="detail-list">
-            <li v-for="(item, i) in renameResult.details" :key="i" :class="{ failed: item.errors?.length }">
+            <li
+              v-for="(item, i) in renameResult.details"
+              :key="i"
+              :class="{ failed: item.error || item.errors?.length }"
+            >
               <strong>{{ item.code }}</strong>
-              <span v-if="item.errors?.length">{{ item.errors.join('；') }}</span>
-              <span v-else-if="item.fileRenamed || item.coverRenamed">
-                <template v-if="item.fileRenamed">{{ baseName(item.oldFile) }} → {{ baseName(item.newFile) }}</template>
-                <template v-if="item.coverRenamed"> / {{ baseName(item.oldCover) }} → {{ baseName(item.newCover) }}</template>
-              </span>
+              <em class="kind">{{ item.kind === 'cover' ? '封面' : '视频' }}</em>
+              <span v-if="item.error || item.errors?.length">{{ item.error || item.errors.join('；') }}</span>
+              <span v-else-if="item.newFile">{{ baseName(item.newFile) }}</span>
+              <span v-else-if="item.newCover">{{ baseName(item.newCover) }}</span>
               <span v-else>无需调整</span>
             </li>
           </ul>
         </div>
         <div class="dialog__foot">
-          <button class="btn btn--primary" @click="renameResult = null">知道了</button>
+          <button class="btn" @click="renameResult = null">关闭</button>
+          <button
+            v-if="renameResult.dryRun && renameResult.renamed > 0"
+            class="btn btn--primary"
+            :disabled="renaming"
+            @click="applyRename"
+          >
+            {{ renaming ? '处理中…' : `执行改名（${renameResult.renamed} 处）` }}
+          </button>
         </div>
       </div>
     </div>
@@ -470,27 +483,51 @@ const askDeleteChoice = (label) =>
     ]
   })
 
+// 第一步：预检。只回"会动哪几个文件"，盘上一个都不改
 const checkAndRename = async () => {
   if (renaming.value) return
-  const go = await ui.confirm({
-    title: '校验文件名',
-    message: '将检查所有影片的视频/封面文件名是否与番号一致，不一致的自动重命名。是否继续？',
-    confirmLabel: '开始检查'
-  })
-  if (!go) return
-
   renaming.value = true
   try {
-    const res = await videoApi.renameToCode()
+    const res = await videoApi.renameToCode(true)
     if (res.success) {
-      renameResult.value = res.data
-      await loadVideos()
+      renameResult.value = { dryRun: res.dryRun, ...res.data }
+      if (!res.data.renamed) ui.success('文件名都与番号一致，没有要改的')
     } else {
       ui.error('检查失败：' + errText(res, '未知错误'))
     }
   } catch (err) {
     console.error('校验文件名失败:', err)
     ui.error('检查失败：' + errText(err))
+  } finally {
+    renaming.value = false
+  }
+}
+
+// 第二步：真要改名了 —— 这一步改的是盘上的文件，所以按钮放在预检清单里，
+// 看完"要动哪几个"才点得到
+const applyRename = async () => {
+  if (renaming.value) return
+  const go = await ui.confirm({
+    title: '执行改名',
+    message: `按清单重命名 ${renameResult.value?.renamed ?? 0} 个文件（视频与封面都会动）。`
+      + '库里记的路径会跟着改，播放不受影响。',
+    danger: true,
+    confirmLabel: '开始改名'
+  })
+  if (!go) return
+  renaming.value = true
+  try {
+    const res = await videoApi.renameToCode(false)
+    if (res.success) {
+      renameResult.value = { dryRun: res.dryRun, ...res.data }
+      await loadVideos()
+      ui.success(`已改名 ${res.data.renamed} 处`)
+    } else {
+      ui.error('改名失败：' + errText(res, '未知错误'))
+    }
+  } catch (err) {
+    console.error('执行改名失败:', err)
+    ui.error('改名失败：' + errText(err))
   } finally {
     renaming.value = false
   }
@@ -597,6 +634,13 @@ const handleDeleteVideo = async (videoId) => {
   color: var(--accent);
   flex-shrink: 0;
   font-variant-numeric: tabular-nums;
+}
+
+/* 预检清单里的次要标记：说清这一处是视频文件还是封面，别和番号抢视觉重心 */
+.detail-list .kind {
+  font-style: normal;
+  color: var(--text-faint);
+  flex-shrink: 0;
 }
 
 .detail-list li.failed {

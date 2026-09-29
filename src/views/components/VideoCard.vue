@@ -63,6 +63,22 @@
         >
 {{ sizeText }}
 </button>
+        <!-- 版本（v11）：一部片名下有多份文件时标出来，卡片上的分辨率与大小是"默认那一版"的 -->
+        <span
+          v-if="video.versionCount > 1"
+          class="tag tag--info pill pill--wide pill--versions"
+          :title="`这部片有 ${video.versionCount} 版，卡片字段按默认那一版；进详情页可切换`"
+        >
+{{ video.versionCount }} 版
+</span>
+        <!-- 点赞榜/最近点赞：这一次赞的是哪一版就标哪一版（不是默认版本时才标，免得满屏"原版"） -->
+        <span
+          v-if="likedOtherVersion"
+          class="tag tag--accent pill pill--liked-version"
+          :title="`赞的是「${video.likedVersion}」这一版`"
+        >
+♥ {{ video.likedVersion }}
+</span>
         <span v-if="video.likeCount > 0" class="tag tag--like pill pill--likes">♥ {{ video.likeCount }}</span>
         <span v-if="video.country" class="tag tag--accent pill pill--wide pill--country">{{ video.country }}</span>
         <span v-if="video.category" class="tag tag--success pill pill--wide pill--category">{{ video.category }}</span>
@@ -129,6 +145,12 @@ const onCoverLoad = (event) => {
 
 const coverUrl = computed(() => videoApi.getCoverUrl(props.video.id))
 
+// 榜单里的这张卡：赞的版本不是影片口径那一版时才打标识（同一部片多个版本各算一条，不去重）
+const likedOtherVersion = computed(() => {
+  const v = props.video
+  return !!v.likedFileId && !!v.fileId && v.likedFileId !== v.fileId
+})
+
 // 「1080p 1.4GB」/「1.4GB」（没扫过分辨率）/「无文件」；复制成功时让位给反馈
 const sizeText = computed(() => {
   if (copied.value) return '已复制'
@@ -159,13 +181,14 @@ const copyCode = async () => {
 }
 
 const handleReset = async () => {
-  if (!props.video?.id || resetting.value) return
+  // 重置作用于"卡片显示的那一版"（默认版本行）；没有版本行说明这库还没迁到 v11
+  const fileId = props.video?.fileId
+  if (!fileId || resetting.value) return
   resetting.value = true
   try {
-    const res = await videoApi.resetFileSize(props.video.id)
+    const res = await videoApi.resetFileSize(fileId)
     if (res.success) {
       patch.value = { ...patch.value, ...(res.data ?? {}) }
-      if (res.data?.coverPath !== undefined) coverFailed.value = false
       ui.success('已重置')
     } else {
       ui.error('重置失败：' + errText(res, '未知错误'))

@@ -79,32 +79,57 @@ export const videoApi = {
   update: (id, data) => api.put(`/video/${id}`, data),
   delete: (id, params) => api.delete(`/video/${id}`, { params }),
   batchDelete: (ids, params) => api.delete('/video/batch', { data: { ids }, params }),
-  getStreamUrl: (id) => `/api/video/stream/${id}`,
+  /** 取流按**版本行 id**（v11：一部片名下一份文件一行），封面仍是影片级 */
+  getStreamUrl: (fileId) => `/api/video/stream/${fileId}`,
   getCoverUrl: (id) => `/api/video/cover/${id}`,
   checkSubtitle: (code) => api.get(`/video/${code}/subtitle/check`),
   getMeta: () => api.get('/video/meta'),
   /** 首页分类板块：一次请求取代按分类各发一次 list */
   getHomeSections: () => api.get('/video/home-sections'),
   getAutoCode: () => api.get('/video/autocode'),
-  like: (id) => api.post(`/video/${id}/like`),
-  resetFileSize: (id) => api.post(`/video/${id}/reset-file-size`),
-  /** 片源两维：dim = 'subtitle' | 'watermark'，一次只改一维 */
-  updateSource: (id, patch) => api.put(`/video/${id}/source`, patch),
-  /** 读这条影片的文件头量分辨率（字幕与广告水印不参与扫描，由人工标） */
-  scanOne: (id) => api.post(`/video/${id}/scan`),
-  /** 全站扫描：任务在服务端后台跑，force=true 连量过的一起重扫 */
+  /** 点赞落在版本上：fileId 不传后端按默认版本记（列表卡片那种没有版本概念的入口） */
+  like: (id, fileId) => api.post(`/video/${id}/like`, null, { params: fileId ? { fileId } : {} }),
+  /** 全站扫描：任务在服务端后台跑，force=true 连量过的一起重扫（候选是"版本行"，不再按影片） */
   startScanAll: (force = false) => api.post('/video/scan/all', null, { params: { force } }),
   scanStatus: () => api.get('/video/scan/status'),
-  stopScanAll: () => api.delete('/video/scan/all'),  deleteVideoFile: (id) => api.delete(`/video/${id}/file`),
-  updateFileInfo: (id, data) => api.put(`/video/${id}/file-info`, data),
+  stopScanAll: () => api.delete('/video/scan/all'),
+  /** 文件名对齐：默认只做预检（dryRun），传 false 才真去改盘上的文件名 */
+  renameToCode: (dryRun = true) => api.post('/video/rename-to-code', null, { params: { dryRun } }),
+  /**
+   * 文件层操作一律按版本行 id（v11）：重置大小、删文件、上传后写回、扫分辨率、标两维。
+   * 一部片的每一版各有各的分辨率与字幕/水印结论，按影片 id 做这些事已经说不清是哪一版。
+   */
+  resetFileSize: (fileId) => api.post(`/video/version/${fileId}/reset-file-size`),
+  deleteVideoFile: (fileId) => api.delete(`/video/version/${fileId}/file`),
+  updateFileInfo: (fileId, data) => api.put(`/video/version/${fileId}/file-info`, data),
+  /** 读这一版的文件头量分辨率（字幕与广告水印不参与扫描，由人工标） */
+  scanOne: (fileId) => api.post(`/video/version/${fileId}/scan`),
+  /** 片源两维：patch = { subtitle?, watermark? }，一次可以只改一维 */
+  updateSource: (fileId, patch) => api.put(`/video/version/${fileId}/source`, patch),
+  getVersion: (fileId) => api.get(`/video/version/${fileId}`),
+  addVersion: (body) => api.post('/video/version', body),
+  updateVersion: (fileId, body) => api.put(`/video/version/${fileId}`, body),
+  deleteVersion: (fileId, params) => api.delete(`/video/version/${fileId}`, { params }),
+  /** 设为影片口径：列表筛选与统计从此走这一版，界面必须先二次确认 */
+  setDefaultVersion: (fileId) => api.post(`/video/version/${fileId}/default`),
+  /** 版本类型词表（新增版本的下拉用它；设置页那份 CRUD 走 versionTypeApi） */
+  getVersionTypes: () => api.get('/video/version/types'),
   getLikeStats: (year, month) => api.get('/video/likes/stats', { params: { year, month } }),
   getDailyRecommend: (count, refresh = false) => api.get('/video/daily-recommend', { params: { count, refresh } }),
   getRecentlyLiked: (count) => api.get('/video/recently-liked', { params: { count } }),
   getTopLiked: (count) => api.get('/video/top-liked', { params: { count } }),
-  renameToCode: () => api.post('/video/rename-to-code'),
   setLinks: (id, links) => api.put(`/video/${id}/links`, { links }),
   /** 只改原名与发行日期；整份 PUT /video/{id} 会连封面路径一起按传入值写，不敢用它 */
   setMeta: (id, body) => api.put(`/video/${id}/meta`, body),
+}
+
+// 版本类型词表（设置里的「版本类型」分区）：解说频道这类"这一版是谁做的"
+export const versionTypeApi = {
+  getList: () => api.get('/versiontype'),
+  add: (body) => api.post('/versiontype', body),
+  update: (id, body) => api.put(`/versiontype/${id}`, body),
+  remove: (id) => api.delete(`/versiontype/${id}`),
+  move: (id, dir) => api.post(`/versiontype/${id}/move`, null, { params: { dir } })
 }
 
 // 抓取通道：去哪查 / 怎么抽 / 要多礼貌，全在设置页里配

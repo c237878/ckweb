@@ -99,9 +99,18 @@
             <td class="col-name-cell" @click="goToDetail(item)">{{ item.name || '(已删除)' }}</td>
             <td class="col-code">{{ item.code || '-' }}</td>
             <td class="col-type">
+              <div class="type-tags">
               <span class="tag" :class="item.targetType === 'comic' ? 'tag--accent' : 'tag--info'">
                 {{ item.targetType === 'comic' ? '漫画' : '影片' }}
               </span>
+              <!-- 赞的是哪一版（v11）：这一列本来就管"这条记录是什么"，版本放这儿而不是番号列，
+                   免得窄屏那行四列被长番号 + 版本名一起撑爆；原版不标，因为番号已经对得上 -->
+              <span
+                v-if="likedOtherVersion(item)"
+                class="tag tag--muted like-version"
+                :title="`赞的是「${item.versionName || item.versionCode}」这一版`"
+              >{{ item.versionName || item.versionCode }}</span>
+              </div>
             </td>
             <td class="col-time">{{ formatDate(item.likedAt, true) || '-' }}</td>
             <td class="col-actions">
@@ -169,6 +178,13 @@ const tell = (msg, isError = false) => {
   feedback.value = msg
   isFeedbackError.value = isError
 }
+
+/**
+ * 这条点赞是不是落在"不是原版"的那一版上（v11）。
+ * 原版不标：那条记录的番号本来就和影片对得上，标一颗"原版"全是噪音。
+ */
+const likedOtherVersion = (item) =>
+  !!item.versionCode && item.versionCode !== item.code
 
 const getCoverUrl = (item) =>
   item.targetType === 'comic'
@@ -356,6 +372,23 @@ onMounted(async () => {
 .col-code,
 .col-type {
   white-space: nowrap;
+}
+
+/* 类型列现在可能有两颗（影片 / 哪一版）：用可换行的 flex 容器装，
+   继承下来的 nowrap 只管字内部不断行，两颗放不下时才折到第二行 */
+.type-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s1);
+  min-width: 0;
+}
+
+/* 版本那颗限宽：类型名一般就两三个字，兜住极端长的手填名称，
+   不让它把这一列顶到下一行去 */
+.like-version {
+  max-width: 7em;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .col-code {

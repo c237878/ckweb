@@ -26,11 +26,50 @@
                         <span v-if="video.country" class="tag tag--accent">{{ video.country }}</span>
                         <span v-if="video.category" class="tag tag--success">{{ video.category }}</span>
                         <span v-if="likeCount > 0" class="tag tag--like">♥ {{ likeCount }}</span>
-                        <span class="tag tag--muted">{{ video.fileSize?formatSize(video.fileSize):'无文件' }}</span>
+                        <span class="tag tag--muted">{{ shown.fileSize ? formatSize(shown.fileSize) : '无文件' }}</span>
                     </div>
+                    <!-- 版本（v11）：一部片名下一份文件一行。下拉只切"现在看哪一版"，改的是播放器与下面几行；
+                         「设为默认」才动影片口径（列表筛选与统计跟着那一版走），所以它单独要二次确认。
+                         只有一版时不摆下拉——大多数片就是原版，一个只有一个项的选择框是添乱。 -->
                     <!-- 信息区统一成「定宽标签 + 值」两列一行的清单，标签一律不带冒号。
-                         两档：这一版片源（字幕 / 水印 / 分辨率）→ 档案（含演员年龄） -->
+                         三档：版本 → 这一版片源（字幕 / 水印 / 分辨率）→ 档案（含演员年龄） -->
                     <div class="kv-list">
+                        <div v-if="versions.length" class="kv">
+                            <span class="kv__k">版本</span>
+                            <div class="kv__v">
+                                <SelectList
+                                    v-if="versions.length > 1"
+                                    v-model="activeFileId"
+                                    :options="versionOptions"
+                                    label="切换播放的版本"
+                                />
+                                <span v-else class="tag tag--muted">{{ active.displayName || '原版' }}</span>
+                                <button
+                                    v-if="versions.length > 1 && active && !active.isDefault"
+                                    type="button"
+                                    class="tag media-option"
+                                    title="让列表筛选与统计按这一版走"
+                                    @click="makeDefault"
+                                >
+设为默认
+</button>
+                                <button type="button" class="tag media-option" @click="openVersionDialog">加一版</button>
+                                <button
+                                    v-if="versions.length > 1 && active && !active.isDefault"
+                                    type="button"
+                                    class="tag media-option"
+                                    title="只删这一版的记录，盘上文件留着"
+                                    @click="removeActive"
+                                >
+删这版
+</button>
+                            </div>
+                        </div>
+                        <!-- 解说版当初录的那条长标题当副标题留着，下拉与标识只放"湿姐"这种短名 -->
+                        <div v-if="shown.label" class="kv">
+                            <span class="kv__k">版本标题</span>
+                            <div class="kv__v" :title="shown.label">{{ shown.label }}</div>
+                        </div>
                         <!-- 已经有结论就只留结论：四颗胶囊并排是"还没标"时的样子，
                              看片时那一屏只需要答案。标错了不在这里改 —— 走右上角「重置」，
                              它把两维与分辨率一起清空，回到没标过的状态重填 -->
@@ -38,12 +77,12 @@
                             <span class="kv__k">字幕</span>
                             <div class="kv__v">
                                 <span
-                                    v-if="video.subtitleState !== 'unknown'"
+                                    v-if="shown.subtitleState !== 'unknown'"
                                     class="tag"
-                                    :class="subtitleClass(video.subtitleState)"
-                                    :title="SUBTITLE_STATES[video.subtitleState]?.long"
+                                    :class="subtitleClass(shown.subtitleState)"
+                                    :title="SUBTITLE_STATES[shown.subtitleState]?.long"
                                 >
-{{ subtitleText(video.subtitleState) }}
+{{ subtitleText(shown.subtitleState) }}
 </span>
                                 <template v-else>
                                     <button
@@ -64,12 +103,12 @@
                             <span class="kv__k">广告水印</span>
                             <div class="kv__v">
                                 <span
-                                    v-if="video.watermarkState !== 'unknown'"
+                                    v-if="shown.watermarkState !== 'unknown'"
                                     class="tag"
-                                    :class="watermarkClass(video.watermarkState)"
-                                    :title="WATERMARK_STATES[video.watermarkState]?.long"
+                                    :class="watermarkClass(shown.watermarkState)"
+                                    :title="WATERMARK_STATES[shown.watermarkState]?.long"
                                 >
-{{ watermarkText(video.watermarkState) }}
+{{ watermarkText(shown.watermarkState) }}
 </span>
                                 <template v-else>
                                     <button
@@ -89,7 +128,7 @@
                         <div class="kv">
                             <span class="kv__k">分辨率</span>
                             <div class="kv__v">
-                                <span v-if="video.resH" class="tag tag--info">{{ video.resW }}×{{ video.resH }}</span>
+                                <span v-if="shown.resH" class="tag tag--info">{{ shown.resW }}×{{ shown.resH }}</span>
                                 <template v-else>
                                     <span class="media-unknown">未扫描</span>
                                     <!-- 量出来就不再摆这颗按钮：重复扫只会得到同一个数，
@@ -98,7 +137,7 @@
                                         type="button"
                                         class="tag media-option"
                                         :disabled="scanning"
-                                        title="读这个视频文件的容器头量宽高（只读文件，不改文件；字幕和广告水印由你自己标）"
+                                        title="读这一版的视频文件容器头量宽高（只读文件，不改文件；字幕和广告水印由你自己标）"
                                         @click="scanThis"
                                     >
 {{ scanning ? '扫描中…' : '扫描' }}
@@ -192,6 +231,16 @@
             </div>
         </div>
 
+        <!-- 加一版：类型 + 版本名称 + 文件名标识（默认按「番号 + 类型后缀」建议，可改） -->
+        <AddVersionDialog
+            :visible="showVersionDialog"
+            :video="video"
+            :versions="versions"
+            @saved="onVersionSaved"
+            @error="(m) => ui.error(m)"
+            @cancel="showVersionDialog = false"
+        />
+
         <!-- 编辑弹窗：其中"删除"按钮触发的确认走全局反馈层（store/ui + AppOverlays） -->
         <AddVideoDialog
             :visible="showEditDialog"
@@ -209,6 +258,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { videoApi } from '@/scripts/api'
 import { useUiStore, errText } from '@/scripts/store/ui'
 import AddVideoDialog from '@/views/components/AddVideoDialog.vue'
+import AddVersionDialog from '@/views/components/AddVersionDialog.vue'
+import SelectList from '@/views/components/SelectList.vue'
 import VideoCard from '@/views/components/VideoCard.vue'
 import { formatSize, ageAt } from '@/scripts/utils/format'
 import {
@@ -221,6 +272,73 @@ const route = useRoute()
 const router = useRouter()
 const ui = useUiStore()
 const video = ref(null)
+// 文件层（v11）：一部片名下每份文件一行。activeFileId 是"现在看哪一版"，
+// 与"哪一版是影片口径"（isDefault）是两件事，后者只有「设为默认」会改
+const versions = ref([])
+const activeFileId = ref('')
+const showVersionDialog = ref(false)
+
+const active = computed(() => versions.value.find((v) => v.id === activeFileId.value) || versions.value[0] || null)
+// 信息区与播放器都读这一份：没有版本行时退回影片对象（旧数据/异常兜底，不让页面空白）
+const shown = computed(() => active.value || video.value || {})
+const versionOptions = computed(() => versions.value.map((v) => ({
+    value: v.id,
+    // 下拉里只放短名：类型名（湿姐）或"原版"，默认那一版标出来，长标题走副标题那一行
+    label: `${v.displayName || '原版'}${v.isDefault ? ' · 默认' : ''}`
+})))
+
+const openVersionDialog = () => { showVersionDialog.value = true }
+
+const onVersionSaved = async () => {
+    showVersionDialog.value = false
+    await loadVideo()
+    ui.success('版本已添加')
+}
+
+// 设为影片口径：一次切换会连带改掉列表筛选结果与全站统计，所以必须二次确认
+const makeDefault = async () => {
+    const v = active.value
+    if (!v) return
+    const go = await ui.confirm({
+        title: '设为默认版本',
+        message: `列表筛选、统计和卡片上的分辨率与大小都会跟着「${v.displayName}」这一版走，`
+            + `原来是「${defaultName.value}」。确定要换吗？`
+    })
+    if (!go) return
+    try {
+        const res = await videoApi.setDefaultVersion(v.id)
+        if (!res?.success) return ui.error(res?.message || '设置失败')
+        await loadVideo()
+        ui.success(res.message || '已设为默认版本')
+    } catch (error) {
+        console.error('设为默认失败:', error)
+        ui.error('设置失败：' + errText(error))
+    }
+}
+
+const defaultName = computed(() => versions.value.find((v) => v.isDefault)?.displayName || '原版')
+
+// 删掉这一版：只剩一版时后端会拒绝（影片没有默认版本，列表筛选与统计会当场失去依据）
+const removeActive = async () => {
+    const v = active.value
+    if (!v) return
+    const go = await ui.confirm({
+        title: '删除这一版',
+        message: `只删库里的版本记录，盘上的文件留着；指向「${v.displayName}」的点赞记录会一起清掉。`,
+        danger: true
+    })
+    if (!go) return
+    try {
+        const res = await videoApi.deleteVersion(v.id)
+        if (!res?.success) return ui.error(res?.message || '删除失败')
+        await loadVideo()
+        ui.success(res.message || '已删除')
+    } catch (error) {
+        console.error('删除版本失败:', error)
+        ui.error('删除失败：' + errText(error))
+    }
+}
+
 const actors = ref([])
 const recommendList = ref([])
 const rotation = ref(0)
@@ -322,15 +440,17 @@ let speedTipTimer = null
 const marking = ref(false)
 // 点当前选中的那颗等于清掉这一维（回到未标记），所以不额外做"清除"按钮
 const markSource = async (dim, value) => {
-    if (!video.value?.id) return
+    // 两维是"这一份文件"的结论：解说版有没有字幕，和原版有没有字幕是两回事
+    const fileId = shown.value.id
+    if (!fileId) return
     const key = dim === 'subtitle' ? 'subtitleState' : 'watermarkState'
-    const next = video.value[key] === value ? 'unknown' : value
+    const next = shown.value[key] === value ? 'unknown' : value
     if (marking.value) return
     marking.value = true
     try {
-        const res = await videoApi.updateSource(video.value.id, { [dim]: next })
+        const res = await videoApi.updateSource(fileId, { [dim]: next })
         if (res.success) {
-            video.value[key] = res.data[key]
+            active.value[key] = res.data[key]
             ui.success(next === 'unknown' ? '已清掉这一维' : '已记录')
         } else {
             ui.error('保存失败：' + errText(res, '未知错误'))
@@ -348,18 +468,19 @@ const scanning = ref(false)
 // ---------------------------------------------------------------- 元数据：原名 / 发行日期 / 片商
 
 const scanThis = async () => {
-    if (!video.value?.id || scanning.value) return
+    const fileId = shown.value.id
+    if (!fileId || scanning.value) return
     scanning.value = true
     try {
-        const res = await videoApi.scanOne(video.value.id)
+        const res = await videoApi.scanOne(fileId)
         if (!res.success) {
             ui.warn(res.message || '没扫出来')
             return
         }
         // 扫描只回分辨率：字幕与广告水印两维不碰，那是人工结论
-        video.value.resW = res.data.resW
-        video.value.resH = res.data.resH
-        video.value.scanTime = new Date().toLocaleString('zh-CN', { hour12: false })
+        active.value.resW = res.data.resW
+        active.value.resH = res.data.resH
+        active.value.scanTime = new Date().toLocaleString('zh-CN', { hour12: false })
         ui.success(res.message)
     } catch (error) {
         console.error('扫描失败:', error)
@@ -416,9 +537,9 @@ const initCkplayer = async () => {
         ckplayerInstance = null
     }
 
-    // 检查字幕
+    // 检查字幕：字幕文件名跟的是**这一版的文件名标识**（ATID-428C 有它自己的一份）
     try {
-        const subRes = await videoApi.checkSubtitle(video.value.code)
+        const subRes = await videoApi.checkSubtitle(shown.value.code || video.value.code)
         if (subRes.success && subRes.hasSubtitle) {
             subtitleInfo.value = subRes
         } else {
@@ -434,11 +555,12 @@ const initCkplayer = async () => {
         ? `/api/video/cover/${video.value.id}`
         : ''
 
-    // 记忆播放位置
-    const savedPlayTime = video.value.fileSize ? getPlayTime(video.value.id) : 0
+    // 记忆播放位置按影片记（切版本不该把进度抹掉），取流按**这一版**的文件（v11）
+    const cur = shown.value
+    const savedPlayTime = cur.fileSize ? getPlayTime(video.value.id) : 0
 
     // 文件不存在时视频地址为空，由 ckplayer 自动显示封面
-    const videoUrl = video.value.fileSize ? videoApi.getStreamUrl(video.value.id) : ''
+    const videoUrl = cur.fileSize ? videoApi.getStreamUrl(cur.id) : ''
 
     const videoObject = {
         container: '#ckplayer',
@@ -559,6 +681,9 @@ onUnmounted(() => {
     }
 })
 
+// 换版本 = 换一个文件：播放器要重开（进度仍按影片 id 记，回到同一部片接着看）
+watch(activeFileId, () => { nextTick(initCkplayer) })
+
 watch(() => route.params.id, async (newId, oldId) => {
     if (newId && newId !== oldId) {
         rotation.value = 0
@@ -573,6 +698,10 @@ const loadVideo = async () => {
         const res = await videoApi.getDetail(route.params.id)
         if (res.success) {
             video.value = res.data.video || res.data
+            versions.value = video.value.versions || []
+            // 默认停在影片口径那一版：进详情页看到的分辨率/大小就该与列表卡片一致
+            activeFileId.value = (versions.value.find((v) => v.isDefault) || versions.value[0] || {}).id || ''
+            delete video.value.versions
             actors.value = res.data.actors || []
             likeCount.value = res.data.likeCount || 0
             // 初始化 ckplayer
@@ -646,20 +775,20 @@ const openEditDialog = () => {
 }
 
 const resetFileSize = async () => {
-    if (!video.value?.id) return
+    const fileId = shown.value.id
+    if (!fileId) return
     resetting.value = true
     try {
-        const res = await videoApi.resetFileSize(video.value.id)
+        const res = await videoApi.resetFileSize(fileId)
         if (res.success) {
-            if (res.data?.filePath !== undefined) video.value.file_path = res.data.filePath
-            if (res.data?.fileSize !== undefined) video.value.fileSize = res.data.fileSize
-            if (res.data?.coverPath !== undefined) video.value.cover_path = res.data.coverPath
-            video.value.subtitleState = 'unknown'
-            video.value.watermarkState = 'unknown'
-            video.value.resW = 0
-            video.value.resH = 0
-            video.value.scanTime = null
-            ui.success('已重置')
+            // 后端把这一版重置后的整份字段带回来（含被清空的分辨率与两维），照单覆盖那一版；
+            // 封面是影片层的，接口找回了封面时会一并带回来
+            if (res.data) {
+                const i = versions.value.findIndex((v) => v.id === fileId)
+                if (i >= 0) versions.value[i] = { ...versions.value[i], ...res.data }
+                if (res.data.coverFound) video.value.coverPath = res.data.coverFound
+            }
+            ui.success(res.message || '已重置')
         } else {
             ui.error('重置失败：' + errText(res, '未知错误'))
         }
@@ -672,20 +801,21 @@ const resetFileSize = async () => {
 
 // 删除视频文件
 const handleDeleteFile = async () => {
-    if (!video.value?.id) return
+    const v = shown.value
+    if (!v.id) return
     const go = await ui.confirm({
         title: '删除视频文件',
-        message: '确定要删除视频文件吗？封面不会受影响。',
+        message: `确定要删掉「${v.displayName || '这一版'}」的文件吗？版本记录会留着（显示成还没上传），`
+            + '封面与别的版本都不动。',
         danger: true
     })
     if (!go) return
     deletingFile.value = true
     try {
-        const res = await videoApi.deleteVideoFile(video.value.id)
+        const res = await videoApi.deleteVideoFile(v.id)
         if (res.success) {
-            video.value.file_path = null
-            video.value.fileSize = 0
-            ui.success('已删除文件')
+            await loadVideo()
+            ui.success(res.message || '已删除文件')
         } else {
             ui.error('删除失败：' + errText(res, '未知错误'))
         }
@@ -723,6 +853,16 @@ const onEditSave = async (formData) => {
         editingVideo.value = null
         await loadVideo()
         ui.success(res.message || '已保存')
+        // 改了番号就会带着这一部片的版本文件改名；跟随了多少、有多少没跟随，都得当场说清，
+        // 不然"手起的名字被悄悄改掉"和"以为改了其实没改"都发现不了
+        const ri = res.renameInfo
+        if (ri?.versionRenamed || ri?.versionSkipped) {
+          const bits = []
+          if (ri.versionRenamed) bits.push(`${ri.versionRenamed} 个版本文件已跟随改名`)
+          if (ri.versionSkipped) bits.push(`${ri.versionSkipped} 个未跟随（行级番号不合规或文件不在）`)
+          if (ri.coverRenamed) bits.push('封面已改名')
+          ui.info(bits.join('；'))
+        }
     } catch (error) {
         console.error('保存失败:', error)
         ui.error('保存失败：' + errText(error))
@@ -768,7 +908,8 @@ const handleLike = async () => {
     if (likeDisabled.value) return
     likeDisabled.value = true
     try {
-        const res = await videoApi.like(video.value.id)
+        // 点赞落在"正在看的这一版"上（v11）；卡片上的总数仍是这部片的求和
+        const res = await videoApi.like(video.value.id, shown.value.id)
         if (res.success) {
             likeCount.value = res.likeCount
             // 观影日历挂在 App 上，不会自己知道点赞发生了

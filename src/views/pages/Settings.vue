@@ -226,6 +226,25 @@
           <StudioManager embedded />
         </section>
 
+        <!-- 版本类型：一部片名下的每份文件算一版（原版 + 解说 / 剪辑…），
+             这里管的是"这一版是谁做的、尾巴长什么样"，与片商（那部片的发行方）不是一回事 -->
+        <section
+          v-else-if="activeGroup === 'versions'"
+          id="panel-versions"
+          class="panel settings-group"
+          role="tabpanel"
+          aria-labelledby="tab-versions"
+          tabindex="-1"
+        >
+          <h2 class="section-title">版本类型</h2>
+          <p class="panel-desc">
+            一部片名下每份文件各是一版：原版在建片时就有了，解说、剪辑这类要在影片详情页点「加一版」。
+            列表筛选与统计只认「默认版本」那一版，切默认版本要二次确认。
+            后缀只用于新建版本时建议文件名尾巴，改番号时不会按它重算，同类型的两版才不会撞成同一个名字。
+          </p>
+          <VersionTypeManager embedded />
+        </section>
+
         <!-- AI 接口：端点、密钥、工具清单与打标口径，整块在组件里 -->
         <section
           v-else-if="activeGroup === 'mcp'"
@@ -392,6 +411,7 @@ import { useUiStore } from '@/scripts/store/ui'
 import TaxonomyTable from '@/views/components/TaxonomyTable.vue'
 import ScrapeChannelsPanel from '@/views/components/ScrapeChannelsPanel.vue'
 import StudioManager from '@/views/pages/StudioManager.vue'
+import VersionTypeManager from '@/views/pages/VersionTypeManager.vue'
 import McpPanel from '@/views/components/McpPanel.vue'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -414,6 +434,7 @@ const GROUPS = [
   { id: 'dirs', label: '扫描目录', desc: '导入影片、封面、字幕时从哪里找文件。' },
   { id: 'taxonomy', label: '地区与分类' },
   { id: 'studios', label: '片商' },
+  { id: 'versions', label: '版本类型' },
   { id: 'channels', label: '抓取通道', desc: '外部站点的查询地址、字段抽取规则，以及限速 / 每日配额 / 连续失败熔断。' },
   { id: 'mcp', label: 'AI 接口' },
   { id: 'links', label: '友情链接', desc: '显示在页脚：用每行的 ↑ ↓ 调位置，也可以直接改排序数字。' }

@@ -114,7 +114,9 @@
 
         <!-- 视频路径：手动输入 + 自动填充 + 上传 -->
         <div class="field">
-          <label for="av-file-path">视频路径</label>
+          <!-- 编辑已有影片时这一格改的是"默认那一版"的路径（v11 文件层在 video_files），
+               标签上说清楚，免得以为在改整部片 -->
+          <label for="av-file-path">视频路径{{ editingVideo ? '（默认版本）' : '' }}</label>
           <div class="row">
             <input
               id="av-file-path"
@@ -483,19 +485,17 @@ const doUpload = async (type, directory, file) => {
       if (type === 'video') {
         form.value.filePath = res.filePath
         form.value.fileSize = res.fileSize
-        // 编辑模式：立即更新数据库 file_size
-        if (props.editingVideo?.id) {
-          await videoApi.updateFileInfo(props.editingVideo.id, {
-            filePath: res.filePath,
-            fileSize: res.fileSize
-          })
+        // 编辑模式：立即写库。文件层在 v11 归版本行，这里落的是"默认那一版"
+        if (props.editingVideo?.fileId) {
+          await videoApi.updateFileInfo(props.editingVideo.fileId, { filePath: res.filePath })
+        } else if (props.editingVideo?.id) {
+          ui.warn('这部片还没有版本记录，文件已落盘但库里没写上；保存一次影片就会补上默认版本')
         }
       } else {
         form.value.coverPath = res.filePath
-        if (props.editingVideo?.id) {
-          await videoApi.updateFileInfo(props.editingVideo.id, {
-            coverPath: res.filePath
-          })
+        // 封面是影片层的（一部一张），但写它的入口仍挂在默认版本行那个接口上（它认得这部片）
+        if (props.editingVideo?.fileId) {
+          await videoApi.updateFileInfo(props.editingVideo.fileId, { coverPath: res.filePath })
         }
       }
     } else {
