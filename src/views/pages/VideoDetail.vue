@@ -417,6 +417,11 @@ const rotation = ref(0)
 const currentVolume = ref(1)  // 默认音量 1 (100%)
 const STORAGE_KEY = 'ckplayer_volume'
 const PLAYTIME_KEY_PREFIX = 'ckplayer_playtime_'
+// 进度按**版本行**记（v11）：原版 119 分钟、解说版 21 分钟，共用一个偏移的话切回来必然错位。
+// 旧数据是按影片 id 存的，兜底只交给"最可能就是它"的那一版——默认版，或这部片只有一版。
+// 每个版本都去继承一次，就等于把这次要修的串位又造回来了。
+const legacyPlayTimeKey = (movieId) => (movieId ? PLAYTIME_KEY_PREFIX + movieId : '')
+const canClaimLegacy = (row) => !!row.isDefault || versions.value.length <= 1
 
 // 从本地存储加载音量
 const loadVolume = () => {
@@ -426,25 +431,31 @@ const loadVolume = () => {
     }
 }
 
-// 获取视频播放时间
-const getPlayTime = (videoId) => {
-    const saved = localStorage.getItem(PLAYTIME_KEY_PREFIX + videoId)
-    if (saved !== null) {
-        return parseFloat(saved)
+// 获取视频播放时间：先读这一版自己的键，没有再读这部片的老键
+const getPlayTime = (fileId, movieId, legacy) => {
+    const keys = [PLAYTIME_KEY_PREFIX + fileId, legacy ? legacyPlayTimeKey(movieId) : ''].filter(Boolean)
+    for (const key of keys) {
+        const saved = localStorage.getItem(key)
+        if (saved !== null) {
+            const n = parseFloat(saved)
+            if (Number.isFinite(n) && n >= 0) return n
+        }
     }
     return 0
 }
 
-// 保存视频播放时间
-const savePlayTime = (videoId, time) => {
-    if (time > 5) {  // 只保存超过5秒的播放记录
-        localStorage.setItem(PLAYTIME_KEY_PREFIX + videoId, time.toString())
-    }
+// 保存视频播放时间：只落在这一版自己的键上。
+// 接管老键的这一版一旦开始自己记，就把老键删掉——留着会被别的版本再继承一次
+const savePlayTime = (fileId, time, owner) => {
+    if (!fileId || time <= 5) return   // 只保存超过5秒的播放记录
+    localStorage.setItem(PLAYTIME_KEY_PREFIX + fileId, time.toString())
+    if (owner?.legacy) localStorage.removeItem(legacyPlayTimeKey(owner.movieId))
 }
 
-// 清除视频播放时间
+// 清除视频播放时间（删片时把这部片所有版本的记录一起清，留着就是没人读的垃圾键）
 const clearPlayTime = (videoId) => {
     localStorage.removeItem(PLAYTIME_KEY_PREFIX + videoId)
+    versions.value.forEach((v) => localStorage.removeItem(PLAYTIME_KEY_PREFIX + v.id))
 }
 
 // 保存音量到本地存储
@@ -568,6 +579,10 @@ const videoNaturalHeight = ref(0)
 const playerContainer = ref(null)
 const playerError = ref('')
 let ckplayerInstance = null
+// 播放器时间回调只更新这里的最新值，由固定的 flush 落盘（见 every()）
+let latestTime = 0
+// 当前在放的是哪一版（{ fileId, movieId, legacy }）：销毁后离开页面时还要靠它补记最后一段
+let playingOwner = null
 
 // 播放器相关的延时任务统一登记，离开页面时一次清干净
 const playerTimers = []
@@ -576,8 +591,18 @@ const later = (fn, delay) => {
     playerTimers.push(id)
     return id
 }
+// 周期任务：进度落盘用固定的 flush，不用每次时间回调都挂一个延时（那样切一次版本就攒一堆
+// 待落地的定时器，每个都可能往陈旧的版本键上写）
+const every = (fn, ms) => {
+    const id = setInterval(fn, ms)
+    playerTimers.push(id)
+    return id
+}
 const clearPlayerTimers = () => {
-    playerTimers.forEach(clearTimeout)
+    playerTimers.forEach((id) => {
+        clearTimeout(id)
+        clearInterval(id)
+    })
     playerTimers.length = 0
 }
 
@@ -594,20 +619,43 @@ const wrapperStyle = computed(() => {
 
 const subtitleInfo = ref(null)
 
-const initCkplayer = async () => {
-    if (!video.value?.id) return
-
-    playerError.value = ''
-
-    // 销毁旧实例
+/**
+ * 拆掉当前播放器：先停掉所有延时/周期任务，再把每个 video 元素停下来并断源，
+ * 最后清容器——ckplayer 的 remove() 成不成功都不影响这一步。
+ *
+ * 原来只调 remove() 且异常被 catch 吞掉：播放中切版本时它抛错，旧 video 就留在页面里继续出声，
+ * 新实例再建一个 → 两版同时播、两路声音叠加（2026-09-30 反馈）。
+ * 先 pause+断源 再 remove：remove 可能已经把节点摘下，那时再去 pause 就晚了。
+ */
+const destroyPlayer = () => {
+    clearPlayerTimers()
+    const box = document.querySelector('#ckplayer')
+    box?.querySelectorAll('video').forEach((el) => {
+        try { el.pause() } catch { /* 已脱离文档，忽略 */ }
+        try { el.removeAttribute('src'); el.load() } catch { /* 同上 */ }
+    })
     if (ckplayerInstance) {
         try {
             ckplayerInstance.remove()
         } catch (e) {
-            console.warn('销毁播放器失败:', e)
+            console.warn('ckplayer remove() 报错，容器仍强制清空:', e)
         }
         ckplayerInstance = null
     }
+    if (box) box.innerHTML = ''
+    latestTime = 0
+}
+
+// 切版本会连着触发两次重建（下拉点得快 / 保存后 loadVideo 又来一次）；
+// 上面那些 await 让两轮交叠时，两边都会 new 一个实例 → 又是两个播放器。用序号让后到的作废。
+let playerSeq = 0
+
+const initCkplayer = async () => {
+    if (!video.value?.id) return
+    const seq = ++playerSeq
+
+    playerError.value = ''
+    destroyPlayer()
 
     // 检查字幕：字幕文件名跟的是**这一版的文件名标识**（ATID-428C 有它自己的一份）
     try {
@@ -627,9 +675,10 @@ const initCkplayer = async () => {
         ? `/api/video/cover/${video.value.id}`
         : ''
 
-    // 记忆播放位置按影片记（切版本不该把进度抹掉），取流按**这一版**的文件（v11）
+    // 取流与进度都按**这一版**（v11）
     const cur = shown.value
-    const savedPlayTime = cur.fileSize ? getPlayTime(video.value.id) : 0
+    const owner = { fileId: cur.id, movieId: video.value.id, legacy: canClaimLegacy(cur) }
+    const savedPlayTime = cur.fileSize ? getPlayTime(cur.id, video.value.id, owner.legacy) : 0
 
     // 文件不存在时视频地址为空，由 ckplayer 自动显示封面
     const videoUrl = cur.fileSize ? videoApi.getStreamUrl(cur.id) : ''
@@ -665,6 +714,7 @@ const initCkplayer = async () => {
         return
     }
 
+    if (seq !== playerSeq) return   // 这轮建到一半又被切了一次，旧的这轮直接作废
     ckplayerInstance = new Ckplayer(videoObject)
 
     // 下面几个延时都要在离开页面时清掉，否则卸载后仍会往陈旧 id 上写播放进度
@@ -672,15 +722,23 @@ const initCkplayer = async () => {
         later(() => setVolume(currentVolume.value), 500)
     }
 
-    // 监听播放时间并保存播放进度
+    // 监听播放时间并保存进度：时间回调只更新内存里的最新值，每 10 秒落一次盘。
+    // 两处都要锁死轮次（seq）与版本（owner）——原来每次时间回调都挂一个 10 秒延时，
+    // 切走之后迟到的那几个会把这一版的位置写到那一版的键上
+    playingOwner = owner
     later(() => {
-        if (!ckplayerInstance) return
+        if (!ckplayerInstance || seq !== playerSeq) return
         ckplayerInstance.time((currentTime) => {
-            later(() => {
-                if (video.value?.id) savePlayTime(video.value.id, currentTime)
-            }, 10000)
+            if (seq === playerSeq) latestTime = currentTime
         })
     }, 1000)
+
+    let lastSavedTime = -1
+    every(() => {
+        if (seq !== playerSeq || latestTime === lastSavedTime) return   // 暂停着就别反复写同一个值
+        lastSavedTime = latestTime
+        savePlayTime(owner.fileId, latestTime, owner)
+    }, 10000)
 
     // 获取视频元数据
     later(() => {
@@ -742,18 +800,12 @@ onUnmounted(() => {
     document.removeEventListener('keydown', handleKeyDown)
     clearTimeout(volumeTipTimer)
     clearTimeout(speedTipTimer)
-    clearPlayerTimers()
-    if (ckplayerInstance) {
-        try {
-            ckplayerInstance.remove()
-        } catch (e) {
-            console.warn('销毁播放器失败:', e)
-        }
-        ckplayerInstance = null
-    }
+    // 离开页面时把最后这一段补上，不然进度最多丢 10 秒（flush 是周期性的）
+    if (playingOwner) savePlayTime(playingOwner.fileId, latestTime, playingOwner)
+    destroyPlayer()   // 内含 clearPlayerTimers + pause/断源，离开页面同样要拆干净，否则音频在后台继续放
 })
 
-// 换版本 = 换一个文件：播放器要重开（进度仍按影片 id 记，回到同一部片接着看）
+// 换版本 = 换一个文件：播放器要整个重开，进度也各记各的（v11）
 watch(activeFileId, () => { nextTick(initCkplayer) })
 
 watch(() => route.params.id, async (newId, oldId) => {
