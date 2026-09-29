@@ -112,6 +112,11 @@ export const videoApi = {
   deleteVersion: (fileId, params) => api.delete(`/video/version/${fileId}`, { params }),
   /** 设为影片口径：列表筛选与统计从此走这一版，界面必须先二次确认 */
   setDefaultVersion: (fileId) => api.post(`/video/version/${fileId}/default`),
+  /**
+   * 把这一版盘上的文件名改成它的行级番号。默认只做预检（dryRun=true），
+   * 传 false 才真改名：改错一格文件名标识就想把 20GB 的文件重命名，代价太大。
+   */
+  alignVersionName: (fileId, dryRun = true) => api.post(`/video/version/${fileId}/align-name`, null, { params: { dryRun } }),
   /** 版本类型词表（新增版本的下拉用它；设置页那份 CRUD 走 versionTypeApi） */
   getVersionTypes: () => api.get('/video/version/types'),
   getLikeStats: (year, month) => api.get('/video/likes/stats', { params: { year, month } }),

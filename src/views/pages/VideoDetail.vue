@@ -53,7 +53,16 @@
                                 >
 设为默认
 </button>
-                                <button type="button" class="tag media-option" @click="openVersionDialog">加一版</button>
+                                <button type="button" class="tag media-option" @click="openVersionDialog()">加一版</button>
+                                <!-- 改这版：单版本时也要能改（原版的文件名标识同样可能需要修） -->
+                                <button
+                                    type="button"
+                                    class="tag media-option"
+                                    title="改这一版的名称、类型、文件名标识与路径（只改库里的记录）"
+                                    @click="openVersionDialog(active)"
+                                >
+改这版
+</button>
                                 <button
                                     v-if="versions.length > 1 && active && !active.isDefault"
                                     type="button"
@@ -231,14 +240,15 @@
             </div>
         </div>
 
-        <!-- 加一版：类型 + 版本名称 + 文件名标识（默认按「番号 + 类型后缀」建议，可改） -->
+        <!-- 加一版 / 改这版 同一个弹窗：字段一样，改的时候多一句"盘上现在叫什么" -->
         <AddVersionDialog
             :visible="showVersionDialog"
             :video="video"
             :versions="versions"
+            :version="versionEditing"
             @saved="onVersionSaved"
             @error="(m) => ui.error(m)"
-            @cancel="showVersionDialog = false"
+            @cancel="closeVersionDialog"
         />
 
         <!-- 编辑弹窗：其中"删除"按钮触发的确认走全局反馈层（store/ui + AppOverlays） -->
@@ -281,18 +291,82 @@ const showVersionDialog = ref(false)
 const active = computed(() => versions.value.find((v) => v.id === activeFileId.value) || versions.value[0] || null)
 // 信息区与播放器都读这一份：没有版本行时退回影片对象（旧数据/异常兜底，不让页面空白）
 const shown = computed(() => active.value || video.value || {})
-const versionOptions = computed(() => versions.value.map((v) => ({
-    value: v.id,
-    // 下拉里只放短名：类型名（湿姐）或"原版"，默认那一版标出来，长标题走副标题那一行
-    label: `${v.displayName || '原版'}${v.isDefault ? ' · 默认' : ''}`
-})))
+const versionOptions = computed(() => {
+    // 下拉里只放短名：类型名（湿姐）或"原版"，默认那一版标出来，长标题走副标题那一行。
+    // 但同一部片可能有两版都挂在同一个类型下（那四家频道的尾巴都是 C），
+    // 这时光看名字选不出区别，就在重名的那几项后面补上行级番号把它们分开
+    const names = versions.value.map((v) => v.displayName || '原版')
+    const dup = new Set(names.filter((n, i) => names.indexOf(n) !== i))
+    return versions.value.map((v) => {
+        const name = v.displayName || '原版'
+        const tail = dup.has(name) && v.code ? ` · ${v.code}` : ''
+        return { value: v.id, label: `${name}${tail}${v.isDefault ? ' · 默认' : ''}` }
+    })
+})
 
-const openVersionDialog = () => { showVersionDialog.value = true }
+const versionEditing = ref(null)
 
-const onVersionSaved = async () => {
+/** 传行就是改这一版，不传就是加一版 */
+const openVersionDialog = (row = null) => {
+    versionEditing.value = row || null
+    showVersionDialog.value = true
+}
+
+const closeVersionDialog = () => {
     showVersionDialog.value = false
+    versionEditing.value = null
+}
+
+const onVersionSaved = async (payload) => {
+    closeVersionDialog()
     await loadVideo()
-    ui.success('版本已添加')
+    ui.success(payload?.isEdit ? '已保存这一版' : '版本已添加')
+    // 改了文件名标识不等于盘上文件跟着改名：库里认新标识、盘上还是旧名字，
+    // 这两步分开才不会出现"填错一格就把 20GB 的文件重命名"
+    if (payload?.codeChanged) await offerAlignName(payload.version)
+}
+
+/**
+ * 提议把这一版盘上的文件名改成新的行级标识。
+ * 一律先预检（后端 dryRun 默认 true）把"会改成什么名"回出来给人看，确认了才执行。
+ * 不确认就把话说清：两边现在不一致，影片列表里的「校验文件名」会把它列进待办。
+ */
+const offerAlignName = async (row) => {
+    if (!row?.id) return
+    if (!row.filePath) {
+        ui.info('这一版还没有文件，改标识不用改名')
+        return
+    }
+    let pre
+    try {
+        pre = await videoApi.alignVersionName(row.id, true)
+    } catch (error) {
+        console.error('文件名预检失败:', error)
+        return ui.error('预检失败：' + errText(error))
+    }
+    if (!pre?.success) return ui.warn(pre?.message || '这一版不用改名')
+    if (!pre.changed) return ui.info(pre.message || '文件名已经与新标识一致，不用动')
+
+    const go = await ui.confirm({
+        title: '把盘上的文件也改成新标识？',
+        message: `${pre.message}。库里已经先改好了，这一步只动这一个文件；不改的话两边会不一致，`
+            + '影片列表里的「校验文件名」会把它列进待办。',
+        danger: true,
+        confirmLabel: '执行改名'
+    })
+    if (!go) return ui.warn('只改了库里的标识，盘上文件名没动')
+    try {
+        const done = await videoApi.alignVersionName(row.id, false)
+        if (done?.success && done.changed) {
+            await loadVideo()
+            ui.success(done.message || '已改名')
+        } else {
+            ui.warn(done?.message || '没改成')
+        }
+    } catch (error) {
+        console.error('改名失败:', error)
+        ui.error('改名失败：' + errText(error))
+    }
 }
 
 // 设为影片口径：一次切换会连带改掉列表筛选结果与全站统计，所以必须二次确认
@@ -699,8 +773,11 @@ const loadVideo = async () => {
         if (res.success) {
             video.value = res.data.video || res.data
             versions.value = video.value.versions || []
-            // 默认停在影片口径那一版：进详情页看到的分辨率/大小就该与列表卡片一致
-            activeFileId.value = (versions.value.find((v) => v.isDefault) || versions.value[0] || {}).id || ''
+            // 停在影片口径那一版：进详情页看到的分辨率/大小就该与列表卡片一致。
+            // 但刚改过/刚选过某一版时别把人弹回默认版——loadVideo 会在每次保存后被调用，
+            // 跳回默认会让人以为自己的编辑没生效
+            const keep = versions.value.find((v) => v.id === activeFileId.value)
+            activeFileId.value = (keep || versions.value.find((v) => v.isDefault) || versions.value[0] || {}).id || ''
             delete video.value.versions
             actors.value = res.data.actors || []
             likeCount.value = res.data.likeCount || 0
