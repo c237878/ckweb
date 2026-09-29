@@ -20,7 +20,10 @@
                 </div>
                 <div class="info-section">
                     <div class="info-row1">
-                        <span>{{ video.code ? video.code + ' ' + video.name : video.name }}</span>
+                        <!-- 有版本名称时标题就用它（解说版当初录的那条标题本来就是"这一版叫什么"），
+                             不再另起一行「版本标题」——那一行把主标题的层级拆散了。
+                             番号仍是影片层的番号，它是这部片的身份，不随版本变 -->
+                        <span>{{ video.code ? video.code + ' ' : '' }}{{ shown.label || video.name }}</span>
                     </div>
                     <div class="info-row2">
                         <span v-if="video.country" class="tag tag--accent">{{ video.country }}</span>
@@ -73,11 +76,6 @@
 删这版
 </button>
                             </div>
-                        </div>
-                        <!-- 解说版当初录的那条长标题当副标题留着，下拉与标识只放"湿姐"这种短名 -->
-                        <div v-if="shown.label" class="kv">
-                            <span class="kv__k">版本标题</span>
-                            <div class="kv__v" :title="shown.label">{{ shown.label }}</div>
                         </div>
                         <!-- 已经有结论就只留结论：四颗胶囊并排是"还没标"时的样子，
                              看片时那一屏只需要答案。标错了不在这里改 —— 走右上角「重置」，
