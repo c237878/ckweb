@@ -6,6 +6,13 @@
       <button class="btn btn--sm btn--primary" @click="open(null)">添加类型</button>
     </div>
 
+    <!-- 一部片同一个类型只能有一条，所以第二版必然落到别的类型上；
+         而那一版的文件名标识是按「影片番号 + 该类型尾巴」自动拼的，
+         几家类型共用一个尾巴时第二版一保存就撞上第一版的标识，这里当场点出来 -->
+    <p v-if="dupSuffixes.length" class="notice">
+      尾巴 {{ dupSuffixes.join('；') }} —— 同一部片加第二版时会自动算出重复的文件名标识，给它们各换一个字母。
+    </p>
+
     <table class="grid-table">
       <thead>
         <tr>
@@ -82,7 +89,7 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import Dialog from '@/views/components/Dialog.vue'
 import { versionTypeApi } from '@/scripts/api'
 import { useUiStore, errText } from '@/scripts/store/ui'
@@ -94,6 +101,17 @@ defineProps({
 
 const ui = useUiStore()
 const rows = ref([])
+
+// 哪些尾巴被多个类型共用（后端 Types() 带 suffixDup 出来，这里只汇成一句话）
+const dupSuffixes = computed(() => {
+  const dup = rows.value.filter((t) => t.suffixDup && t.suffix)
+  const seen = new Set()
+  return dup.reduce((acc, t) => {
+    const names = rows.value.filter((o) => o.suffix === t.suffix).map((o) => o.name).join(' / ')
+    if (!seen.has(t.suffix)) { seen.add(t.suffix); acc.push(`「${names}」都是 ${t.suffix}`) }
+    return acc
+  }, [])
+})
 const show = ref(false)
 const editing = ref(null)
 const form = ref({ name: '', suffix: '' })

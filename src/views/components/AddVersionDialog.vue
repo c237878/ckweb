@@ -31,7 +31,7 @@
                 v-model="form.typeId"
                 :options="typeOptions"
                 label="选择版本类型"
-                placeholder="选这一版是谁做的 / 什么性质"
+                placeholder="这部片已有的类型不再列出；都不合适用就到设置里加一类"
               />
             </template>
           </div>
@@ -110,7 +110,12 @@ const form = reactive({ typeId: '', label: '', code: '', filePath: '' })
 const openedAsEdit = ref(false)
 const openedCode = ref('')
 
-const typeOptions = computed(() => types.value.map((t) => ({
+// 一部片同一个类型只能有一条（后端 TypeTakenBy 与 idx_video_files_movie_type 都兜着），
+// 所以这部片已经用掉的类型直接不列出来——摆一个选了必然被拒的项更气人
+const usedTypeIds = computed(() => new Set(
+  props.versions.filter((v) => v.id !== props.version?.id && v.typeId).map((v) => v.typeId)
+))
+const typeOptions = computed(() => types.value.filter((t) => !usedTypeIds.value.has(t.id)).map((t) => ({
   value: t.id,
   label: t.suffix ? `${t.name}（尾巴 ${t.suffix}）` : t.name
 })))
