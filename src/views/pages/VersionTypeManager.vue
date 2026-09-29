@@ -9,13 +9,15 @@
     <table class="grid-table">
       <thead>
         <tr>
-          <th>类型</th><th class="col-suffix">文件名后缀</th><th class="num">版本数</th><th class="ops">操作</th>
+          <th>类型</th><th class="num">版本数</th><th class="ops">操作</th>
         </tr>
       </thead>
       <tbody>
         <tr v-for="(t, i) in rows" :key="t.id">
-          <td>{{ t.name }}</td>
-          <td class="dim col-suffix">{{ t.suffix || '—' }}</td>
+          <!-- 后缀与类型名同列：这一列的值本来就短，拆成一列在窄面板里会把操作列顶出容器 -->
+          <td>
+            {{ t.name }}<span v-if="t.suffix" class="dim suffix"> · 尾巴 {{ t.suffix }}</span>
+          </td>
           <td class="num">{{ t.used }}</td>
           <td class="ops">
             <button
@@ -180,14 +182,8 @@ onMounted(load)
 </script>
 
 <style scoped>
-/* 后缀列比片商那些列短得多，窄屏下先收起次要的一列，别把操作列挤成两行 */
-.col-suffix {
-  width: 9em;
-}
-
-@media (max-width: 720px) {
-  .col-suffix {
-    display: none;
-  }
+/* 尾巴跟着类型名走：次要信息，字号降一档就好，不再占一整列 */
+.suffix {
+  font-size: var(--f-xs);
 }
 </style>
