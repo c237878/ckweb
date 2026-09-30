@@ -10,7 +10,7 @@
             :style="rotationStyle"
             controls
             playsinline
-            preload="metadata"
+            :preload="startAt > 0 ? 'metadata' : 'none'"
             :poster="poster || undefined"
             @loadedmetadata="onMetadata"
             @timeupdate="onTimeUpdate"
@@ -38,7 +38,9 @@ const props = defineProps({
     /** 取流地址；空串表示这一版还没有文件，只显示封面 */
     src: { type: String, default: '' },
     poster: { type: String, default: '' },
-    /** 续播位置（秒）；这一版的进度，不是影片的 */
+    /** 续播位置（秒）；这一版的进度，不是影片的。
+     *  为 0 时 preload 走 none：不预读数据，画面就停在封面上，不会显示第 0 帧
+     *  （拖回开头 = 不续播，他要看到封面而不是某一帧的截图） */
     startAt: { type: Number, default: 0 },
     subtitleUrl: { type: String, default: '' },
     volume: { type: Number, default: 1 },
@@ -57,9 +59,14 @@ const swapSource = () => {
     if (!v) return
     v.pause()
     errorText.value = ''
-    if (props.src) v.src = props.src
-    else v.removeAttribute('src')
-    v.load()
+    if (props.src) {
+        // 挂新地址本身就会走一遍资源选择算法，不要再 load()：
+        // load() 会立刻开始拉流，把 preload="none" 的"从头看时只出封面、不占带宽"给抵消掉
+        v.src = props.src
+    } else {
+        v.removeAttribute('src')
+        v.load()
+    }
 }
 
 const applyVolume = () => {

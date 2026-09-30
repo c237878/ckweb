@@ -468,11 +468,20 @@ const getPlayTime = (fileId, movieId, legacy) => {
     return 0
 }
 
-// 保存视频播放时间：只落在这一版自己的键上。
-// 接管老键的这一版一旦开始自己记，就把老键删掉——留着会被别的版本再继承一次
+// 记这一版看到哪儿了。
+// 回到开头（≤5 秒）当"不要续播"处理：删掉记录，而不是什么都不做——
+// 原来只写 >5 的值，于是人把进度条拖回起点、下次进来又被老的几百秒弹走（2026-09-30 反馈）
 const savePlayTime = (fileId, time, owner) => {
-    if (!fileId || time <= 5) return   // 只保存超过5秒的播放记录
-    localStorage.setItem(PLAYTIME_KEY_PREFIX + fileId, time.toString())
+    if (!fileId) return
+    const key = PLAYTIME_KEY_PREFIX + fileId
+    if (!(time > 5)) {
+        localStorage.removeItem(key)
+        // 老键也要一起清：不清的话这一版下次进来又继承那个偏移，看着像"清了个寂寞"
+        if (owner?.legacy) localStorage.removeItem(legacyPlayTimeKey(owner.movieId))
+        return
+    }
+    localStorage.setItem(key, time.toString())
+    // 接管老键的这一版一旦开始自己记，就把老键删掉——留着会被别的版本再继承一次
     if (owner?.legacy) localStorage.removeItem(legacyPlayTimeKey(owner.movieId))
 }
 
@@ -630,12 +639,21 @@ const videoNaturalHeight = ref(0)
 let latestTime = 0
 // 当前在放的是哪一版（{ fileId, movieId, legacy }）：离开页面时还要靠它补记最后一段
 let playingOwner = null
+// 下面这对分辨率是从 video 元素读出来的，属于某一个文件，换版本要清
+let naturalFileId = ''
 
+// 外壳宽高比：播放器解码出的真实分辨率优先，没解码时用库里记的那一条兜底。
+// 兜底这一路现在是主路：从头看时 preload=none，浏览器不读数据也就不会告诉你分辨率，
+// 少了这层兜底，竖屏片在按下播放前会先被塞进 16:9 的盒子里
 const wrapperStyle = computed(() => {
-    if (!videoNaturalWidth.value || !videoNaturalHeight.value) {
-        return { aspectRatio: '16/9' }
-    }
-    const ar = videoNaturalWidth.value / videoNaturalHeight.value
+    const fromPlayer = videoNaturalWidth.value && videoNaturalHeight.value
+        ? { w: videoNaturalWidth.value, h: videoNaturalHeight.value }
+        : null
+    const cur = shown.value
+    const fromDb = cur?.resW && cur?.resH ? { w: cur.resW, h: cur.resH } : null
+    const dims = fromPlayer || fromDb
+    if (!dims) return { aspectRatio: '16/9' }
+    const ar = dims.w / dims.h
     if (rotation.value % 180 === 90) {
         return { aspectRatio: (1 / ar).toFixed(4) }
     }
@@ -668,6 +686,13 @@ const loadVersionMeta = async () => {
     playingOwner = { fileId: cur.id, movieId: video.value.id, legacy: canClaimLegacy(cur) }
     playerStartAt.value = cur.fileSize ? getPlayTime(cur.id, video.value.id, playingOwner.legacy) : 0
     latestTime = 0
+    // 解码分辨率属于"那一个文件"：只有真的换了文件才清，否则存一次编辑就会把
+    // 正在播的这一版的比例抹掉，外壳当场抖一下
+    if (naturalFileId !== cur.id) {
+        naturalFileId = ''
+        videoNaturalWidth.value = 0
+        videoNaturalHeight.value = 0
+    }
     subtitleInfo.value = null
 
     // 字幕文件名跟的是**这一版的文件名标识**（ATID-428C 有它自己的一份）
@@ -687,8 +712,11 @@ const loadVersionMeta = async () => {
 let lastFlushAt = 0
 const onPlayerTime = (t) => {
     latestTime = t
+    const atStart = t <= 5
     const now = Date.now()
-    if (now - lastFlushAt < 10000) return
+    // 拖回开头这件事要**立刻**记（就是清掉），不能等下一个 10 秒窗口：
+    // 拖完直接 F5 的话 onUnmounted 不一定跑到，老的几百秒就会活下来，看起来"清不掉"
+    if (!atStart && now - lastFlushAt < 10000) return
     lastFlushAt = now
     if (playingOwner) savePlayTime(playingOwner.fileId, t, playingOwner)
 }
@@ -702,6 +730,7 @@ const onPlayerEnded = () => {
 
 // 真实分辨率：竖屏/非 16:9 的片子靠它撑外壳的宽高比，旋转后换成倒数
 const onPlayerMetadata = ({ width, height }) => {
+    naturalFileId = playingOwner?.fileId || ''
     videoNaturalWidth.value = width || 1920
     videoNaturalHeight.value = height || 1080
 }
