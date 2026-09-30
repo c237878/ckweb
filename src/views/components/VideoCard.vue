@@ -143,7 +143,10 @@ const onCoverLoad = (event) => {
   isPortrait.value = img.naturalHeight > img.naturalWidth
 }
 
-const coverUrl = computed(() => videoApi.getCoverUrl(props.video.id, 'm'))
+// 列表卡片一律取 160px 档：画框只有一两百像素宽，而图在挂载卷上，
+// 弱网下 24 张 m 档（约 860KB）与 24 张 s 档（约 300KB）是"能不能看"的差别。
+// 详情页大图与"另存封面"仍走原图那条路由。
+const coverUrl = computed(() => videoApi.getCoverUrl(props.video.id, 's'))
 
 // 榜单里的这张卡：赞的版本不是影片口径那一版时才打标识（同一部片多个版本各算一条，不去重）
 const likedOtherVersion = computed(() => {

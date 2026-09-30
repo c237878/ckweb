@@ -272,7 +272,18 @@ export const systemApi = {
   /** 健康检查：库可写、配置里的目录在不在、备份多久没跑。只 stat 目录，不列内容 */
   health: () => api.get('/system/health'),
   /** 不等周期，立刻跑一轮盘上核对 + 增量扫描。后台跑，接口立刻回 */
-  runScanNow: () => api.post('/system/scan/run')
+  runScanNow: () => api.post('/system/scan/run'),
+  /** 马上存一份快照（文件名带时刻）。只是加文件，不要口令 */
+  backupNow: () => api.post('/system/backup/now'),
+  /** 只改"以后往哪儿写"，不动已有文件；传空串是退回配置文件那份 */
+  setBackupDir: (path) => api.post('/system/backup/dir', { path }),
+  /** 把已有快照搬去新目录（removeSource=false 时只复制不删源）。会删文件，要口令 */
+  transferBackupDir: (path, removeSource = true) =>
+    api.post('/system/backup/transfer', { path, removeSource }),
+  /** 删掉某一份快照。要口令 */
+  deleteBackup: (name) => api.delete(`/system/backup/${encodeURIComponent(name)}`),
+  /** 恢复到指定快照：先留恢复前的凭证，再把快照灌回当前库，最后自动补结构。要口令 */
+  restore: (name) => api.post('/system/restore', { name })
 }
 
 // 破坏性操作的管理口令（设置里的「安全」分区）
