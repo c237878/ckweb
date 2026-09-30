@@ -312,7 +312,17 @@
           <div v-else class="settings-grid">
             <div v-for="item in activeFieldGroup.items" :key="item.id" class="field">
               <label :for="'setting-' + item.id">{{ item.label }}</label>
+              <!-- 只有给了候选项的字段才换下拉：值仍然是一个字符串，存法与输入框完全一样 -->
+              <select
+                v-if="item.options"
+                :id="'setting-' + item.id"
+                v-model="item.value"
+                class="input"
+              >
+                <option v-for="o in item.options" :key="o.value" :value="o.value">{{ o.label }}</option>
+              </select>
               <input
+                v-else
                 :id="'setting-' + item.id"
                 v-model="item.value"
                 class="input"
@@ -485,6 +495,18 @@ const settingsList = ref([
   { id: 'siteName', group: 'site', label: '网站名称', value: '', placeholder: '影视网站', hint: '显示在页头与浏览器标签' },
   { id: 'pageSize', group: 'site', label: '影片每页数量', value: '', type: 'number', min: 1, max: 100, placeholder: '默认 24', hint: '影片列表每页显示的条数' },
   { id: 'personPageSize', group: 'site', label: '系列/演员每页数量', value: '', type: 'number', min: 1, max: 100, placeholder: '留空则与影片一致', hint: '系列与演员的卡片比影片小得多，一屏能放的条数不是一个量级' },
+  {
+    id: 'coverSize',
+    group: 'site',
+    label: '列表封面清晰度',
+    value: 'm',
+    options: [
+      { value: 's', label: '省流量 · 160px（一屏约 180KB）' },
+      { value: 'n', label: '平衡 · 240px（一屏约 360KB）' },
+      { value: 'm', label: '清晰 · 400px（一屏约 840KB）' }
+    ],
+    hint: '只管列表与首页卡片上那张封面，详情页大图与另存封面仍是原图。手机流量、远程弱网下选省流量那一档；换档后每张封面第一次被看到时要现生成一次，之后走本地缓存。'
+  },
   { id: 'homePageCategories', group: 'site', label: '首页展示分类', value: '', placeholder: '多个分类用逗号分隔，留空显示全部', hint: '可选值见「地区与分类」' },
   { id: 'homePageCategoryCount', group: 'site', label: '首页分类数量', value: '', type: 'number', min: 1, max: 100, placeholder: '默认 12', hint: '每个分类/板块显示的数量，今日推荐也用这个值' },
   { id: 'posterDir', group: 'media', label: '艳图目录', value: '', placeholder: '如: /Volumes/disk1/posters' }

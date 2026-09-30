@@ -113,6 +113,7 @@ import { formatSize } from '@/scripts/utils/format'
 import { copyText } from '@/scripts/utils/clipboard'
 import { subtitleText, subtitleClass, watermarkText, watermarkClass, resolutionText } from '@/scripts/constants'
 import { videoApi } from '@/scripts/api'
+import { useAppStore } from '@/scripts/store/app'
 import { useUiStore, errText } from '@/scripts/store/ui'
 
 const props = defineProps({
@@ -125,6 +126,7 @@ const props = defineProps({
 
 const router = useRouter()
 const ui = useUiStore()
+const app = useAppStore()
 const emit = defineEmits(['select', 'pick'])
 
 const resetting = ref(false)
@@ -143,10 +145,11 @@ const onCoverLoad = (event) => {
   isPortrait.value = img.naturalHeight > img.naturalWidth
 }
 
-// 列表卡片一律取 160px 档：画框只有一两百像素宽，而图在挂载卷上，
-// 弱网下 24 张 m 档（约 860KB）与 24 张 s 档（约 300KB）是"能不能看"的差别。
-// 详情页大图与"另存封面"仍走原图那条路由。
-const coverUrl = computed(() => videoApi.getCoverUrl(props.video.id, 's'))
+// 卡片封面的档位由设置里「列表封面清晰度」说了算（s=160 / n=240 / m=400）：
+// 画框只有一两百 CSS 像素宽，而原图在挂载卷上，一屏 24 张时 160 档约 177KB、400 档约 844KB，
+// 弱网下是"能不能看"的差别，但糊不糊只有他自己说了算，所以做成可设的、默认给清晰。
+// 详情页大图与"另存封面"仍走原图那条路由，不受这个设置影响。
+const coverUrl = computed(() => videoApi.getCoverUrl(props.video.id, app.coverSize))
 
 // 榜单里的这张卡：赞的版本不是影片口径那一版时才打标识（同一部片多个版本各算一条，不去重）
 const likedOtherVersion = computed(() => {
