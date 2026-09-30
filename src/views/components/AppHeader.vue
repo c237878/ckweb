@@ -19,6 +19,16 @@
       </nav>
 
       <div class="header-tools">
+        <!-- 平时什么都不显示；只有存储/目录真出事时才出现一个入口。
+             这个项目的故障面是"卷没挂上"，服务本身却完全健康，不提示就会被当成软件坏了 -->
+        <router-link
+          v-if="healthProblem"
+          to="/settings?group=status"
+          class="health-flag"
+          :title="healthProblem"
+        >
+          <span class="health-flag__dot" aria-hidden="true"></span>存储异常
+        </router-link>
         <button
           class="theme-toggle"
           type="button"
@@ -43,13 +53,33 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAppStore } from '@/scripts/store/app'
+import { systemApi } from '@/scripts/api'
 
 const app = useAppStore()
 const route = useRoute()
 const navOpen = ref(false)
+const health = ref(null)
+
+// 每 10 分钟看一眼，够用了：卷掉了通常表现为页面开始报 404，这里只是提前一步说清楚原因
+let timer = null
+const check = async () => {
+  try {
+    const res = await systemApi.health()
+    health.value = res?.success ? res.data : null
+  } catch {
+    health.value = null   // 后端没起来时不额外报"存储异常"，那是另一回事
+  }
+}
+const healthProblem = computed(() => (health.value && !health.value.ok ? health.value.problems.join('；') : ''))
+
+onMounted(() => {
+  check()
+  timer = setInterval(check, 10 * 60 * 1000)
+})
+onBeforeUnmount(() => clearInterval(timer))
 
 // 窄屏菜单是覆盖在内容上的，跳完页不收起就会挡住新页面顶部
 watch(() => route.path, () => { navOpen.value = false })
@@ -68,6 +98,28 @@ const navItems = [
 </script>
 
 <style scoped>
+/* 只在出事才出现的标记：红点 + 短词，点击进运行状态看详情 */
+.health-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s1);
+  height: var(--ctl-h-sm);
+  padding: 0 var(--s2);
+  border: 1px solid var(--danger);
+  border-radius: var(--r1);
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: var(--f-sm);
+  white-space: nowrap;
+}
+
+.health-flag__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--danger);
+}
+
 .app-header {
   position: sticky;
   top: 0;

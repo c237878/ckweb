@@ -63,6 +63,20 @@
         </li>
       </ul>
     </div>
+
+    <!-- 卷没挂上时的表现是"封面全空、扫描说没文件"，而服务本身看着完全健康，
+         所以这里把配置里那几个目录在不在直接列出来 -->
+    <div v-if="health" class="sys-status__vols">
+      <span class="tag" :class="health.ok ? 'tag--success' : 'tag--danger'">{{ health.ok ? '存储与目录都正常' : health.problems.join('；') }}</span>
+      <span class="meta">库可写 {{ health.dbWritable ? '是' : '否' }} · 缩略图缓存可写 {{ health.thumbsWritable ? '是' : '否' }} · {{ health.checkedAt }}</span>
+      <ul class="vol-list">
+        <li v-for="vol in health.volumes" :key="vol.path" :class="{ 'is-bad': !vol.present }">
+          <span class="mark" :aria-label="vol.present ? '在' : '不在'">{{ vol.present ? '✓' : '!' }}</span>
+          <span>{{ vol.purpose }}</span>
+          <span class="dim">{{ vol.path }}</span>
+        </li>
+      </ul>
+    </div>
   </div>
 </template>
 
@@ -72,6 +86,7 @@ import { systemApi } from '@/scripts/api'
 
 const data = ref(null)
 const backups = ref(null)
+const health = ref(null)
 const loading = ref(false)
 const error = ref('')
 
@@ -97,13 +112,14 @@ const load = async () => {
   loading.value = true
   error.value = ''
   try {
-    const [c, b] = await Promise.all([systemApi.checks(), systemApi.backups()])
+    const [c, b, h] = await Promise.all([systemApi.checks(), systemApi.backups(), systemApi.health()])
     if (!c?.success) {
       error.value = c?.message || '体检失败'
       return
     }
     data.value = c.data
     backups.value = b?.success ? b.data : null
+    health.value = h?.success ? h.data : null
   } catch (err) {
     console.error('系统自检失败:', err)
     error.value = '体检失败：请确认后端服务可用'
@@ -178,6 +194,44 @@ tr.is-bad .mark {
   margin: 0;
   color: var(--text-dim);
   font-size: var(--f-xs);
+}
+
+.sys-status__vols {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  padding-top: var(--s3);
+  border-top: 1px solid var(--border);
+}
+
+.vol-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+  font-size: var(--f-sm);
+}
+
+.vol-list li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s2);
+  min-width: 0;
+}
+
+.vol-list .dim {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* 丢了的目录整行标红，比只在顶部徽章里提一句好定位——问题常常是某一个卷没挂 */
+.vol-list li.is-bad {
+  color: var(--danger);
 }
 
 .sys-status__backups {
