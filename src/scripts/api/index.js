@@ -224,7 +224,9 @@ export const settingApi = {
 // 运行状态与自检（设置里的「运行状态」分区）
 export const systemApi = {
   /** 跑一遍不变量断言：纯 SQL，几十毫秒，进页面点一次算一次 */
-  checks: () => api.get('/system/checks')
+  checks: () => api.get('/system/checks'),
+  /** 备份概况：目录配了没有、最近一份是几点、留了多少（读目录元信息，不碰媒体卷） */
+  backups: () => api.get('/system/backups')
 }
 
 // 数据源（地区 / 分类）管理：清单 + 引用计数，改名带级联
