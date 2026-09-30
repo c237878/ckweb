@@ -7,7 +7,7 @@
           <button
             class="btn btn--sm"
             :class="{ 'btn--ghost': scanRunning }"
-            :title="scanRunning ? '正在读的那一个会读完，然后停下' : '逐个读视频文件的容器头量分辨率（只读文件，不改文件；字幕和广告水印由你自己标）'"
+            :title="scanRunning ? '正在读的那一个会读完，然后停下' : '逐个读视频文件的容器头量分辨率（只读文件，不改文件；字幕和广告水印由你自己标）。没量过的每天后台也会自己补一遍，这个按钮是立刻补'"
             @click="scanRunning ? stopScan() : startScan()"
           >
             {{ scanRunning ? '停止扫描' : '扫描片源' }}
@@ -468,7 +468,10 @@ const scanText = computed(() => {
   if (!s) return ''
   if (!s.total) return '正在清点要扫的影片…'
   const tail = s.etaSeconds ? ` · ${fmtEta(s.etaSeconds)}` : ''
-  return `扫描${s.what} · 已读 ${s.processed} / ${s.total} · 量到 ${s.ok} 个 · 读不出 ${s.missed} 个${tail}`
+  // 读不出分两种：文件根本不在盘上（卷掉了/搬走了）与文件在但读不出容器头（多半没下完）。
+  // 只有前者值得人去看一眼，所以单独报出来
+  const gone = s.missing ? `（其中 ${s.missing} 个不在盘上）` : ''
+  return `扫描${s.what} · 已读 ${s.processed} / ${s.total} · 量到 ${s.ok} 个 · 读不出 ${s.missed} 个${gone}${tail}`
 })
 
 const stopScanPoll = () => {
@@ -476,6 +479,12 @@ const stopScanPoll = () => {
     clearInterval(scanTimer)
     scanTimer = null
   }
+}
+
+// 轮询只挂一份：中途打开页面（定时扫描正在跑）和点按钮启动走的是同一条路
+const ensureScanPolling = () => {
+  if (scanTimer) return
+  scanTimer = setInterval(pollScan, 2000)
 }
 
 const pollScan = async () => {
@@ -490,6 +499,9 @@ const pollScan = async () => {
   if (res.data.running) {
     scan.value = res.data
     scanWatching = true
+    // 一天跑一次的定时扫描不等人点按钮：页面是中途打开的话，这里得把轮询自己接上，
+    // 否则进度条会停在打开那一刻的数字上不动，看起来像卡住了
+    ensureScanPolling()
     return
   }
 
@@ -499,8 +511,9 @@ const pollScan = async () => {
   if (scanWatching) {
     scanWatching = false
     stopScanPoll()
+    const gone = s.missing ? `，其中 ${s.missing} 个不在盘上` : ''
     ui[s.note ? 'warn' : 'info'](
-      `扫描结束：读 ${s.processed} 个，量到 ${s.ok} 个，读不出 ${s.missed} 个${s.note ? ` · ${s.note}` : ''}`
+      `扫描结束：读 ${s.processed} 个，量到 ${s.ok} 个，读不出 ${s.missed} 个${gone}${s.note ? ` · ${s.note}` : ''}`
     )
     loadVideos()
   }
@@ -516,7 +529,7 @@ const startScan = async () => {
     ui.info(res.message)
     scanWatching = true
     scan.value = res.data
-    scanTimer = setInterval(pollScan, 2000)
+    ensureScanPolling()
   } catch (err) {
     console.error('启动扫描失败:', err)
     ui.error('启动失败：' + errText(err))

@@ -42,8 +42,8 @@
     </table>
 
     <p class="sys-status__foot">
-      下面的检查只跑纯 SQL（几十毫秒）。要看"文件是不是真的还在盘上""封面有没有缺"
-      那种得逐条 stat 挂载卷的检查，那是另一个任务，不放在这个页面里同步跑。
+      上面的检查只跑纯 SQL（几十毫秒）。要看"文件是不是真的还在盘上"那种得逐条 stat 挂载卷的，
+      是每天后台自己跑一次的那一项，结果在下面。
     </p>
 
     <!-- 备份单独一块：它读的是目录而不是库，出问题的原因也完全不同（盘没挂上、目录没配） -->
@@ -82,6 +82,26 @@
         </div>
       </div>
       <p class="sys-status__note">这里只列证据：留哪一条、要不要删，得人来定。</p>
+    </div>
+
+    <!-- 扫描与盘上核对：每天自己跑的那两件事得有个地方说结果，
+         否则"新片的分辨率一直没补上""文件早被搬走了"都只能靠人自己想起来去点按钮 -->
+    <div v-if="health?.scan" class="sys-status__scan">
+      <span class="tag" :class="scanClass">{{ scanText }}</span>
+      <span class="meta">{{ scanMeta }}</span>
+
+      <span class="tag" :class="sweepClass">{{ sweepText }}</span>
+      <ul v-if="missingFiles.length" class="missing-list">
+        <li v-for="m in missingFiles" :key="m.fileId">
+          <router-link :to="`/video/${m.videoId}`" class="dim">{{ m.code || '（无番号）' }}</router-link>
+          <span class="dim missing-path" :title="m.path">{{ m.path }}</span>
+        </li>
+      </ul>
+      <p class="sys-status__note">
+        核对只 stat 文件在不在，不读内容，也不会因此改库：多个版本行指向同一个文件时按路径只数一次。
+        卷掉了的时候全部文件都会报"不在"，那时候清记录就是把一次故障变成永久损坏——
+        真要删，看着上面这几条自己定。
+      </p>
     </div>
 
     <div v-if="health" class="sys-status__vols">
@@ -162,8 +182,69 @@ const backupText = computed(() => {
   return day === now ? `今日快照已就位（${day}）` : `最近快照是 ${day}，今天这份还没落盘`
 })
 
-const sizeText = (bytes) => (bytes >= 1048576
-  ? `${(bytes / 1048576).toFixed(1)} MB`
+// 扫描与盘上核对的结果都在 health.scan 里：它们不是 SQL 不变量（要么得逐条 stat，
+// 要么本来就是内存里的任务状态），所以跟自检分开摆
+const scan = computed(() => health.value?.scan || null)
+const schedule = computed(() => scan.value?.schedule || null)
+const lastRun = computed(() => scan.value?.lastRun || null)
+const sweep = computed(() => schedule.value?.sweep || null)
+
+const scanText = computed(() => {
+  if (schedule.value && schedule.value.enabled === false) return '自动扫描已关闭（Media:AutoScan=false）'
+  if (scan.value?.running) return '扫描进行中'
+  const r = lastRun.value
+  if (!r) return '这个进程还没跑过扫描'
+  return `${r.trigger}扫描 ${r.finishedAt}：查 ${r.processed} 个 · 量到 ${r.ok} 个`
+    + (r.missed ? ` · 读不出 ${r.missed} 个` : '')
+})
+
+// 读不出≠出问题：新片还没下完也会读不出。只有"盘上没有"那种才值得多看一眼
+const scanClass = computed(() => {
+  if (scan.value?.running) return 'tag--muted'
+  if (schedule.value && schedule.value.enabled === false) return 'tag--muted'
+  const r = lastRun.value
+  if (!r) return 'tag--muted'
+  return r.missing > 0 ? 'tag--warn' : 'tag--success'
+})
+
+const scanMeta = computed(() => {
+  const s = schedule.value
+  if (!s) return ''
+  const parts = []
+  parts.push(s.scannedOn === s.today
+    ? '今天这一轮已经跑过'
+    : `今天（${s.today}）还没跑：启动 ${s.startupDelayMinutes} 分钟后开始，之后每 ${s.intervalMinutes} 分钟看一次`)
+  if (s.note) parts.push(s.note)
+  if (lastRun.value?.cancelled) parts.push('上一轮是手动停的，数字是停下的那一刻')
+  return parts.join(' · ')
+})
+
+const sweepText = computed(() => {
+  const w = sweep.value
+  if (!w) return '还没做过盘上核对'
+  if (w.suspicious) return `盘上核对：${w.missing} / ${w.checked} 个报"不在"，占比过高，多半是挂载卷掉了`
+  // 卷冷到第一个文件都没 stat 完也会发生，这时候"0 个都在"是假的好消息
+  if (w.complete === false && !w.checked) return `盘上核对：一个都没来得及看（${w.ranAt}）`
+  const part = w.complete === false ? '·没看完，时间用完' : ''
+  return w.missing
+    ? `盘上核对：查了 ${w.checked} 个文件${part}，${w.missing} 个不在盘上（${w.ranAt}）`
+    : `盘上核对：${w.checked} 个文件都在${part}（${w.ranAt}）`
+})
+
+const sweepClass = computed(() => {
+  const w = sweep.value
+  if (!w) return 'tag--muted'
+  if (w.suspicious) return 'tag--danger'
+  return w.missing || w.complete === false ? 'tag--warn' : 'tag--success'
+})
+
+// 可疑的那一轮不列清单：整卷没挂时报出来的会是"全库都不在"，那种名单只会误导人
+const missingFiles = computed(() => {
+  const w = sweep.value
+  return w && !w.suspicious ? (w.samples || []) : []
+})
+
+const sizeText = (bytes) => (bytes >= 1048576 ? `${(bytes / 1048576).toFixed(1)} MB`
   : `${Math.round(bytes / 1024)} KB`)
 
 onMounted(load)
@@ -256,6 +337,41 @@ tr.is-bad .mark {
   margin: 0;
   color: var(--text-dim);
   font-size: var(--f-xs);
+}
+
+/* 扫描 + 盘上核对：两块都在讲"文件的事"，所以紧跟在重复清单后面 */
+.sys-status__scan {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  padding-top: var(--s3);
+  border-top: 1px solid var(--border);
+}
+
+/* 一条一行：番号短、路径长，只有路径可以截断（跟上面重复清单同一套排版） */
+.missing-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+  font-size: var(--f-sm);
+}
+
+.missing-list li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s2);
+  min-width: 0;
+}
+
+.missing-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .sys-status__vols {
