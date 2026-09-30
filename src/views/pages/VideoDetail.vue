@@ -5,9 +5,21 @@
             <div class="left-panel">
                 <div class="player-section">
                     <div class="player-wrapper" :style="wrapperStyle">
-                        <div v-if="video.id" id="ckplayer" ref="playerContainer"></div>
+                        <VideoPlayer
+                            v-if="video.id"
+                            ref="playerRef"
+                            :src="playerSrc"
+                            :poster="playerPoster"
+                            :start-at="playerStartAt"
+                            :subtitle-url="playerSubtitleUrl"
+                            :volume="currentVolume"
+                            :rate="currentSpeed"
+                            :rotation="rotation"
+                            @time="onPlayerTime"
+                            @metadata="onPlayerMetadata"
+                            @ended="onPlayerEnded"
+                        />
                         <div v-else class="no-video">暂无视频</div>
-                        <div v-if="playerError" class="player-error">{{ playerError }}</div>
                         <!-- 音量提示 -->
                         <div v-if="volumeTipVisible" class="volume-tip">
                             <span>音量: {{ Math.round(currentVolume * 100) }}%</span>
@@ -261,7 +273,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { videoApi } from '@/scripts/api'
 import { useUiStore, errText } from '@/scripts/store/ui'
@@ -274,7 +286,7 @@ import {
     SUBTITLE_STATES, WATERMARK_STATES, SUBTITLE_MARK_OPTIONS, WATERMARK_MARK_OPTIONS,
     subtitleClass, watermarkClass, subtitleText, watermarkText
 } from '@/scripts/constants'
-import { loadCkplayer } from '@/scripts/utils/ckplayer'
+import VideoPlayer from '@/views/components/VideoPlayer.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -415,6 +427,8 @@ const actors = ref([])
 const recommendList = ref([])
 const rotation = ref(0)
 const currentVolume = ref(1)  // 默认音量 1 (100%)
+// 键名里的 ckplayer 是历史包袱，不改：改了等于把大家存的观看位置和音量清零。
+// 播放器已经换成原生 <video>（见 VideoPlayer.vue），这里只沿用旧键名继续读写
 const STORAGE_KEY = 'ckplayer_volume'
 const PLAYTIME_KEY_PREFIX = 'ckplayer_playtime_'
 // 进度按**版本行**记（v11）：原版 119 分钟、解说版 21 分钟，共用一个偏移的话切回来必然错位。
@@ -463,18 +477,10 @@ const saveVolume = () => {
     localStorage.setItem(STORAGE_KEY, currentVolume.value.toString())
 }
 
-// 设置播放器音量
+// 设置播放器音量：写 ref 就够了，VideoPlayer 看着 props 走
 const setVolume = (vol) => {
     currentVolume.value = Math.max(0, Math.min(1, vol))
     saveVolume()
-    
-    if (ckplayerInstance) {
-        try {
-            ckplayerInstance.volume(currentVolume.value)
-        } catch (e) {
-            console.warn('设置音量失败:', e)
-        }
-    }
 }
 
 // 键盘控制音量
@@ -576,35 +582,9 @@ let volumeTipTimer = null
 
 const videoNaturalWidth = ref(0)
 const videoNaturalHeight = ref(0)
-const playerContainer = ref(null)
-const playerError = ref('')
-let ckplayerInstance = null
-// 播放器时间回调只更新这里的最新值，由固定的 flush 落盘（见 every()）
 let latestTime = 0
-// 当前在放的是哪一版（{ fileId, movieId, legacy }）：销毁后离开页面时还要靠它补记最后一段
+// 当前在放的是哪一版（{ fileId, movieId, legacy }）：离开页面时还要靠它补记最后一段
 let playingOwner = null
-
-// 播放器相关的延时任务统一登记，离开页面时一次清干净
-const playerTimers = []
-const later = (fn, delay) => {
-    const id = setTimeout(fn, delay)
-    playerTimers.push(id)
-    return id
-}
-// 周期任务：进度落盘用固定的 flush，不用每次时间回调都挂一个延时（那样切一次版本就攒一堆
-// 待落地的定时器，每个都可能往陈旧的版本键上写）
-const every = (fn, ms) => {
-    const id = setInterval(fn, ms)
-    playerTimers.push(id)
-    return id
-}
-const clearPlayerTimers = () => {
-    playerTimers.forEach((id) => {
-        clearTimeout(id)
-        clearInterval(id)
-    })
-    playerTimers.length = 0
-}
 
 const wrapperStyle = computed(() => {
     if (!videoNaturalWidth.value || !videoNaturalHeight.value) {
@@ -619,142 +599,66 @@ const wrapperStyle = computed(() => {
 
 const subtitleInfo = ref(null)
 
-/**
- * 拆掉当前播放器：先停掉所有延时/周期任务，再把每个 video 元素停下来并断源，
- * 最后清容器——ckplayer 的 remove() 成不成功都不影响这一步。
- *
- * 原来只调 remove() 且异常被 catch 吞掉：播放中切版本时它抛错，旧 video 就留在页面里继续出声，
- * 新实例再建一个 → 两版同时播、两路声音叠加（2026-09-30 反馈）。
- * 先 pause+断源 再 remove：remove 可能已经把节点摘下，那时再去 pause 就晚了。
- */
-const destroyPlayer = () => {
-    clearPlayerTimers()
-    const box = document.querySelector('#ckplayer')
-    box?.querySelectorAll('video').forEach((el) => {
-        try { el.pause() } catch { /* 已脱离文档，忽略 */ }
-        try { el.removeAttribute('src'); el.load() } catch { /* 同上 */ }
-    })
-    if (ckplayerInstance) {
-        try {
-            ckplayerInstance.remove()
-        } catch (e) {
-            console.warn('ckplayer remove() 报错，容器仍强制清空:', e)
-        }
-        ckplayerInstance = null
-    }
-    if (box) box.innerHTML = ''
-    latestTime = 0
-}
+// 播放器换成原生 <video>（见 VideoPlayer.vue）后，页面这边只负责喂状态：地址、封面、字幕、
+// 续播位置都按**这一版**算出来，换版本靠响应式换源。
+// 原来那套手动拆装（new Ckplayer / remove / 序号作废）没有留下来的理由——
+// 两版同播的成因就是一个播放器实例活在 Vue 之外，现在结构上不存在这种东西了
+const playerRef = ref(null)
+const playerStartAt = ref(0)
 
-// 切版本会连着触发两次重建（下拉点得快 / 保存后 loadVideo 又来一次）；
-// 上面那些 await 让两轮交叠时，两边都会 new 一个实例 → 又是两个播放器。用序号让后到的作废。
-let playerSeq = 0
+const playerSrc = computed(() => {
+    const cur = shown.value
+    return cur?.fileSize ? videoApi.getStreamUrl(cur.id) : ''
+})
+const playerPoster = computed(() => (video.value?.coverPath ? `/api/video/cover/${video.value.id}` : ''))
+const playerSubtitleUrl = computed(() => subtitleInfo.value?.url || '')
 
-const initCkplayer = async () => {
+// 连点版本时，后一次的字幕响应会盖掉前一次的收尾，所以仍要挡一下交叠
+let metaSeq = 0
+
+const loadVersionMeta = async () => {
     if (!video.value?.id) return
-    const seq = ++playerSeq
+    const seq = ++metaSeq
+    const cur = shown.value
+    playingOwner = { fileId: cur.id, movieId: video.value.id, legacy: canClaimLegacy(cur) }
+    playerStartAt.value = cur.fileSize ? getPlayTime(cur.id, video.value.id, playingOwner.legacy) : 0
+    latestTime = 0
+    subtitleInfo.value = null
 
-    playerError.value = ''
-    destroyPlayer()
-
-    // 检查字幕：字幕文件名跟的是**这一版的文件名标识**（ATID-428C 有它自己的一份）
+    // 字幕文件名跟的是**这一版的文件名标识**（ATID-428C 有它自己的一份）
     try {
-        const subRes = await videoApi.checkSubtitle(shown.value.code || video.value.code)
-        if (subRes.success && subRes.hasSubtitle) {
-            subtitleInfo.value = subRes
-        } else {
-            subtitleInfo.value = null
-        }
+        const res = await videoApi.checkSubtitle(cur.code || video.value.code)
+        if (seq !== metaSeq) return
+        subtitleInfo.value = res?.success && res.hasSubtitle ? res : null
     } catch (e) {
+        if (seq !== metaSeq) return
         console.warn('检查字幕失败:', e)
         subtitleInfo.value = null
     }
+}
 
-    // 封面图片
-    const poster = video.value.coverPath
-        ? `/api/video/cover/${video.value.id}`
-        : ''
+// 进度：时间事件只更新内存值，每 10 秒落一次盘。
+// 不用定时器挂：暂停时本来就没有事件，也就不用清任务
+let lastFlushAt = 0
+const onPlayerTime = (t) => {
+    latestTime = t
+    const now = Date.now()
+    if (now - lastFlushAt < 10000) return
+    lastFlushAt = now
+    if (playingOwner) savePlayTime(playingOwner.fileId, t, playingOwner)
+}
 
-    // 取流与进度都按**这一版**（v11）
-    const cur = shown.value
-    const owner = { fileId: cur.id, movieId: video.value.id, legacy: canClaimLegacy(cur) }
-    const savedPlayTime = cur.fileSize ? getPlayTime(cur.id, video.value.id, owner.legacy) : 0
+// 放完了就清掉这一版的记录，下次从头看，而不是把人放到最后一帧上
+const onPlayerEnded = () => {
+    if (!playingOwner) return
+    localStorage.removeItem(PLAYTIME_KEY_PREFIX + playingOwner.fileId)
+    latestTime = 0
+}
 
-    // 文件不存在时视频地址为空，由 ckplayer 自动显示封面
-    const videoUrl = cur.fileSize ? videoApi.getStreamUrl(cur.id) : ''
-
-    const videoObject = {
-        container: '#ckplayer',
-        variable: 'player',
-        autoplay: false,
-        video: videoUrl,
-        screenshot: true,
-        poster: poster,
-        seek: savedPlayTime
-    }
-
-    // 如果有字幕，添加 track 配置
-    if (subtitleInfo.value) {
-        videoObject.track = [{
-            src: subtitleInfo.value.url,
-            srclang: 'zh',
-            kind: 'subtitles',
-            label: '中文字幕',
-            default: true
-        }]
-    }
-
-    // 播放器只在进详情页时才用得到，改为按需注入（原先挂在 index.html 里阻塞所有页面）
-    let Ckplayer
-    try {
-        Ckplayer = await loadCkplayer()
-    } catch (err) {
-        console.error('播放器加载失败:', err)
-        playerError.value = '播放器加载失败，请刷新页面重试'
-        return
-    }
-
-    if (seq !== playerSeq) return   // 这轮建到一半又被切了一次，旧的这轮直接作废
-    ckplayerInstance = new Ckplayer(videoObject)
-
-    // 下面几个延时都要在离开页面时清掉，否则卸载后仍会往陈旧 id 上写播放进度
-    if (currentVolume.value !== 1) {
-        later(() => setVolume(currentVolume.value), 500)
-    }
-
-    // 监听播放时间并保存进度：时间回调只更新内存里的最新值，每 10 秒落一次盘。
-    // 两处都要锁死轮次（seq）与版本（owner）——原来每次时间回调都挂一个 10 秒延时，
-    // 切走之后迟到的那几个会把这一版的位置写到那一版的键上
-    playingOwner = owner
-    later(() => {
-        if (!ckplayerInstance || seq !== playerSeq) return
-        ckplayerInstance.time((currentTime) => {
-            if (seq === playerSeq) latestTime = currentTime
-        })
-    }, 1000)
-
-    let lastSavedTime = -1
-    every(() => {
-        if (seq !== playerSeq || latestTime === lastSavedTime) return   // 暂停着就别反复写同一个值
-        lastSavedTime = latestTime
-        savePlayTime(owner.fileId, latestTime, owner)
-    }, 10000)
-
-    // 获取视频元数据
-    later(() => {
-        const videoEl = document.querySelector('#ckplayer video')
-        if (videoEl) {
-            if (videoEl.videoWidth && videoEl.videoHeight) {
-                videoNaturalWidth.value = videoEl.videoWidth
-                videoNaturalHeight.value = videoEl.videoHeight
-            } else {
-                videoEl.addEventListener('loadedmetadata', () => {
-                    videoNaturalWidth.value = videoEl.videoWidth || 1920
-                    videoNaturalHeight.value = videoEl.videoHeight || 1080
-                })
-            }
-        }
-    }, 500)
+// 真实分辨率：竖屏/非 16:9 的片子靠它撑外壳的宽高比，旋转后换成倒数
+const onPlayerMetadata = ({ width, height }) => {
+    videoNaturalWidth.value = width || 1920
+    videoNaturalHeight.value = height || 1080
 }
 
 // 显示音量提示
@@ -767,16 +671,9 @@ const showVolumeTip = () => {
     }, 1000)
 }
 
-// 设置播放倍速
+// 设置播放倍速：写 ref，VideoPlayer 看着 props 走
 const setSpeed = (speed) => {
     currentSpeed.value = speed
-    if (ckplayerInstance) {
-        try {
-            ckplayerInstance.playbackRate(speed)
-        } catch (e) {
-            console.warn('设置倍速失败:', e)
-        }
-    }
     showSpeedTip()
 }
 
@@ -800,13 +697,16 @@ onUnmounted(() => {
     document.removeEventListener('keydown', handleKeyDown)
     clearTimeout(volumeTipTimer)
     clearTimeout(speedTipTimer)
-    // 离开页面时把最后这一段补上，不然进度最多丢 10 秒（flush 是周期性的）
+    // 离开页面时把最后这一段补上，不然进度最多丢 10 秒（落盘是每 10 秒一次）
     if (playingOwner) savePlayTime(playingOwner.fileId, latestTime, playingOwner)
-    destroyPlayer()   // 内含 clearPlayerTimers + pause/断源，离开页面同样要拆干净，否则音频在后台继续放
+    // video 元素的暂停与断源在 VideoPlayer 的 onBeforeUnmount 里，页面不用再管
 })
 
-// 换版本 = 换一个文件：播放器要整个重开，进度也各记各的（v11）
-watch(activeFileId, () => { nextTick(initCkplayer) })
+// 换版本 = 换一个文件：地址/封面靠 computed 自动跟上，这里只管字幕、续播位置和旋转
+watch(activeFileId, () => {
+    rotation.value = 0
+    loadVersionMeta()
+})
 
 watch(() => route.params.id, async (newId, oldId) => {
     if (newId && newId !== oldId) {
@@ -831,10 +731,8 @@ const loadVideo = async () => {
             delete video.value.versions
             actors.value = res.data.actors || []
             likeCount.value = res.data.likeCount || 0
-            // 初始化 ckplayer
-            nextTick(async () => {
-                await initCkplayer()
-            })
+            // 这一版的字幕 + 续播位置；播放器本身是声明式的，改这些 props 就够了
+            await loadVersionMeta()
         }
     } catch (error) {
         console.error('加载视频详情失败:', error)
@@ -855,45 +753,28 @@ const loadRecommend = async () => {
 
 // 截图功能
 const handleScreenshot = () => {
-    if (!ckplayerInstance) {
-        console.warn('播放器未初始化')
+    const base64 = playerRef.value?.screenshot()
+    if (!base64) {
+        ui.error('还没有画面可截：先播起来再截')
         return
     }
-    
-    try {
-        // ckplayer 的 screenshot 方法会触发 screenshot 事件并返回 base64
-        const base64 = ckplayerInstance.screenshot()
-        if (base64) {
-            // 在新标签页打开截图
-            const imgWindow = window.open('', '_blank')
-            if (imgWindow) {
-                imgWindow.document.write(`
-                    <html>
-                    <head><title>截图 - ${video.value?.name || '视频'}</title></head>
-                    <body style="margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#000;">
-                        <img src="${base64}" style="max-width:100%;max-height:100%;" />
-                    </body>
-                    </html>
-                `)
-                imgWindow.document.close()
-            }
-        }
-    } catch (e) {
-        console.error('截图失败:', e)
+    const imgWindow = window.open('', '_blank')
+    if (imgWindow) {
+        imgWindow.document.write(`
+            <html>
+            <head><title>截图 - ${video.value?.name || '视频'}</title></head>
+            <body style="margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#000;">
+            <img src="${base64}" style="max-width:100%;max-height:100%;" />
+            </body>
+            </html>
+        `)
+        imgWindow.document.close()
     }
 }
 
+// 旋转只是画面变换，角度传给 VideoPlayer，它去动 video 元素的 transform
 const rotateVideo = () => {
     rotation.value = (rotation.value + 90) % 360
-    // 直接旋转 video 元素
-    const videoEl = document.querySelector('#ckplayer video')
-    if (videoEl) {
-        videoEl.style.transform = `rotate(${rotation.value}deg)`
-        videoEl.style.transformOrigin = 'center center'
-        console.log('视频旋转:', rotation.value)
-    } else {
-        console.warn('video 元素未找到')
-    }
 }
 
 const openEditDialog = () => {
@@ -953,11 +834,16 @@ const handleDeleteFile = async () => {
     deletingFile.value = false
 }
 
-// 画中画
+// 画中画：原生能力，直接把 VideoPlayer 里的元素交给浏览器
 const handlePictureInPicture = async () => {
-    const videoEl = document.querySelector('#ckplayer video')
+    if (!playerSrc.value) {
+        // 没有文件时 metadata 都没加载，浏览器会直接拒绝进画中画，先给个说得通的话
+        ui.error('这一版还没有文件，放不了')
+        return
+    }
+    const videoEl = playerRef.value?.videoEl()
     if (!videoEl) {
-        console.warn('video 元素未找到')
+        ui.error('播放器还没准备好')
         return
     }
     try {
@@ -968,6 +854,7 @@ const handlePictureInPicture = async () => {
         }
     } catch (error) {
         console.error('画中画失败:', error)
+        ui.error('画中画失败：' + errText(error, '浏览器不支持'))
     }
 }
 
@@ -1093,22 +980,9 @@ const handleLike = async () => {
     overflow: hidden;
 }
 
-.player-wrapper video,
-.player-wrapper #ckplayer {
+.player-wrapper :deep(.video-player) {
     width: 100%;
     height: 100%;
-    display: block;
-}
-
-/* ckplayer 自己的控制条是 z-index:260 的绝对定位层，会越过页面的 --z-dialog(200)
-   盖到确认弹窗上。给它一个自己的层叠上下文，把那 260 关在容器里。 */
-.player-wrapper #ckplayer {
-    position: relative;
-    z-index: 0;
-}
-
-.player-wrapper video {
-    object-fit: contain;
 }
 
 .no-video {
@@ -1118,20 +992,6 @@ const handleLike = async () => {
     justify-content: center;
     color: var(--text-faint);
     font-size: var(--f-lg);
-}
-
-.player-error {
-    position: absolute;
-    left: 50%;
-    bottom: 18%;
-    transform: translateX(-50%);
-    padding: 6px 14px;
-    border-radius: var(--r1);
-    background: var(--danger-soft);
-    border: 1px solid var(--danger);
-    color: var(--danger);
-    font-size: var(--f-sm);
-    white-space: nowrap;
 }
 
 .volume-tip {
