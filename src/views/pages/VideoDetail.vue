@@ -431,6 +431,8 @@ const currentVolume = ref(1)  // 默认音量 1 (100%)
 // 播放器已经换成原生 <video>（见 VideoPlayer.vue），这里只沿用旧键名继续读写
 const STORAGE_KEY = 'ckplayer_volume'
 const PLAYTIME_KEY_PREFIX = 'ckplayer_playtime_'
+// 「回到开头」的判定秒数：低于它就删掉续播记录。两处共用一个常量，别各写各的
+const START_EPSILON = 1
 // 进度按**版本行**记（v11）：原版 119 分钟、解说版 21 分钟，共用一个偏移的话切回来必然错位。
 // 旧数据是按影片 id 存的，兜底只交给"最可能就是它"的那一版——默认版，或这部片只有一版。
 // 每个版本都去继承一次，就等于把这次要修的串位又造回来了。
@@ -469,12 +471,13 @@ const getPlayTime = (fileId, movieId, legacy) => {
 }
 
 // 记这一版看到哪儿了。
-// 回到开头（≤5 秒）当"不要续播"处理：删掉记录，而不是什么都不做——
-// 原来只写 >5 的值，于是人把进度条拖回起点、下次进来又被老的几百秒弹走（2026-09-30 反馈）
+// 回到开头（≤START_EPSILON 秒）当"不要续播"处理：删掉记录，而不是什么都不做——
+// 原来只写 >5 的值，于是人把进度条拖回起点、下次进来又被老的几百秒弹走（2026-09-30 反馈）。
+// 阈值收成 1 秒：停在第 2、3 秒算"我真在看这里"，只有贴着片头才当重看
 const savePlayTime = (fileId, time, owner) => {
     if (!fileId) return
     const key = PLAYTIME_KEY_PREFIX + fileId
-    if (!(time > 5)) {
+    if (!(time > START_EPSILON)) {
         localStorage.removeItem(key)
         // 老键也要一起清：不清的话这一版下次进来又继承那个偏移，看着像"清了个寂寞"
         if (owner?.legacy) localStorage.removeItem(legacyPlayTimeKey(owner.movieId))
@@ -712,7 +715,7 @@ const loadVersionMeta = async () => {
 let lastFlushAt = 0
 const onPlayerTime = (t) => {
     latestTime = t
-    const atStart = t <= 5
+    const atStart = t <= START_EPSILON
     const now = Date.now()
     // 拖回开头这件事要**立刻**记（就是清掉），不能等下一个 10 秒窗口：
     // 拖完直接 F5 的话 onUnmounted 不一定跑到，老的几百秒就会活下来，看起来"清不掉"
