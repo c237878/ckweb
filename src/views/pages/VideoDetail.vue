@@ -437,6 +437,16 @@ const PLAYTIME_KEY_PREFIX = 'ckplayer_playtime_'
 const legacyPlayTimeKey = (movieId) => (movieId ? PLAYTIME_KEY_PREFIX + movieId : '')
 const canClaimLegacy = (row) => !!row.isDefault || versions.value.length <= 1
 
+// 「这次看到哪一版」按影片存本机：刷新/明天再进来仍停在那一版。
+// 这只是浏览选择，**不是影片口径**——列表卡片、统计、筛选仍走 is_default 那一版，
+// 改默认只有「设为默认」那颗按钮会动
+const CHOICE_KEY_PREFIX = 'ckweb_version_choice_'
+const readVersionChoice = (movieId) => (movieId ? localStorage.getItem(CHOICE_KEY_PREFIX + movieId) || '' : '')
+const writeVersionChoice = (movieId, fileId) => {
+    if (movieId && fileId) localStorage.setItem(CHOICE_KEY_PREFIX + movieId, fileId)
+}
+const dropVersionChoice = (movieId) => localStorage.removeItem(CHOICE_KEY_PREFIX + movieId)
+
 // 从本地存储加载音量
 const loadVolume = () => {
     const saved = localStorage.getItem(STORAGE_KEY)
@@ -483,13 +493,48 @@ const setVolume = (vol) => {
     saveVolume()
 }
 
-// 键盘控制音量
+// 键盘：数字 1-9 倍速、0 归位、上下音量、空格播放暂停、左右 ±10 秒
+// 表单元素里不抢按键；焦点在 video 上时也不抢——浏览器自带空格/方向键，两边都动手会翻两次
+const isFormTarget = () => {
+    const el = document.activeElement
+    const tag = el?.tagName?.toLowerCase()
+    if (tag === 'video') return true
+    return ['input', 'textarea', 'select', 'button', 'a'].includes(tag) || el?.isContentEditable === true
+}
+
+const togglePlay = () => {
+    const v = playerRef.value?.videoEl()
+    if (!v || !Number.isFinite(v.duration) || v.duration === 0) return   // 没有文件的那一版不响应
+    if (v.paused) v.play().catch(() => {})
+    else v.pause()
+}
+
+const seekBy = (delta) => {
+    const v = playerRef.value?.videoEl()
+    if (!v || !Number.isFinite(v.duration) || v.duration === 0) return
+    v.currentTime = Math.max(0, Math.min(v.duration - 1, v.currentTime + delta))
+}
+
 const handleKeyDown = (e) => {
     // 只有在页面可见且没有焦点在输入框时才响应
     if (document.visibilityState === 'hidden') return
     const activeTag = document.activeElement?.tagName?.toLowerCase()
     if (activeTag === 'input' || activeTag === 'textarea') return
-    
+
+    if (e.key === ' ' || e.code === 'Space') {
+        if (isFormTarget()) return
+        e.preventDefault()
+        togglePlay()
+        return
+    }
+
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        if (isFormTarget()) return
+        e.preventDefault()
+        seekBy(e.key === 'ArrowRight' ? 10 : -10)
+        return
+    }
+
     // 数字键 1-9 设置倍速
     if (e.key >= '1' && e.key <= '9') {
         e.preventDefault()
@@ -702,9 +747,11 @@ onUnmounted(() => {
     // video 元素的暂停与断源在 VideoPlayer 的 onBeforeUnmount 里，页面不用再管
 })
 
-// 换版本 = 换一个文件：地址/封面靠 computed 自动跟上，这里只管字幕、续播位置和旋转
-watch(activeFileId, () => {
+// 换版本 = 换一个文件：地址/封面靠 computed 自动跟上，这里只管字幕、续播位置和旋转。
+// 顺手把这次的选择按影片记下来，下次刷新/再进来仍停在同一版（不动 is_default）
+watch(activeFileId, (id) => {
     rotation.value = 0
+    if (id && video.value?.id) writeVersionChoice(video.value.id, id)
     loadVersionMeta()
 })
 
@@ -724,10 +771,10 @@ const loadVideo = async () => {
             video.value = res.data.video || res.data
             versions.value = video.value.versions || []
             // 停在影片口径那一版：进详情页看到的分辨率/大小就该与列表卡片一致。
-            // 但刚改过/刚选过某一版时别把人弹回默认版——loadVideo 会在每次保存后被调用，
-            // 跳回默认会让人以为自己的编辑没生效
+            // 但两件事优先于它：① 正在看的这一版（保存编辑后别把人弹走）② 本机上次看到的那一版
             const keep = versions.value.find((v) => v.id === activeFileId.value)
-            activeFileId.value = (keep || versions.value.find((v) => v.isDefault) || versions.value[0] || {}).id || ''
+            const last = versions.value.find((v) => v.id === readVersionChoice(video.value.id))
+            activeFileId.value = (keep || last || versions.value.find((v) => v.isDefault) || versions.value[0] || {}).id || ''
             delete video.value.versions
             actors.value = res.data.actors || []
             likeCount.value = res.data.likeCount || 0
@@ -901,6 +948,7 @@ const onDeleteVideo = async (videoId) => {
     if (choice === 'cancel') return
     try {
         clearPlayTime(videoId)  // 清除播放记录
+        dropVersionChoice(videoId)   // 「上次看到哪一版」也跟着清，留着就是没人认领的键
         await videoApi.delete(videoId, { deleteFiles: choice === 'deleteAll' })
         router.push('/')
         ui.success('已删除')
@@ -922,8 +970,14 @@ const handleLike = async () => {
     if (likeDisabled.value) return
     likeDisabled.value = true
     try {
-        // 点赞落在"正在看的这一版"上（v11）；卡片上的总数仍是这部片的求和
-        const res = await videoApi.like(video.value.id, shown.value.id)
+        // 点赞落在"正在看的这一版"上（v11）；卡片上的总数仍是这部片的求和。
+        // 顺带记一下当时的播放位置（v12）：这些点攒起来就是以后的"精彩瞬间"，
+        // 现在不记就再也问不回来。没起播（没文件/还在片头）时不传，别留个看着像 0 分 0 秒的假值
+        const el = playerRef.value?.videoEl()
+        const at = el && Number.isFinite(el.currentTime) && el.currentTime > 0
+            ? Math.round(el.currentTime * 10) / 10
+            : null
+        const res = await videoApi.like(video.value.id, shown.value.id, at)
         if (res.success) {
             likeCount.value = res.likeCount
             // 观影日历挂在 App 上，不会自己知道点赞发生了

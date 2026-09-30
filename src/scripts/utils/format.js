@@ -35,6 +35,21 @@ const dateParts = (value) => {
   return m ? { y: +m[1], mo: m[2] ? +m[2] : 0, d: m[3] ? +m[3] : 0 } : null
 }
 
+/** 秒 → 时:分:秒 / 分:秒。给"点赞时的播放位置"这类列用。
+ *  没存过（null/undefined/空串）返回空串，调用方补占位符——
+ *  Number(null) 是 0，不先挡一下老记录会显示成 0:00，看着像"片头就点了赞" */
+export function formatClock(seconds) {
+  if (seconds === null || seconds === undefined || seconds === '') return ''
+  const n = Number(seconds)
+  if (!Number.isFinite(n) || n < 0) return ''
+  const h = Math.floor(n / 3600)
+  const m = Math.floor((n % 3600) / 60)
+  const s = Math.floor(n % 60)
+  const mm = String(m).padStart(2, '0')
+  const ss = String(s).padStart(2, '0')
+  return h > 0 ? `${h}:${mm}:${ss}` : `${m}:${ss}`
+}
+
 /**
  * 影片发行时这位演员多大：发行年 - 出生年，两边都精确到月日再按生日是否未到减 1。
  * 缺日期或算出负数/离谱值（抓取常见脏数据）返回 0，调用方按 0 不显示。

@@ -6,6 +6,8 @@
         <video
             ref="el"
             class="video-player__el"
+            :class="{ 'video-player__el--swapped': swapped }"
+            :style="rotationStyle"
             controls
             playsinline
             preload="metadata"
@@ -30,7 +32,7 @@
 </template>
 
 <script setup>
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 const props = defineProps({
     /** 取流地址；空串表示这一版还没有文件，只显示封面 */
@@ -68,17 +70,27 @@ const applyRate = () => {
     const v = el.value
     if (v) v.playbackRate = props.rate || 1
 }
-const applyRotation = () => {
-    const v = el.value
-    if (v) v.style.transform = props.rotation ? `rotate(${props.rotation}deg)` : ''
-}
+/**
+ * 旋转后的尺寸：元素盒要**横竖互换**，不能只是原地转。
+ *
+ * 外壳竖着（aspect-ratio 已换成倒数）时，video 元素是"高>宽"的一个盒子，
+ * 原地 rotate(90deg) 会把它变成"宽>高"伸到外壳外面，被 overflow:hidden 切掉两头
+ * ——这就是之前旋转后画面显示不全的成因。
+ * 用容器查询单位把宽高互换（100cqh 当宽、100cqw 当高）正好补满外壳；
+ * 再居中一次，因为绝对定位后原点是左上角。样式绑在模板上，不再手写 element.style。
+ */
+const swapped = computed(() => Math.abs(props.rotation) % 180 === 90)
+const rotationStyle = computed(() => {
+    const deg = props.rotation || 0
+    if (!swapped.value) return { transform: deg ? `rotate(${deg}deg)` : '' }
+    return { transform: `translate(-50%, -50%) rotate(${deg}deg)` }
+})
 
 const onMetadata = () => {
     const v = el.value
     if (!v) return
     applyVolume()
     applyRate()
-    applyRotation()
     // 字幕默认开（和换播放器前的行为一致），要关用控制条上的字幕菜单
     for (const t of v.textTracks || []) {
         if (t.kind === 'subtitles') t.mode = 'showing'
@@ -108,7 +120,6 @@ onMounted(swapSource)
 watch(() => [props.src, props.subtitleUrl], swapSource)
 watch(() => props.volume, applyVolume)
 watch(() => props.rate, applyRate)
-watch(() => props.rotation, applyRotation)
 
 onBeforeUnmount(() => {
     // 离开页面时同样先停再断源，不然音频会跟着到别的页面
@@ -148,6 +159,8 @@ defineExpose({ videoEl, screenshot, play: () => el.value?.play(), pause: () => e
     width: 100%;
     height: 100%;
     background: #000;
+    /* 让 cqh/cqw 有参照：旋转时要拿外壳的高当元素的宽 */
+    container-type: size;
 }
 
 .video-player__el {
@@ -156,6 +169,15 @@ defineExpose({ videoEl, screenshot, play: () => el.value?.play(), pause: () => e
     height: 100%;
     object-fit: contain;
     transform-origin: center center;
+}
+
+/* 横竖互换：外壳的高当宽、外壳的宽当高，转 90° 之后刚好铺满外壳，不再伸出去被切 */
+.video-player__el--swapped {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 100cqh;
+    height: 100cqw;
 }
 
 .video-player__error {

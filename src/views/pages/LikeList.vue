@@ -67,6 +67,7 @@
             <th>名称</th>
             <th class="col-code">番号</th>
             <th class="col-type">类型</th>
+            <th class="col-prog">播放进度</th>
             <th class="col-time">点赞时间</th>
             <th class="col-actions">操作</th>
           </tr>
@@ -112,6 +113,11 @@
               >{{ item.versionName || item.versionCode }}</span>
               </div>
             </td>
+            <td class="col-prog">
+              <!-- 赞在哪个点（v12）：这是那一版时间轴上的位置，和版本列对着看才有意义。
+                   老记录没存过就是"—"，不是 0:00 -->
+              {{ formatClock(item.playTime) || '—' }}
+            </td>
             <td class="col-time">{{ formatDate(item.likedAt, true) || '-' }}</td>
             <td class="col-actions">
               <button class="btn btn--sm btn--danger" @click="handleDelete(item)">删除</button>
@@ -131,7 +137,7 @@ import { useRouter } from 'vue-router'
 import { likeApi, videoApi, comicApi } from '@/scripts/api'
 import { useAppStore } from '@/scripts/store/app'
 import { useUiStore } from '@/scripts/store/ui'
-import { formatDate } from '@/scripts/utils/format'
+import { formatDate, formatClock } from '@/scripts/utils/format'
 import { LIKE_TARGET_OPTIONS } from '@/scripts/constants'
 import { loadFilterState, saveFilterState } from '@/scripts/utils/filterPersist'
 import Pagination from '@/views/components/Pagination.vue'
@@ -267,6 +273,9 @@ const handleDelete = async (item) => {
     const res = await likeApi.delete(item.id)
     if (res.success) {
       await loadList()
+      // 观影日历是常驻组件（挂在 App 上，不随路由重建），只监听这个事件重取统计。
+      // 以前这里删完只刷了自己那份列表，日历要等整页刷新才动
+      window.dispatchEvent(new CustomEvent('likesUpdated', { detail: { id: item.videoId } }))
       ui.success('已删除')
     } else {
       tell(res.message || '删除失败', true)
@@ -291,6 +300,8 @@ const handleBatchDelete = async () => {
     if (res.success) {
       selectedIds.value = []
       await loadList()
+      // 一次删掉 N 条，日历要重取的不止当天：派发一次让它整月重算
+      window.dispatchEvent(new CustomEvent('likesUpdated', { detail: { batch: true } }))
       ui.success('已删除选中的记录')
     } else {
       tell(res.message || '批量删除失败', true)
@@ -402,6 +413,13 @@ onMounted(async () => {
   color: var(--text-dim);
 }
 
+/* 进度就一个 mm:ss / h:mm:ss，跟时间列同一套排版，但别换行成两截 */
+.col-prog {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+}
+
 .col-actions {
   width: 84px;
 }
@@ -459,9 +477,12 @@ onMounted(async () => {
   .table tbody tr {
     display: grid;
     grid-template-columns: auto minmax(0, auto) minmax(0, auto) minmax(0, auto) minmax(0, auto);
+    /* 多了一列进度，窄屏就从两行变三行：把进度和时间放同一行，两边都短，
+       不会像硬塞进原来那行那样在 390 宽上溢出 */
     grid-template-areas:
       "check name name name act"
-      "check code type time act";
+      "check code type type act"
+      "check prog time time act";
     gap: var(--s1) var(--s3);
     align-items: center;
     padding: var(--s3);
@@ -496,6 +517,11 @@ onMounted(async () => {
 
   .col-time {
     grid-area: time;
+    font-size: var(--f-xs);
+  }
+
+  .col-prog {
+    grid-area: prog;
     font-size: var(--f-xs);
   }
 
