@@ -7,7 +7,7 @@
           <button
             class="btn btn--sm"
             :class="{ 'btn--ghost': scanRunning }"
-            :title="scanRunning ? '正在读的那一个会读完，然后停下' : '逐个读视频文件的容器头量分辨率（只读文件，不改文件；字幕和广告水印由你自己标）。没量过的每天后台也会自己补一遍，这个按钮是立刻补'"
+            :title="scanRunning ? '正在读的那一个会读完，然后停下' : '逐个读视频文件的容器头量分辨率（只读文件，不改文件；字幕和广告水印由你自己标）。没量过的后台也会按设好的节奏自己补一遍（设置→运行状态），这个按钮是立刻补'"
             @click="scanRunning ? stopScan() : startScan()"
           >
             {{ scanRunning ? '停止扫描' : '扫描片源' }}

@@ -270,7 +270,9 @@ export const systemApi = {
   /** 备份概况：目录配了没有、最近一份是几点、留了多少（读目录元信息，不碰媒体卷） */
   backups: () => api.get('/system/backups'),
   /** 健康检查：库可写、配置里的目录在不在、备份多久没跑。只 stat 目录，不列内容 */
-  health: () => api.get('/system/health')
+  health: () => api.get('/system/health'),
+  /** 不等周期，立刻跑一轮盘上核对 + 增量扫描。后台跑，接口立刻回 */
+  runScanNow: () => api.post('/system/scan/run')
 }
 
 // 破坏性操作的管理口令（设置里的「安全」分区）

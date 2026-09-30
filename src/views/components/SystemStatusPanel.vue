@@ -43,7 +43,7 @@
 
     <p class="sys-status__foot">
       上面的检查只跑纯 SQL（几十毫秒）。要看"文件是不是真的还在盘上"那种得逐条 stat 挂载卷的，
-      是每天后台自己跑一次的那一项，结果在下面。
+      是下面那项后台按节奏自己跑的体检，频率就在那儿设。
     </p>
 
     <!-- 备份单独一块：它读的是目录而不是库，出问题的原因也完全不同（盘没挂上、目录没配） -->
@@ -84,12 +84,30 @@
       <p class="sys-status__note">这里只列证据：留哪一条、要不要删，得人来定。</p>
     </div>
 
-    <!-- 扫描与盘上核对：每天自己跑的那两件事得有个地方说结果，
-         否则"新片的分辨率一直没补上""文件早被搬走了"都只能靠人自己想起来去点按钮 -->
+    <!-- 后台那轮体检：开关与频率就在这儿设（写进 system_settings，下一个看门周期生效，不用重启），
+         下面两行是它上一轮跑出来的结果 -->
     <div v-if="health?.scan" class="sys-status__scan">
-      <span class="tag" :class="scanClass">{{ scanText }}</span>
-      <span class="meta">{{ scanMeta }}</span>
+      <div class="scan-ctl">
+        <label class="scan-ctl__switch">
+          <input v-model="policy.enabled" type="checkbox" :disabled="saving" @change="savePolicy" />
+          后台自动体检
+        </label>
+        <select
+          v-model="policy.intervalDays"
+          class="input scan-ctl__days"
+          aria-label="体检频率"
+          :disabled="saving"
+          @change="savePolicy"
+        >
+          <option v-for="d in DAY_STEPS" :key="d" :value="d">{{ dayText(d) }}</option>
+        </select>
+        <button class="btn btn--sm btn--ghost" :disabled="running" @click="runNow">
+          {{ running ? '正在跑…' : '立刻跑一次' }}
+        </button>
+      </div>
+      <p class="sys-status__note">{{ policyText }}</p>
 
+      <span class="tag" :class="scanClass">{{ scanText }}</span>
       <span class="tag" :class="sweepClass">{{ sweepText }}</span>
       <ul v-if="missingFiles.length" class="missing-list">
         <li v-for="m in missingFiles" :key="m.fileId">
@@ -97,10 +115,12 @@
           <span class="dim missing-path" :title="m.path">{{ m.path }}</span>
         </li>
       </ul>
+      <p v-if="schedule?.note" class="sys-status__note">{{ schedule.note }}</p>
       <p class="sys-status__note">
-        核对只 stat 文件在不在，不读内容，也不会因此改库：多个版本行指向同一个文件时按路径只数一次。
+        一轮体检 = 把库里登记的文件路径都 stat 一遍，再把没量过分辨率的新片补上。
+        核对只报证据，不会因此改库：多个版本行指向同一个文件时按路径只数一次，
         卷掉了的时候全部文件都会报"不在"，那时候清记录就是把一次故障变成永久损坏——
-        真要删，看着上面这几条自己定。
+        真要删，看着上面这几条自己定。关掉自动体检不影响列表页那个「扫描片源」按钮。
       </p>
     </div>
 
@@ -119,8 +139,11 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
-import { systemApi, videoApi } from '@/scripts/api'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { settingApi, systemApi, videoApi } from '@/scripts/api'
+import { useUiStore, errText } from '@/scripts/store/ui'
+
+const ui = useUiStore()
 
 const data = ref(null)
 const backups = ref(null)
@@ -162,6 +185,7 @@ const load = async () => {
     backups.value = b?.success ? b.data : null
     health.value = h?.success ? h.data : null
     dupes.value = d?.success ? d.data : null
+    syncPolicy()
   } catch (err) {
     console.error('系统自检失败:', err)
     error.value = '体检失败：请确认后端服务可用'
@@ -182,41 +206,120 @@ const backupText = computed(() => {
   return day === now ? `今日快照已就位（${day}）` : `最近快照是 ${day}，今天这份还没落盘`
 })
 
-// 扫描与盘上核对的结果都在 health.scan 里：它们不是 SQL 不变量（要么得逐条 stat，
-// 要么本来就是内存里的任务状态），所以跟自检分开摆
+// 体检（盘上核对 + 增量扫描）的开关、频率和结果都在 health.scan.schedule 里：
+// 它们不是 SQL 不变量（要么得逐条 stat，要么本来就是内存里的任务状态），所以跟自检分开摆
 const scan = computed(() => health.value?.scan || null)
 const schedule = computed(() => scan.value?.schedule || null)
 const lastRun = computed(() => scan.value?.lastRun || null)
 const sweep = computed(() => schedule.value?.sweep || null)
 
+// 频率只给这几个档：1 是"每天"，3/7 是他要的"隔几天"，30 是"每月看一眼"的上限
+const DAY_STEPS = [1, 2, 3, 7, 14, 30]
+const dayText = (d) => (d === 1 ? '每天一轮' : `每 ${d} 天一轮`)
+
+// 这两个值以库里的为准，界面只是把后端读回来的填进控件；
+// saving 期间不同步，否则刚勾上就被上一趟请求的结果打回去
+const policy = ref({ enabled: true, intervalDays: 1 })
+const saving = ref(false)
+const runningNow = ref(false)
+const running = computed(() => !!schedule.value?.running || runningNow.value)
+
+const syncPolicy = () => {
+  const s = schedule.value
+  if (!s || saving.value) return
+  policy.value = { enabled: !!s.enabled, intervalDays: DAY_STEPS.includes(s.intervalDays) ? s.intervalDays : 1 }
+}
+
+const policyText = computed(() => {
+  const s = schedule.value
+  if (!s) return ''
+  if (!s.enabled) return '关着：后台不会自己跑，只有点「立刻跑一次」或列表页的「扫描片源」时才动'
+  const last = s.lastRun ? `上次 ${s.lastRun}` : '还没跑过'
+  const next = s.nextRunAt ? `，下次约 ${s.nextRunAt}` : ''
+  const wait = s.due ? `（已到点，最多再等 ${s.watchdogMinutes} 分钟）` : ''
+  return `${dayText(s.intervalDays)} · ${last}${next}${wait}`
+})
+
+const savePolicy = async () => {
+  saving.value = true
+  try {
+    const res = await Promise.all([
+      settingApi.save({ name: 'scan_auto_enabled', content: policy.value.enabled ? '1' : '0' }),
+      settingApi.save({ name: 'scan_interval_days', content: String(policy.value.intervalDays) })
+    ])
+    const bad = res.find((r) => !r?.success)
+    if (bad) {
+      ui.error(bad.message || '保存失败')
+      await load()   // 没写进去就把控件拨回去
+      return
+    }
+    ui.success(policy.value.enabled
+      ? `${dayText(policy.value.intervalDays)}（下一个看门周期生效，不用重启）`
+      : '后台自动体检已关掉')
+    await load()
+  } catch (err) {
+    console.error('保存体检节奏失败:', err)
+    ui.error('保存失败：' + errText(err))
+    await load()
+  } finally {
+    saving.value = false
+  }
+}
+
+// 轮询只在手动触发时挂：跑完就自己摘掉
+let pollTimer = null
+const stopPoll = () => {
+  if (pollTimer) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
+}
+onBeforeUnmount(stopPoll)
+
+// 到点没到点都不等：手动这一轮同样会刷新"上次/下次"，因为跑一轮就把开始时间落库
+const runNow = async () => {
+  try {
+    const res = await systemApi.runScanNow()
+    if (!res?.success) {
+      ui.warn(res?.message || '没能启动')
+      return
+    }
+    ui.info(res.message)
+    runningNow.value = true
+    if (!pollTimer) pollTimer = setInterval(pollRun, 3000)
+  } catch (err) {
+    console.error('触发体检失败:', err)
+    ui.error('失败：' + errText(err))
+  }
+}
+
+// 只重读 health 这一个接口：跑完再整块刷新一次，免得每三秒发四条请求
+const pollRun = async () => {
+  let res
+  try { res = await systemApi.health() } catch { return }
+  if (!res?.success) return
+  health.value = res.data
+  if (res.data?.scan?.schedule?.running) return
+  stopPoll()
+  runningNow.value = false
+  await load()
+}
+
 const scanText = computed(() => {
-  if (schedule.value && schedule.value.enabled === false) return '自动扫描已关闭（Media:AutoScan=false）'
-  if (scan.value?.running) return '扫描进行中'
+  if (running.value) return '这一轮正在跑'
   const r = lastRun.value
   if (!r) return '这个进程还没跑过扫描'
   return `${r.trigger}扫描 ${r.finishedAt}：查 ${r.processed} 个 · 量到 ${r.ok} 个`
     + (r.missed ? ` · 读不出 ${r.missed} 个` : '')
+    + (r.note ? ` · ${r.note}` : '')
 })
 
 // 读不出≠出问题：新片还没下完也会读不出。只有"盘上没有"那种才值得多看一眼
 const scanClass = computed(() => {
-  if (scan.value?.running) return 'tag--muted'
-  if (schedule.value && schedule.value.enabled === false) return 'tag--muted'
+  if (running.value) return 'tag--muted'
   const r = lastRun.value
   if (!r) return 'tag--muted'
   return r.missing > 0 ? 'tag--warn' : 'tag--success'
-})
-
-const scanMeta = computed(() => {
-  const s = schedule.value
-  if (!s) return ''
-  const parts = []
-  parts.push(s.scannedOn === s.today
-    ? '今天这一轮已经跑过'
-    : `今天（${s.today}）还没跑：启动 ${s.startupDelayMinutes} 分钟后开始，之后每 ${s.intervalMinutes} 分钟看一次`)
-  if (s.note) parts.push(s.note)
-  if (lastRun.value?.cancelled) parts.push('上一轮是手动停的，数字是停下的那一刻')
-  return parts.join(' · ')
 })
 
 const sweepText = computed(() => {
@@ -346,6 +449,27 @@ tr.is-bad .mark {
   gap: var(--s2);
   padding-top: var(--s3);
   border-top: 1px solid var(--border);
+}
+
+/* 开关那一行：复选框、频率、按钮同一行排开，窄屏自然折行 */
+.scan-ctl {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2);
+}
+
+.scan-ctl__switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s1);
+  font-size: var(--f-sm);
+}
+
+/* 频率只有六个档位，给个窄宽度别让它抢走整行 */
+.scan-ctl__days {
+  flex: 0 1 auto;
+  width: auto;
 }
 
 /* 一条一行：番号短、路径长，只有路径可以截断（跟上面重复清单同一套排版） */
