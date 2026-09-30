@@ -124,7 +124,9 @@ const onError = () => {
 
 // 首挂就要挂源：watcher 只在变化时跑，漏掉这一步会得到一个没有 src 的空元素
 onMounted(swapSource)
-watch(() => [props.src, props.subtitleUrl], swapSource)
+// 只盯 src：字幕轨道是 video 的子元素，浏览器会自己增删 textTracks，
+// 把 subtitleUrl 也当换源条件的话，字幕检查晚一步回来就会把刚定好的播放位置抹成 0
+watch(() => props.src, swapSource)
 watch(() => props.volume, applyVolume)
 watch(() => props.rate, applyRate)
 

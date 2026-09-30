@@ -125,6 +125,8 @@ export const videoApi = {
   saveState: (fileId, position) => api.post('/video/state', { fileId, position }),
   /** 批量读进度（列表要显示"看到几成"时用，一次问完） */
   getStates: (ids) => api.get('/video/states', { params: { ids: (ids || []).join(',') } }),
+  /** 某一版上被点赞的时间点（v12 的 play_time 攒出来的，做精彩瞬间用） */
+  getMoments: (id) => api.get(`/video/${id}/moments`),
   /** 点赞落在版本上：fileId 不传后端按默认版本记（列表卡片那种没有版本概念的入口）。
    *  time = 点赞那一刻的播放位置（秒），只有详情页拿得到，别处不传就是 NULL */
   like: (id, fileId, time) => api.post(`/video/${id}/like`, null, {

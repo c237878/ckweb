@@ -29,6 +29,22 @@
                             <span>倍速: {{ currentSpeed }}x</span>
                         </div>
                     </div>
+
+                    <!-- 被点赞的时间点（v12 的 play_time 攒出来的）：点一下就跳到那一处播。
+                         大部分片子一个都没有，所以整块是有的才出现，不占位。 -->
+                    <div v-if="moments.length" class="moments">
+                        <span class="moments__label">点赞时间点</span>
+                        <button
+                            v-for="m in moments"
+                            :key="m.likeId"
+                            type="button"
+                            class="tag moments__chip"
+                            :title="`${m.versionName} · ${m.likedAt} 点赞，跳到 ${formatClock(m.position)}`"
+                            @click="jumpToMoment(m)"
+                        >
+{{ formatClock(m.position) }}
+                        </button>
+                    </div>
                 </div>
                 <div class="info-section">
                     <div class="info-row1">
@@ -281,7 +297,7 @@ import AddVideoDialog from '@/views/components/AddVideoDialog.vue'
 import AddVersionDialog from '@/views/components/AddVersionDialog.vue'
 import SelectList from '@/views/components/SelectList.vue'
 import VideoCard from '@/views/components/VideoCard.vue'
-import { formatSize, ageAt } from '@/scripts/utils/format'
+import { formatSize, ageAt, formatClock } from '@/scripts/utils/format'
 import {
     SUBTITLE_STATES, WATERMARK_STATES, SUBTITLE_MARK_OPTIONS, WATERMARK_MARK_OPTIONS,
     subtitleClass, watermarkClass, subtitleText, watermarkText
@@ -714,9 +730,38 @@ const loadVersionMeta = async () => {
 
     // 进度以服务端为准（多端接续的全部意义）；服务端没有而本地有，就用本地并补传一次，
     // 这一版从此在库里有了自己的行
+    loadMoments()
     const serverPos = Number(stateRes?.data?.position) || 0
     if (serverPos > START_EPSILON) playerStartAt.value = serverPos
     else if (localPos > START_EPSILON) savePlayTime(cur.id, localPos, playingOwner)
+}
+
+// 点赞时间点：后端只在有人点赞时才有数据，所以单独一个请求，不塞进详情接口
+const moments = ref([])
+let pendingSeek = null
+
+const loadMoments = async () => {
+    if (!video.value?.id) return
+    try {
+        const res = await videoApi.getMoments(video.value.id)
+        moments.value = res?.success ? (res.data || []) : []
+    } catch (e) {
+        console.warn('读取点赞时间点失败:', e)
+        moments.value = []
+    }
+}
+
+// 跳到某个时间点：不是当前那一版就先切版本（换版会重加载，位置靠 pendingSeek 交接）
+const jumpToMoment = (m) => {
+    if (m.fileId && m.fileId !== activeFileId.value) {
+        pendingSeek = m.position
+        activeFileId.value = m.fileId
+        return
+    }
+    const el = playerRef.value?.videoEl()
+    if (!el) return
+    el.currentTime = m.position
+    el.play().catch(() => {})
 }
 
 // 进度：时间事件只更新内存值，每 10 秒落一次盘。
@@ -745,6 +790,11 @@ const onPlayerMetadata = ({ width, height }) => {
     naturalFileId = playingOwner?.fileId || ''
     videoNaturalWidth.value = width || 1920
     videoNaturalHeight.value = height || 1080
+    if (pendingSeek !== null) {
+        const el = playerRef.value?.videoEl()
+        if (el) { el.currentTime = pendingSeek; el.play().catch(() => {}) }
+        pendingSeek = null
+    }
 }
 
 // 显示音量提示
@@ -1021,6 +1071,8 @@ const handleLike = async () => {
         const res = await videoApi.like(video.value.id, shown.value.id, at)
         if (res.success) {
             likeCount.value = res.likeCount
+            // 点赞当时就带上播放位置，时间点列表要立刻多出一颗
+            loadMoments()
             // 观影日历挂在 App 上，不会自己知道点赞发生了
             window.dispatchEvent(new CustomEvent('likesUpdated', { detail: { id: video.value.id } }))
         }
@@ -1057,6 +1109,25 @@ const handleLike = async () => {
     display: flex;
     flex-direction: column;
     gap: var(--s3);
+}
+
+.moments {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s1);
+    padding-top: var(--s2);
+}
+
+.moments__label {
+    color: var(--text-dim);
+    font-size: var(--f-sm);
+    margin-right: var(--s1);
+}
+
+.moments__chip {
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
 }
 
 .player-section {
