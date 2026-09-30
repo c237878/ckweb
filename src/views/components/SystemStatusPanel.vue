@@ -66,6 +66,24 @@
 
     <!-- 卷没挂上时的表现是"封面全空、扫描说没文件"，而服务本身看着完全健康，
          所以这里把配置里那几个目录在不在直接列出来 -->
+    <!-- 疑似重复只在真有结果或还没扫过时出现，避免空面板多一块"什么都没有" -->
+    <div v-if="dupes && (dupes.groupCount || dupes.fingerprinted)" class="sys-status__dupes">
+      <span class="tag" :class="dupes.groupCount ? 'tag--warn' : 'tag--success'">
+        {{ dupes.groupCount ? `疑似重复 ${dupes.groupCount} 组` : '没有发现内容相同的文件' }}
+      </span>
+      <span class="meta">已算指纹 {{ dupes.fingerprinted }} / {{ dupes.filesWithContent }} 个文件{{ dupes.fingerprinted < dupes.filesWithContent ? '（没扫到的那部分不参与判断）' : '' }}</span>
+      <div v-for="g in dupes.groups.slice(0, 8)" :key="g.fingerprint" class="dupe-group">
+        <span class="meta">指纹 {{ g.fingerprint.slice(0, 18) }}…</span>
+        <div v-for="f in g.files" :key="f.fileId" class="dupe-file">
+          <router-link :to="`/video/${f.videoId}`" class="dim">{{ f.videoCode }}</router-link>
+          <span>{{ f.videoName }}</span>
+          <span class="meta">{{ sizeText(f.size) }}</span>
+          <span class="dim dupe-path" :title="f.path">{{ f.path }}</span>
+        </div>
+      </div>
+      <p class="sys-status__note">这里只列证据：留哪一条、要不要删，得人来定。</p>
+    </div>
+
     <div v-if="health" class="sys-status__vols">
       <span class="tag" :class="health.ok ? 'tag--success' : 'tag--danger'">{{ health.ok ? '存储与目录都正常' : health.problems.join('；') }}</span>
       <span class="meta">库可写 {{ health.dbWritable ? '是' : '否' }} · 缩略图缓存可写 {{ health.thumbsWritable ? '是' : '否' }} · {{ health.checkedAt }}</span>
@@ -82,11 +100,12 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { systemApi } from '@/scripts/api'
+import { systemApi, videoApi } from '@/scripts/api'
 
 const data = ref(null)
 const backups = ref(null)
 const health = ref(null)
+const dupes = ref(null)
 const loading = ref(false)
 const error = ref('')
 
@@ -112,7 +131,9 @@ const load = async () => {
   loading.value = true
   error.value = ''
   try {
-    const [c, b, h] = await Promise.all([systemApi.checks(), systemApi.backups(), systemApi.health()])
+    const [c, b, h, d] = await Promise.all([
+      systemApi.checks(), systemApi.backups(), systemApi.health(), videoApi.getDuplicates()
+    ])
     if (!c?.success) {
       error.value = c?.message || '体检失败'
       return
@@ -120,6 +141,7 @@ const load = async () => {
     data.value = c.data
     backups.value = b?.success ? b.data : null
     health.value = h?.success ? h.data : null
+    dupes.value = d?.success ? d.data : null
   } catch (err) {
     console.error('系统自检失败:', err)
     error.value = '体检失败：请确认后端服务可用'
@@ -191,6 +213,46 @@ tr.is-bad .mark {
 }
 
 .sys-status__foot {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--f-xs);
+}
+
+.sys-status__dupes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  padding-top: var(--s3);
+  border-top: 1px solid var(--border);
+}
+
+.dupe-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+  padding: var(--s2);
+  border: 1px solid var(--border);
+  border-radius: var(--r2);
+}
+
+.dupe-file {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--s2);
+  font-size: var(--f-sm);
+}
+
+/* 路径最长，只有它可以截断；番号与片名要完整看得见 */
+.dupe-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.sys-status__note {
   margin: 0;
   color: var(--text-dim);
   font-size: var(--f-xs);
