@@ -245,6 +245,23 @@
           <VersionTypeManager embedded />
         </section>
 
+        <!-- 安全：只锁破坏性接口，口令由他自己按 -->
+        <section
+          v-else-if="activeGroup === 'security'"
+          id="panel-security"
+          class="panel settings-group"
+          role="tabpanel"
+          aria-labelledby="tab-security"
+          tabindex="-1"
+        >
+          <h2 class="section-title">安全</h2>
+          <p class="panel-desc">
+            后端跑在本机局域网里，任何设备都能调到删除与改名接口，浏览器里某个陌生网页的一个请求也一样。
+            这里给这类操作加一道管理口令：生成一次、这台设备记住就行，读接口与播放完全不受影响。
+          </p>
+          <SecurityPanel />
+        </section>
+
         <!-- 运行状态：结构版本 + 不变量自检。这些关系坏了界面不会报错，只会数字悄悄变，
              所以给一条能随手跑一遍的检查，而不是等哪天看着列表不对再猜 -->
         <section
@@ -432,6 +449,7 @@ import ScrapeChannelsPanel from '@/views/components/ScrapeChannelsPanel.vue'
 import StudioManager from '@/views/pages/StudioManager.vue'
 import VersionTypeManager from '@/views/pages/VersionTypeManager.vue'
 import SystemStatusPanel from '@/views/components/SystemStatusPanel.vue'
+import SecurityPanel from '@/views/components/SecurityPanel.vue'
 import McpPanel from '@/views/components/McpPanel.vue'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -457,6 +475,7 @@ const GROUPS = [
   { id: 'versions', label: '版本类型' },
   { id: 'channels', label: '抓取通道', desc: '外部站点的查询地址、字段抽取规则，以及限速 / 每日配额 / 连续失败熔断。' },
   { id: 'mcp', label: 'AI 接口' },
+  { id: 'security', label: '安全', desc: '给删除、改名、批量写这几类破坏性接口加一道管理口令；浏览与播放不受影响。' },
   { id: 'status', label: '运行状态', desc: '数据库结构版本、并发模式，以及"每部片恰好一条默认版本"这类不变量的自检结果。' },
   { id: 'links', label: '友情链接', desc: '显示在页脚：用每行的 ↑ ↓ 调位置，也可以直接改排序数字。' }
 ]

@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { getAdminToken } from '@/scripts/utils/adminToken'
 
 const api = axios.create({
   baseURL: '/api',
@@ -7,6 +8,30 @@ const api = axios.create({
     'Content-Type': 'application/json'
   }
 })
+
+/**
+ * 破坏性接口（删片/删图/改名/批量）要带管理口令。头由这里统一加，
+ * 调用点不用各自记得——漏一处就等于那个接口形同没锁。
+ * 跨站的网页学不会发这个自定义头，也猜不到值，所以这一步同时挡掉了 drive-by 删除。
+ */
+function withAdminToken(config) {
+  const token = getAdminToken()
+  if (token) config.headers = { ...config.headers, 'X-Admin-Token': token }
+  return config
+}
+
+/**
+ * 401 转成一份正常的 { success:false, needToken } 载荷返回。
+ * 不这么做的话各处 catch 里只能拿到 "Request failed with status code 401"，
+ * 人看到的是一句英文故障，而不是一句"这操作需要口令，去设置-安全"。
+ */
+function unwrapNeedToken(error) {
+  const data = error?.response?.data
+  if (error?.response?.status === 401 && data && data.needToken) return data
+  return Promise.reject(error)
+}
+
+api.interceptors.request.use(withAdminToken)
 
 // 上传专用实例 - 跳过 Vite 代理，直连后端（避免大文件断流）
 // baseURL 包含 /api 前缀，因为 UploadController 路由为 api/[controller]
@@ -20,12 +45,14 @@ const uploadAxios = axios.create({
   headers: { 'Content-Type': 'multipart/form-data' }
 })
 
+uploadAxios.interceptors.request.use(withAdminToken)
+
 // 响应拦截器：与 api 实例保持一致
 uploadAxios.interceptors.response.use(
   response => response.data,
   error => {
     console.error('Upload API Error:', error)
-    return Promise.reject(error)
+    return unwrapNeedToken(error)
   }
 )
 
@@ -34,7 +61,7 @@ api.interceptors.response.use(
   response => response.data,
   error => {
     console.error('API Error:', error)
-    return Promise.reject(error)
+    return unwrapNeedToken(error)
   }
 )
 
@@ -227,6 +254,14 @@ export const systemApi = {
   checks: () => api.get('/system/checks'),
   /** 备份概况：目录配了没有、最近一份是几点、留了多少（读目录元信息，不碰媒体卷） */
   backups: () => api.get('/system/backups')
+}
+
+// 破坏性操作的管理口令（设置里的「安全」分区）
+export const securityApi = {
+  status: () => api.get('/security/status'),
+  /** 不传 value 就是让后端随机生成；已有口令时必须带 current */
+  set: (body) => api.post('/security/token', body),
+  clear: (current) => api.delete('/security/token', { params: current ? { current } : {} })
 }
 
 // 数据源（地区 / 分类）管理：清单 + 引用计数，改名带级联
