@@ -91,6 +91,13 @@
         label="按片商筛选"
         @change="applyFilter"
       />
+      <SelectList
+        v-model="filters.typeId"
+        :options="versionTypeOptions"
+        all-label="全部版本"
+        label="按版本类型筛选"
+        @change="applyFilter"
+      />
       <ComboBox
         v-model="filters.seriesId"
         :options="seriesList"
@@ -196,7 +203,8 @@
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue'
-import { videoApi, studioApi } from '@/scripts/api'
+import { useRoute, useRouter } from 'vue-router'
+import { videoApi, studioApi, versionTypeApi } from '@/scripts/api'
 import { useAppStore } from '@/scripts/store/app'
 import { useUiStore, errText } from '@/scripts/store/ui'
 import { SORT_OPTIONS, SUBTITLE_OPTIONS, WATERMARK_OPTIONS, RESOLUTION_OPTIONS } from '@/scripts/constants'
@@ -218,6 +226,8 @@ const DOWNLOAD_OPTIONS = [
 
 const app = useAppStore()
 const ui = useUiStore()
+const route = useRoute()
+const router = useRouter()
 
 const videos = ref([])
 const page = ref(1)
@@ -244,11 +254,14 @@ const filters = ref({
   watermark: '',
   resolution: '',
   studio: '',
+  typeId: '',
 
 })
 
 // 词表下拉：一次拉全（几百项），值用 id——名字会改，id 不会
 const studioOptions = ref([])
+// 版本类型词表：设置里点「看这一类型的片」会带 ?typeId= 跳过来，这里也要能显示成名字
+const versionTypeOptions = ref([])
 
 const pageSize = computed(() => app.pageSize)
 
@@ -270,10 +283,29 @@ watch(
   { deep: true }
 )
 
+// 深链（首页分类板块、设置里「看这一类型的片」）优先于 localStorage 里的浏览状态：
+// 点进来是明确意图，不能被上次留下的筛选叠上去变成"看不出为什么是这个结果"
+const FILTER_KEYS = ['category', 'country', 'seriesId', 'keyword', 'downloaded',
+  'subtitle', 'watermark', 'resolution', 'studio', 'typeId', 'sortBy']
+
+const applyQueryFilters = () => {
+  const q = route.query || {}
+  const hits = FILTER_KEYS.filter((k) => q[k] !== undefined && q[k] !== '')
+  if (!hits.length) return false
+  filters.value = Object.keys(filters.value).reduce((acc, k) => ({ ...acc, [k]: '' }), {})
+  hits.forEach((k) => {
+    const raw = q[k]
+    filters.value[k] = String(Array.isArray(raw) ? raw[0] : raw)
+  })
+  page.value = 1
+  return true
+}
+
 onMounted(async () => {
   const saved = loadFilterState(STORAGE_KEY)
   if (saved?.filters) filters.value = { ...filters.value, ...saved.filters, keyword: '' }
   if (saved?.page) page.value = saved.page
+  applyQueryFilters()
 
   await app.init()
   await Promise.all([loadMeta(), loadVocab(), loadVideos()])
@@ -281,13 +313,23 @@ onMounted(async () => {
   pollScan()
 })
 
+// 地址栏换了筛选条件（含浏览器前进后退）就跟着走；自己 syncQuery 写回去的那一下不算，
+// 否则改一次下拉要发两次列表请求
+watch(() => route.query, (q) => {
+  if (route.name !== 'VideoList') return
+  if (querySame(currentQuery(), q)) return
+  applyQueryFilters()
+  loadVideos()
+})
+
 const loadVocab = async () => {
   try {
-    const s = await studioApi.getList({ pageSize: 500 })
+    const [s, t] = await Promise.all([studioApi.getList({ pageSize: 500 }), versionTypeApi.getList()])
     if (s.success) studioOptions.value = (s.data || []).map((x) => ({ value: x.id, label: `${x.name} (${x.videoCount})` }))
+    if (t.success) versionTypeOptions.value = (t.data || []).map((x) => ({ value: x.id, label: `${x.name} (${x.used})` }))
   } catch (err) {
     // 片商词表拉不到只是少一个下拉，不该挡住列表
-    console.error('加载片商词表失败:', err)
+    console.error('加载词表失败:', err)
   }
 }
 
@@ -319,6 +361,7 @@ const loadVideos = async () => {
     if (filters.value.watermark) params.watermark = filters.value.watermark
     if (filters.value.resolution) params.resolution = filters.value.resolution
     if (filters.value.studio) params.studio = filters.value.studio
+    if (filters.value.typeId) params.typeId = filters.value.typeId
     if (filters.value.sortBy) params.sortBy = filters.value.sortBy
 
     const res = await videoApi.getList(params)
@@ -340,7 +383,30 @@ const loadVideos = async () => {
 
 const applyFilter = () => {
   page.value = 1
+  syncQuery()
   loadVideos()
+}
+
+// 地址栏跟着筛选走：改了条件却留着 ?typeId=… 的话，一刷新又跳回点进来的那个类型，
+// 像是没生效。replace 不压历史，前进后退仍然只按页面本身
+const currentQuery = () => {
+  const q = {}
+  FILTER_KEYS.forEach((k) => {
+    const v = filters.value[k]
+    if (v !== '' && v !== null && v !== undefined) q[k] = String(v)
+  })
+  return q
+}
+// 两边比的是同一组键，顺序无关
+const querySame = (a, b) => {
+  const ka = Object.keys(a).filter((k) => a[k] !== undefined && a[k] !== '')
+  const kb = Object.keys(b).filter((k) => b[k] !== undefined && b[k] !== '')
+  return ka.length === kb.length && ka.every((k) => String(a[k]) === String(b[k]))
+}
+const syncQuery = () => {
+  const q = currentQuery()
+  if (querySame(q, route.query)) return
+  router.replace({ path: route.path, query: q })
 }
 
 // 停顿 400ms 再查，避免每敲一个字打一次接口
@@ -379,7 +445,7 @@ const handleSelectVideo = (videoId) => {
 const handleReset = () => {
   filters.value = {
     country: '', category: '', seriesId: '', keyword: '', downloaded: '',
-    subtitle: '', watermark: '', resolution: '', studio: '', sortBy: ''
+    subtitle: '', watermark: '', resolution: '', studio: '', typeId: '', sortBy: ''
   }
   applyFilter()
 }

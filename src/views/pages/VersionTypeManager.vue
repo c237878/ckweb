@@ -16,7 +16,7 @@
     <table class="grid-table">
       <thead>
         <tr>
-          <th>类型</th><th class="num">版本数</th><th class="ops">操作</th>
+          <th>类型</th><th class="num">影片数</th><th class="ops">操作</th>
         </tr>
       </thead>
       <tbody>
@@ -25,7 +25,19 @@
           <td>
             {{ t.name }}<span v-if="t.suffix" class="dim suffix"> · 尾巴 {{ t.suffix }}</span>
           </td>
-          <td class="num">{{ t.used }}</td>
+          <td class="num">
+            <!-- 数字本身就是入口：一个类型下几十上百部片，跳列表页看比在这里弹表格好用
+                 （列表已有分页/排序/其他筛选）。0 的那一行没有可看的东西，就不画链接 -->
+            <router-link
+              v-if="t.used"
+              class="count-link"
+              :to="`/videos?typeId=${encodeURIComponent(t.id)}`"
+              :title="`看「${t.name}」这一类型下的 ${t.used} 部影片`"
+            >
+              {{ t.used }}
+            </router-link>
+            <span v-else class="dim">0</span>
+          </td>
           <td class="ops">
             <button
               class="btn btn--sm btn--ghost"
@@ -203,5 +215,16 @@ onMounted(load)
 /* 尾巴跟着类型名走：次要信息，字号降一档就好，不再占一整列 */
 .suffix {
   font-size: var(--f-xs);
+}
+
+/* 全局 a 是 color: inherit（看不出可点），列表数字这种"点进去看"的链接自己给强调色 */
+.count-link {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.count-link:hover {
+  color: var(--accent-strong);
 }
 </style>
