@@ -119,6 +119,12 @@ export const videoApi = {
   /** 首页分类板块：一次请求取代按分类各发一次 list */
   getHomeSections: () => api.get('/video/home-sections'),
   getAutoCode: () => api.get('/video/autocode'),
+  /** 某一版的播放进度（v13 起在库里）：换设备、清缓存不再从头看起 */
+  getState: (fileId) => api.get(`/video/state/${fileId}`),
+  /** position ≤1 秒后端会删掉记录，与本地"拖回开头就是不续播"同一条口径 */
+  saveState: (fileId, position) => api.post('/video/state', { fileId, position }),
+  /** 批量读进度（列表要显示"看到几成"时用，一次问完） */
+  getStates: (ids) => api.get('/video/states', { params: { ids: (ids || []).join(',') } }),
   /** 点赞落在版本上：fileId 不传后端按默认版本记（列表卡片那种没有版本概念的入口）。
    *  time = 点赞那一刻的播放位置（秒），只有详情页拿得到，别处不传就是 NULL */
   like: (id, fileId, time) => api.post(`/video/${id}/like`, null, {

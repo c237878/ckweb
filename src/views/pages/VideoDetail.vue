@@ -477,15 +477,14 @@ const getPlayTime = (fileId, movieId, legacy) => {
 const savePlayTime = (fileId, time, owner) => {
     if (!fileId) return
     const key = PLAYTIME_KEY_PREFIX + fileId
-    if (!(time > START_EPSILON)) {
-        localStorage.removeItem(key)
-        // 老键也要一起清：不清的话这一版下次进来又继承那个偏移，看着像"清了个寂寞"
-        if (owner?.legacy) localStorage.removeItem(legacyPlayTimeKey(owner.movieId))
-        return
-    }
-    localStorage.setItem(key, time.toString())
+    const atStart = !(time > START_EPSILON)
+    if (atStart) localStorage.removeItem(key)
+    else localStorage.setItem(key, time.toString())
     // 接管老键的这一版一旦开始自己记，就把老键删掉——留着会被别的版本再继承一次
     if (owner?.legacy) localStorage.removeItem(legacyPlayTimeKey(owner.movieId))
+    // 服务端那份是跨设备的来源，本地只是缓存 + 离线兜底；传失败不影响继续看，
+    // 下次进来发现"本地有、服务端没有"还会再补一次
+    videoApi.saveState(fileId, atStart ? 0 : time).catch(() => {})
 }
 
 // 清除视频播放时间（删片时把这部片所有版本的记录一起清，留着就是没人读的垃圾键）
@@ -687,7 +686,8 @@ const loadVersionMeta = async () => {
     const seq = ++metaSeq
     const cur = shown.value
     playingOwner = { fileId: cur.id, movieId: video.value.id, legacy: canClaimLegacy(cur) }
-    playerStartAt.value = cur.fileSize ? getPlayTime(cur.id, video.value.id, playingOwner.legacy) : 0
+    const localPos = cur.fileSize ? getPlayTime(cur.id, video.value.id, playingOwner.legacy) : 0
+    playerStartAt.value = localPos
     latestTime = 0
     // 解码分辨率属于"那一个文件"：只有真的换了文件才清，否则存一次编辑就会把
     // 正在播的这一版的比例抹掉，外壳当场抖一下
@@ -698,16 +698,25 @@ const loadVersionMeta = async () => {
     }
     subtitleInfo.value = null
 
-    // 字幕文件名跟的是**这一版的文件名标识**（ATID-428C 有它自己的一份）
-    try {
-        const res = await videoApi.checkSubtitle(cur.code || video.value.code)
-        if (seq !== metaSeq) return
-        subtitleInfo.value = res?.success && res.hasSubtitle ? res : null
-    } catch (e) {
-        if (seq !== metaSeq) return
+    // 字幕文件名跟的是**这一版的文件名标识**（ATID-428C 有它自己的一份）；
+    // 服务端进度与它并行取，两件事都要挡一下交叠（连点版本时后一次说了算）
+    const subtitleReq = videoApi.checkSubtitle(cur.code || video.value.code).catch((e) => {
         console.warn('检查字幕失败:', e)
-        subtitleInfo.value = null
-    }
+        return null
+    })
+    const stateReq = cur.fileSize
+        ? videoApi.getState(cur.id).catch(() => null)   // 读不到就退回本地那份，不影响开播
+        : Promise.resolve(null)
+    const [subRes, stateRes] = await Promise.all([subtitleReq, stateReq])
+    if (seq !== metaSeq) return
+
+    subtitleInfo.value = subRes?.success && subRes.hasSubtitle ? subRes : null
+
+    // 进度以服务端为准（多端接续的全部意义）；服务端没有而本地有，就用本地并补传一次，
+    // 这一版从此在库里有了自己的行
+    const serverPos = Number(stateRes?.data?.position) || 0
+    if (serverPos > START_EPSILON) playerStartAt.value = serverPos
+    else if (localPos > START_EPSILON) savePlayTime(cur.id, localPos, playingOwner)
 }
 
 // 进度：时间事件只更新内存值，每 10 秒落一次盘。
