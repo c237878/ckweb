@@ -221,6 +221,12 @@ export const settingApi = {
   save: (data) => api.post('/systemsetting', data)
 }
 
+// 运行状态与自检（设置里的「运行状态」分区）
+export const systemApi = {
+  /** 跑一遍不变量断言：纯 SQL，几十毫秒，进页面点一次算一次 */
+  checks: () => api.get('/system/checks')
+}
+
 // 数据源（地区 / 分类）管理：清单 + 引用计数，改名带级联
 export const taxonomyApi = {
   get: () => api.get('/taxonomy'),

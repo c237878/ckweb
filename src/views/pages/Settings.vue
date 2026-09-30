@@ -245,6 +245,25 @@
           <VersionTypeManager embedded />
         </section>
 
+        <!-- 运行状态：结构版本 + 不变量自检。这些关系坏了界面不会报错，只会数字悄悄变，
+             所以给一条能随手跑一遍的检查，而不是等哪天看着列表不对再猜 -->
+        <section
+          v-else-if="activeGroup === 'status'"
+          id="panel-status"
+          class="panel settings-group"
+          role="tabpanel"
+          aria-labelledby="tab-status"
+          tabindex="-1"
+        >
+          <h2 class="section-title">运行状态</h2>
+          <p class="panel-desc">
+            检查的是记录之间的关系是否还成立：每部片恰好一条默认版本、一部片同一个版本类型只一条、
+            点赞落在这部片自己的版本上、番号不重复、关联表不指向已经不存在的东西。
+            违例数不为 0 时这里会列出样本，改完再点「重新体检」确认。
+          </p>
+          <SystemStatusPanel />
+        </section>
+
         <!-- AI 接口：端点、密钥、工具清单与打标口径，整块在组件里 -->
         <section
           v-else-if="activeGroup === 'mcp'"
@@ -412,6 +431,7 @@ import TaxonomyTable from '@/views/components/TaxonomyTable.vue'
 import ScrapeChannelsPanel from '@/views/components/ScrapeChannelsPanel.vue'
 import StudioManager from '@/views/pages/StudioManager.vue'
 import VersionTypeManager from '@/views/pages/VersionTypeManager.vue'
+import SystemStatusPanel from '@/views/components/SystemStatusPanel.vue'
 import McpPanel from '@/views/components/McpPanel.vue'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -437,6 +457,7 @@ const GROUPS = [
   { id: 'versions', label: '版本类型' },
   { id: 'channels', label: '抓取通道', desc: '外部站点的查询地址、字段抽取规则，以及限速 / 每日配额 / 连续失败熔断。' },
   { id: 'mcp', label: 'AI 接口' },
+  { id: 'status', label: '运行状态', desc: '数据库结构版本、并发模式，以及"每部片恰好一条默认版本"这类不变量的自检结果。' },
   { id: 'links', label: '友情链接', desc: '显示在页脚：用每行的 ↑ ↓ 调位置，也可以直接改排序数字。' }
 ]
 
