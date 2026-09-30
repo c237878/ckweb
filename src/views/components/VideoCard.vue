@@ -143,7 +143,7 @@ const onCoverLoad = (event) => {
   isPortrait.value = img.naturalHeight > img.naturalWidth
 }
 
-const coverUrl = computed(() => videoApi.getCoverUrl(props.video.id))
+const coverUrl = computed(() => videoApi.getCoverUrl(props.video.id, 'm'))
 
 // 榜单里的这张卡：赞的版本不是影片口径那一版时才打标识（同一部片多个版本各算一条，不去重）
 const likedOtherVersion = computed(() => {

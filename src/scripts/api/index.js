@@ -108,7 +108,12 @@ export const videoApi = {
   batchDelete: (ids, params) => api.delete('/video/batch', { data: { ids }, params }),
   /** 取流按**版本行 id**（v11：一部片名下一份文件一行），封面仍是影片级 */
   getStreamUrl: (fileId) => `/api/video/stream/${fileId}`,
-  getCoverUrl: (id) => `/api/video/cover/${id}`,
+  /** 封面地址。传 size（'s'=160 / 'm'=400）走缩略图：卡片只有一两百像素宽，
+   *  不该去拉中位 142KB、p99 2.7MB 的原图——那些文件还在挂载卷上。
+   *  要原画质的地方（详情页大图、截图用的封面、裁头像的预览）就不要传 size。 */
+  getCoverUrl: (id, size = '') => size
+    ? `/api/video/cover/${id}/${size}`
+    : `/api/video/cover/${id}`,
   checkSubtitle: (code) => api.get(`/video/${code}/subtitle/check`),
   getMeta: () => api.get('/video/meta'),
   /** 首页分类板块：一次请求取代按分类各发一次 list */

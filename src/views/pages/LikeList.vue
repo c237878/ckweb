@@ -195,7 +195,7 @@ const likedOtherVersion = (item) =>
 const getCoverUrl = (item) =>
   item.targetType === 'comic'
     ? comicApi.getCoverUrl(item.coverPath)
-    : videoApi.getCoverUrl(item.videoId)
+    : videoApi.getCoverUrl(item.videoId, 's')
 
 const goToDetail = (item) => {
   if (item.targetType === 'comic') {

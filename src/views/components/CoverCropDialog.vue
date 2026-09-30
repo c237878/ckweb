@@ -47,7 +47,7 @@
                 :title="f.name || f.code"
                 @click="picked = f"
               >
-                <img :src="coverUrl(f)" :alt="`${f.code} 封面`" loading="lazy" decoding="async" />
+                <img :src="coverUrl(f, 's')" :alt="`${f.code} 封面`" loading="lazy" decoding="async" />
                 <span class="picker__code">{{ f.code }}</span>
               </button>
             </div>
@@ -101,7 +101,9 @@ const zoomPct = ref(100)
 // 原图尺寸：预览换算要用，来自封面加载完的 naturalWidth/Height
 const nat = ref({ w: 0, h: 0 })
 
-const coverUrl = (film) => videoApi.getCoverUrl(film.id)
+// 选择格用缩略图就够；预览那张必须是原图——裁切框是按原图尺寸算的，
+// 拿缩放过的图当预览会对不上落盘结果
+const coverUrl = (film, size = '') => videoApi.getCoverUrl(film.id, size)
 
 const onCoverLoad = (e) => {
   nat.value = { w: e.target.naturalWidth, h: e.target.naturalHeight }
