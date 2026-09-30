@@ -52,6 +52,7 @@
           @sync="syncImages"
           @set-primary="setPrimary"
           @fetch-meta="fetchMeta"
+          @crop-from-cover="showCropDialog = true"
         />
       </section>
 
@@ -105,6 +106,14 @@
         @cancel="showEditDialog = false"
         @delete="onDelete"
       />
+
+      <CoverCropDialog
+        :visible="showCropDialog"
+        :actor-id="actorId"
+        :name="actor?.name || ''"
+        @saved="onCropSaved"
+        @cancel="showCropDialog = false"
+      />
     </template>
   </div>
 </template>
@@ -121,6 +130,7 @@ import {
 import VideoCard from '@/views/components/VideoCard.vue'
 import AddActorDialog from '@/views/components/AddActorDialog.vue'
 import ActorAlbum from '@/views/components/ActorAlbum.vue'
+import CoverCropDialog from '@/views/components/CoverCropDialog.vue'
 import Pagination from '@/views/components/Pagination.vue'
 import SelectList from '@/views/components/SelectList.vue'
 
@@ -132,6 +142,7 @@ const ui = useUiStore()
 const actor = ref(null)
 const syncing = ref(false)
 const fetching = ref(false)
+const showCropDialog = ref(false)
 const videos = ref([])
 const page = ref(1)
 const total = ref(0)
@@ -279,6 +290,13 @@ const setPrimary = async (fileName) => {
     console.error('设置演员头像失败:', err)
     ui.error('设置失败：' + errText(err))
   }
+}
+
+// 从封面截完：新图已经进了 actor_images 并且是主图，重取一次详情让相册与头像跟上
+const onCropSaved = async (res) => {
+  showCropDialog.value = false
+  ui.success(res?.message || '已设为头像')
+  await loadActor()
 }
 
 // 抓不到是常态（站上没有档案、或名字对不上），所以原因用同一条 toast 说清楚，

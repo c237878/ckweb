@@ -87,8 +87,11 @@ export const videoApi = {
   /** 首页分类板块：一次请求取代按分类各发一次 list */
   getHomeSections: () => api.get('/video/home-sections'),
   getAutoCode: () => api.get('/video/autocode'),
-  /** 点赞落在版本上：fileId 不传后端按默认版本记（列表卡片那种没有版本概念的入口） */
-  like: (id, fileId) => api.post(`/video/${id}/like`, null, { params: fileId ? { fileId } : {} }),
+  /** 点赞落在版本上：fileId 不传后端按默认版本记（列表卡片那种没有版本概念的入口）。
+   *  time = 点赞那一刻的播放位置（秒），只有详情页拿得到，别处不传就是 NULL */
+  like: (id, fileId, time) => api.post(`/video/${id}/like`, null, {
+    params: { ...(fileId ? { fileId } : {}), ...(time === null || time === undefined ? {} : { time }) }
+  }),
   /** 全站扫描：任务在服务端后台跑，force=true 连量过的一起重扫（候选是"版本行"，不再按影片） */
   startScanAll: (force = false) => api.post('/video/scan/all', null, { params: { force } }),
   scanStatus: () => api.get('/video/scan/status'),
@@ -180,6 +183,8 @@ export const actorApi = {
   syncImages: (id) => api.post(id ? `/actor/${id}/images/sync` : '/actor/images/sync'),
   /** 指定列表页那张脸用哪张图 */
   setPrimaryImage: (id, fileName) => api.put(`/actor/${id}/image/primary`, { fileName }),
+  /** 从她出演影片的封面截一张正方形当头像：{ videoId, x, y }，x/y 是裁切窗口位置 0~1 */
+  avatarFromCover: (id, body) => api.post(`/actor/${id}/avatar/from-cover`, body),
   /**
    * 给一位演员补档：头像 + 资料一次问完（同一份档案问两遍没意义）。
    * 拿不准就什么都不做，返回里会说明原因；src 见 ACTOR_SOURCES。

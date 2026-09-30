@@ -18,6 +18,15 @@
       <button type="button" class="btn btn--sm" :disabled="syncing" @click="sync">
         {{ syncing ? '同步中…' : '同步照片' }}
       </button>
+      <!-- 抓不到头像的人是常态：她主演影片的封面本来就是她的照片，裁一张正方形就能顶上 -->
+      <button
+        type="button"
+        class="btn btn--sm"
+        title="从她出演影片的封面裁一张正方形当头像"
+        @click="emit('crop-from-cover')"
+      >
+        从封面截
+      </button>
     </div>
   </div>
 
@@ -105,6 +114,14 @@
         <button type="button" class="btn btn--sm btn--ghost" :disabled="syncing" @click="sync">
           {{ syncing ? '同步中…' : '重新同步' }}
         </button>
+        <button
+          type="button"
+          class="btn btn--sm btn--ghost"
+          title="从她出演影片的封面裁一张正方形当头像"
+          @click="emit('crop-from-cover')"
+        >
+          从封面截
+        </button>
       </div>
     </div>
   </div>
@@ -175,7 +192,7 @@ const props = defineProps({
   scrapeable: { type: Boolean, default: true }
 })
 
-const emit = defineEmits(['sync', 'set-primary', 'fetch-meta'])
+const emit = defineEmits(['sync', 'set-primary', 'fetch-meta', 'crop-from-cover'])
 
 // 来源清单来自后端：通道被停用的那个源不会出现在这里
 const { src, sources, load } = useScrapeSources()
