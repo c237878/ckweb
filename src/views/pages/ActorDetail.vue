@@ -53,6 +53,7 @@
           @set-primary="setPrimary"
           @fetch-meta="fetchMeta"
           @crop-from-cover="showCropDialog = true"
+          @remove-image="removeImage"
         />
       </section>
 
@@ -289,6 +290,30 @@ const setPrimary = async (fileName) => {
   } catch (err) {
     console.error('设置演员头像失败:', err)
     ui.error('设置失败：' + errText(err))
+  }
+}
+
+// 删这张照片：必须让调用方显式选是否连磁盘文件一起删。
+// 只删记录是不稳定的——文件还在目录里，下次点「同步照片」扫盘就把它加回来了，
+// 所以默认那一项是"删记录和文件"，但要人自己确认（不可恢复）
+const removeImage = async (fileName) => {
+  const choice = await ui.ask({
+    title: '删除这张照片',
+    message: `删除后不可恢复。磁盘上的文件「${fileName}」要一起删掉吗？`,
+    actions: [
+      { value: 'deleteAll', label: '删记录和文件', danger: true },
+      { value: 'recordOnly', label: '仅删记录' }
+    ]
+  })
+  if (choice === 'cancel' || !choice) return
+  try {
+    const res = await actorApi.deleteImage(route.params.id, fileName, choice === 'deleteAll')
+    if (!res?.success) return ui.error(res?.message || '删除失败')
+    ui.success(res.message || '已删除')
+    await loadActor()
+  } catch (err) {
+    console.error('删除演员图片失败:', err)
+    ui.error('删除失败：' + errText(err))
   }
 }
 

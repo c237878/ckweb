@@ -116,6 +116,14 @@
         </button>
         <button
           type="button"
+          class="btn btn--sm btn--danger"
+          title="删掉这一张：连磁盘上的文件一起删（只删记录的话下次同步照片它又回来）"
+          @click="emit('remove-image', current.fileName)"
+        >
+          删除这张
+        </button>
+        <button
+          type="button"
           class="btn btn--sm btn--ghost"
           title="从她出演影片的封面裁一张正方形当头像"
           @click="emit('crop-from-cover')"
@@ -192,7 +200,7 @@ const props = defineProps({
   scrapeable: { type: Boolean, default: true }
 })
 
-const emit = defineEmits(['sync', 'set-primary', 'fetch-meta', 'crop-from-cover'])
+const emit = defineEmits(['sync', 'set-primary', 'fetch-meta', 'crop-from-cover', 'remove-image'])
 
 // 来源清单来自后端：通道被停用的那个源不会出现在这里
 const { src, sources, load } = useScrapeSources()

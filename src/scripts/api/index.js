@@ -183,8 +183,12 @@ export const actorApi = {
   syncImages: (id) => api.post(id ? `/actor/${id}/images/sync` : '/actor/images/sync'),
   /** 指定列表页那张脸用哪张图 */
   setPrimaryImage: (id, fileName) => api.put(`/actor/${id}/image/primary`, { fileName }),
-  /** 从她出演影片的封面截一张正方形当头像：{ videoId, x, y }，x/y 是裁切窗口位置 0~1 */
+  /** 从她出演影片的封面截一张正方形当头像：{ videoId, x, y, zoom }，x/y 是裁切窗口位置 0~1 */
   avatarFromCover: (id, body) => api.post(`/actor/${id}/avatar/from-cover`, body),
+  /** 删掉一张演员图片。默认连磁盘文件一起删（只删行的话，下次扫盘同步又长回来）；
+   *  deleteFile=false 是"从库里摘掉、文件留着" */
+  deleteImage: (id, fileName, deleteFile = true) =>
+    api.delete(`/actor/${id}/image`, { params: { fileName, deleteFile } }),
   /**
    * 给一位演员补档：头像 + 资料一次问完（同一份档案问两遍没意义）。
    * 拿不准就什么都不做，返回里会说明原因；src 见 ACTOR_SOURCES。
