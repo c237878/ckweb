@@ -85,6 +85,13 @@
         @change="applyFilter"
       />
       <SelectList
+        v-model="filters.codec"
+        :options="CODEC_OPTIONS"
+        all-label="全部编码"
+        label="按视频编码筛选"
+        @change="applyFilter"
+      />
+      <SelectList
         v-model="filters.studio"
         :options="studioOptions"
         all-label="全部片商"
@@ -207,7 +214,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { videoApi, studioApi, versionTypeApi } from '@/scripts/api'
 import { useAppStore } from '@/scripts/store/app'
 import { useUiStore, errText } from '@/scripts/store/ui'
-import { SORT_OPTIONS, SUBTITLE_OPTIONS, WATERMARK_OPTIONS, RESOLUTION_OPTIONS } from '@/scripts/constants'
+import { SORT_OPTIONS, SUBTITLE_OPTIONS, WATERMARK_OPTIONS, RESOLUTION_OPTIONS, CODEC_OPTIONS } from '@/scripts/constants'
 import { debounce } from '@/scripts/utils/debounce'
 import VideoCard from '@/views/components/VideoCard.vue'
 import AddVideoDialog from '@/views/components/AddVideoDialog.vue'
@@ -253,6 +260,7 @@ const filters = ref({
   subtitle: '',
   watermark: '',
   resolution: '',
+  codec: '',
   studio: '',
   typeId: '',
 
@@ -286,7 +294,7 @@ watch(
 // 深链（首页分类板块、设置里「看这一类型的片」）优先于 localStorage 里的浏览状态：
 // 点进来是明确意图，不能被上次留下的筛选叠上去变成"看不出为什么是这个结果"
 const FILTER_KEYS = ['category', 'country', 'seriesId', 'keyword', 'downloaded',
-  'subtitle', 'watermark', 'resolution', 'studio', 'typeId', 'sortBy']
+  'subtitle', 'watermark', 'resolution', 'codec', 'studio', 'typeId', 'sortBy']
 
 const applyQueryFilters = () => {
   const q = route.query || {}
@@ -360,6 +368,7 @@ const loadVideos = async () => {
     if (filters.value.subtitle) params.subtitle = filters.value.subtitle
     if (filters.value.watermark) params.watermark = filters.value.watermark
     if (filters.value.resolution) params.resolution = filters.value.resolution
+    if (filters.value.codec) params.codec = filters.value.codec
     if (filters.value.studio) params.studio = filters.value.studio
     if (filters.value.typeId) params.typeId = filters.value.typeId
     if (filters.value.sortBy) params.sortBy = filters.value.sortBy
@@ -445,7 +454,7 @@ const handleSelectVideo = (videoId) => {
 const handleReset = () => {
   filters.value = {
     country: '', category: '', seriesId: '', keyword: '', downloaded: '',
-    subtitle: '', watermark: '', resolution: '', studio: '', typeId: '', sortBy: ''
+    subtitle: '', watermark: '', resolution: '', codec: '', studio: '', typeId: '', sortBy: ''
   }
   applyFilter()
 }

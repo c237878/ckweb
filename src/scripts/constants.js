@@ -72,6 +72,17 @@ export const RESOLUTION_OPTIONS = [
   { value: 'unscanned', label: '未扫描' }
 ]
 
+/** 视频编码档位，与后端 Utils/SourceStates.cs 的 Codecs 键一一对应 */
+export const CODEC_OPTIONS = [
+  { value: 'h264', label: 'H.264' },
+  { value: 'hevc', label: 'H.265 / HEVC' },
+  { value: 'av1', label: 'AV1' },
+  { value: 'vp9', label: 'VP9' },
+  { value: 'mpeg4', label: 'MPEG-4 老封装' },
+  { value: 'other', label: '其他' },
+  { value: 'unscanned', label: '未扫描' }
+]
+
 /**
  * 卡片上的分辨率文案：按**短边**报。横屏的短边就是高度，所以横屏与"按行数"完全等价；
  * 竖屏 720×1280 报 720p 而不是 1280p，与手机视频的通行叫法一致。
