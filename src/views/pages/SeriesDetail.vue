@@ -127,6 +127,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { seriesApi } from '@/scripts/api'
 import { useAppStore } from '@/scripts/store/app'
+import { rememberedPage, rememberPage } from '@/scripts/utils/pageMemory'
 import { useUiStore, errText } from '@/scripts/store/ui'
 import { SUBTITLE_OPTIONS, WATERMARK_OPTIONS, RESOLUTION_OPTIONS } from '@/scripts/constants'
 import VideoCard from '@/views/components/VideoCard.vue'
@@ -163,6 +164,11 @@ const savingSort = ref(false)
 
 const pageSize = computed(() => app.pageSize)
 
+/**
+ * 一个系列常有大几十部、好几页，每次进来都从第一页重翻等于把"我看到哪儿了"当没发生。
+ * 与演员页共用 utils/pageMemory 那一份口径：只记大于 1 的页，越界的页码由 loadVideos 收回。
+ */
+const pageKey = () => `series_videos_page_${route.params.id}`
 
 const openEditDialog = () => {
   showEditDialog.value = true
@@ -220,8 +226,16 @@ const loadVideos = async () => {
     if (resolution) params.resolution = resolution
     const res = await seriesApi.getVideos(route.params.id, params)
     if (res.success) {
+      const count = res.total || 0
+      const last = Math.max(1, Math.ceil(count / pageSize.value))
+      if (page.value > last) {
+        // 记下的那一页可能已经不存在（删过片、或改了每页条数）：退到最后一页重取一次
+        page.value = last
+        videosLoading.value = false
+        return loadVideos()
+      }
       videos.value = res.data || []
-      total.value = res.total || 0
+      total.value = count
     } else {
       videosError.value = res.message || '系列影片加载失败'
     }
@@ -374,6 +388,8 @@ const decodeUrl = (url) => {
 
 onMounted(async () => {
   await app.init()
+  // 每页条数是在设置里配的，页数只是"翻到哪儿了"：进来先回到上次那一页
+  page.value = rememberedPage(pageKey())
   await loadAll()
 })
 
@@ -382,12 +398,15 @@ watch(
   (newId) => {
     if (!newId) return
     series.value = null
-    page.value = 1
+    page.value = rememberedPage(pageKey())   // 每个系列各记各的那一页
     clearSourceFilter()
     sorting.value = false
     loadAll()
   }
 )
+
+// 翻页就落一次本地，不等退出页面再攒（保存排序后回到第一页，这条记忆也就跟着清掉）
+watch(page, (n) => rememberPage(pageKey(), n))
 
 // 筛选是服务端行为，改动后回到第一页重新取（三维存在一个对象里，要 deep 才看得到里面变了）
 watch(

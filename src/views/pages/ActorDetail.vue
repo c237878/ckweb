@@ -126,6 +126,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { actorApi } from '@/scripts/api'
 import { useAppStore } from '@/scripts/store/app'
+import { rememberedPage, rememberPage } from '@/scripts/utils/pageMemory'
 import { useUiStore, errText } from '@/scripts/store/ui'
 import {
   SUBTITLE_OPTIONS, WATERMARK_OPTIONS, RESOLUTION_OPTIONS, linkKindLabel
@@ -178,26 +179,9 @@ const sort = ref('date')
 
 /**
  * 看到第几页按演员各自记在本地：一人能有九十部、四五页，每次进来都从第一页重翻，
- * 等于把"我看到哪儿了"当没发生。只记大于 1 的页（第一页是常态，不值得占存储）；
- * 记下的页码可能因为删片越界，由 loadVideos 收回到范围内。
+ * 等于把"我看到哪儿了"当没发生。具体口径在 utils/pageMemory（系列页用的是同一份）。
  */
-const pageKey = () => `ckweb_actor_videos_page_${route.params.id}`
-const rememberedPage = () => {
-  try {
-    const n = parseInt(localStorage.getItem(pageKey()) || '', 10)
-    return n > 1 ? n : 1
-  } catch {
-    return 1   // 隐私模式下读不到就算了，不影响浏览
-  }
-}
-const rememberPage = (n) => {
-  try {
-    if (n > 1) localStorage.setItem(pageKey(), String(n))
-    else localStorage.removeItem(pageKey())
-  } catch {
-    /* 写不进去也一样记住这一屏，只是下次进来回到第一页 */
-  }
-}
+const pageKey = () => `actor_videos_page_${route.params.id}`
 
 // 后端写入时已校验过 scheme，这里再挡一道：非 http(s) 不渲染成链接，
 // 免得哪天直接改库把 javascript: 塞进来就是一条现成的 XSS
@@ -406,7 +390,7 @@ const loadAll = async () => {
 onMounted(async () => {
   await app.init()
   // 每页条数是在设置里配的，页数只是"翻到哪儿了"：进来先回到上次那一页
-  page.value = rememberedPage()
+  page.value = rememberedPage(pageKey())
   await loadAll()
 })
 
@@ -416,7 +400,7 @@ watch(
   (newId) => {
     if (!newId) return
     actor.value = null
-    page.value = rememberedPage()      // 每个演员各记各的那一页
+    page.value = rememberedPage(pageKey())      // 每个演员各记各的那一页
     clearSourceFilter()
     loadAll()
   }
@@ -441,7 +425,7 @@ watch(sort, () => {
 })
 
 // 翻页就落一次本地，不等退出页面再攒
-watch(page, rememberPage)
+watch(page, (n) => rememberPage(pageKey(), n))
 </script>
 
 <style scoped>
