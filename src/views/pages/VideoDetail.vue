@@ -692,7 +692,13 @@ const playerSrc = computed(() => {
     return cur?.fileSize ? videoApi.getStreamUrl(cur.id) : ''
 })
 const playerPoster = computed(() => (video.value?.coverPath ? `/api/video/cover/${video.value.id}` : ''))
-const playerSubtitleUrl = computed(() => subtitleInfo.value?.url || '')
+// ASS/SSA/SUB 这类浏览器点不亮的格式，服务端会明确说 displayable=false：
+// 那就别挂 <track>（挂上去只会一次 parse error，界面上什么都没发生，日志里也看不出）
+const playerSubtitleUrl = computed(() => {
+    const s = subtitleInfo.value
+    if (!s?.url || s.displayable === false) return ''
+    return s.url
+})
 
 // 连点版本时，后一次的字幕响应会盖掉前一次的收尾，所以仍要挡一下交叠
 let metaSeq = 0

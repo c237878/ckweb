@@ -23,7 +23,7 @@
                 kind="subtitles"
                 :src="subtitleUrl"
                 srclang="zh"
-                label="中文字幕"
+                label="字幕"
                 default
             />
         </video>
