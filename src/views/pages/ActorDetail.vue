@@ -79,6 +79,8 @@
               all-label="全部分辨率"
               label="按分辨率筛选影片"
             />
+            <!-- 排序不是筛选：默认就按发行日期升序，这里给的是"换回番号序"的出口 -->
+            <SelectList v-model="sort" :options="SORT_OPTIONS" label="参演影片排序方式" />
           </div>
         </div>
 
@@ -89,7 +91,7 @@
         <div v-else-if="videosError" class="notice notice--error">{{ videosError }}</div>
 
         <div v-else-if="videos.length" class="grid">
-          <VideoCard v-for="video in videos" :key="video.id" :video="video" />
+          <VideoCard v-for="video in videos" :key="video.id" :video="video" show-date />
         </div>
 
         <div v-else class="empty">
@@ -156,10 +158,46 @@ const videosError = ref('')
 // 片源三维筛选（都下沉到后端，所以"未标记"是一个真实筛选值而不是排除）
 const sourceFilter = ref({ subtitle: '', watermark: '', resolution: '' })
 const hasSourceFilter = computed(() => Object.values(sourceFilter.value).some((v) => v !== ''))
-const clearSourceFilter = () => { sourceFilter.value = { subtitle: '', watermark: '', resolution: '' } }
+// 已经空了就别再换引用：deep watcher 只看引用变没变，切演员时会因此多跑一次，
+// 表现是先回第一页、又跳回记下的那一页，闪一下
+const clearSourceFilter = () => {
+  if (!hasSourceFilter.value) return
+  sourceFilter.value = { subtitle: '', watermark: '', resolution: '' }
+}
 const showEditDialog = ref(false)
 
 const pageSize = computed(() => app.pageSize)
+
+// 参演影片默认按发行日期升序：看一个人的作品是顺着时间线看的，番号序看不出先后。
+// 想按番号找某一部的话在这儿切回去（后端两种都是写死的 ORDER BY 串）。
+const SORT_OPTIONS = [
+  { value: 'date', label: '按发行日期' },
+  { value: 'code', label: '按番号' }
+]
+const sort = ref('date')
+
+/**
+ * 看到第几页按演员各自记在本地：一人能有九十部、四五页，每次进来都从第一页重翻，
+ * 等于把"我看到哪儿了"当没发生。只记大于 1 的页（第一页是常态，不值得占存储）；
+ * 记下的页码可能因为删片越界，由 loadVideos 收回到范围内。
+ */
+const pageKey = () => `ckweb_actor_videos_page_${route.params.id}`
+const rememberedPage = () => {
+  try {
+    const n = parseInt(localStorage.getItem(pageKey()) || '', 10)
+    return n > 1 ? n : 1
+  } catch {
+    return 1   // 隐私模式下读不到就算了，不影响浏览
+  }
+}
+const rememberPage = (n) => {
+  try {
+    if (n > 1) localStorage.setItem(pageKey(), String(n))
+    else localStorage.removeItem(pageKey())
+  } catch {
+    /* 写不进去也一样记住这一屏，只是下次进来回到第一页 */
+  }
+}
 
 // 后端写入时已校验过 scheme，这里再挡一道：非 http(s) 不渲染成链接，
 // 免得哪天直接改库把 javascript: 塞进来就是一条现成的 XSS
@@ -236,15 +274,23 @@ const loadVideos = async () => {
   videosLoading.value = true
   videosError.value = ''
   try {
-    const params = { page: page.value, pageSize: pageSize.value }
+    const params = { page: page.value, pageSize: pageSize.value, sort: sort.value }
     const { subtitle, watermark, resolution } = sourceFilter.value
     if (subtitle) params.subtitle = subtitle
     if (watermark) params.watermark = watermark
     if (resolution) params.resolution = resolution
     const res = await actorApi.getVideos(route.params.id, params)
     if (res.success) {
+      const count = res.total || 0
+      const last = Math.max(1, Math.ceil(count / pageSize.value))
+      if (page.value > last) {
+        // 记下的那一页可能已经不存在（删过片、或换了每页条数）：退到最后一页重取一次
+        page.value = last
+        videosLoading.value = false
+        return loadVideos()
+      }
       videos.value = res.data || []
-      total.value = res.total || 0
+      total.value = count
     } else {
       videosError.value = res.message || '参演影片加载失败'
     }
@@ -359,6 +405,8 @@ const loadAll = async () => {
 
 onMounted(async () => {
   await app.init()
+  // 每页条数是在设置里配的，页数只是"翻到哪儿了"：进来先回到上次那一页
+  page.value = rememberedPage()
   await loadAll()
 })
 
@@ -368,7 +416,7 @@ watch(
   (newId) => {
     if (!newId) return
     actor.value = null
-    page.value = 1
+    page.value = rememberedPage()      // 每个演员各记各的那一页
     clearSourceFilter()
     loadAll()
   }
@@ -385,6 +433,15 @@ watch(
   },
   { deep: true }
 )
+
+// 换排序等于换了一份结果集，从第一页看起
+watch(sort, () => {
+  page.value = 1
+  loadVideos()
+})
+
+// 翻页就落一次本地，不等退出页面再攒
+watch(page, rememberPage)
 </script>
 
 <style scoped>

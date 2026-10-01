@@ -527,9 +527,10 @@ const settingsList = ref([
     options: [
       { value: 's', label: '省流量 · 160px（一屏约 180KB）' },
       { value: 'n', label: '平衡 · 240px（一屏约 360KB）' },
-      { value: 'm', label: '清晰 · 400px（一屏约 840KB）' }
+      { value: 'm', label: '清晰 · 400px（一屏约 840KB）' },
+      { value: 'orig', label: '原图 · 不缩略（一张中位 141KB，最大 2.5MB）' }
     ],
-    hint: '只管列表与首页卡片上那张封面，详情页大图与另存封面仍是原图。手机流量、远程弱网下选省流量那一档；换档后每张封面第一次被看到时要现生成一次，之后走本地缓存。'
+    hint: '只管列表与首页卡片上那张封面，详情页大图与另存封面仍是原图。原图那档一屏 24 张是几十兆，只在宽带下用；换档后每张封面第一次被看到时要现生成一次，之后走本地缓存。'
   },
   { id: 'homePageCategories', group: 'site', label: '首页展示分类', value: '', placeholder: '多个分类用逗号分隔，留空显示全部', hint: '可选值见「地区与分类」' },
   { id: 'homePageCategoryCount', group: 'site', label: '首页分类数量', value: '', type: 'number', min: 1, max: 100, placeholder: '默认 12', hint: '每个分类/板块显示的数量，今日推荐也用这个值' },

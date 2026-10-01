@@ -40,6 +40,14 @@
            ——由全局 a.tag:hover / button.tag:hover 负责，span 天然拿不到。
            卡片窄时只显示其中一部分，见文末 .pill--wide -->
       <div class="pills">
+        <!-- 发行日期：只有按时间排的列表（演员页）才显示，别处不加这颗胶囊。
+             库里日期有 YYYY / YYYY-MM / YYYY-MM-DD 三种长度，原样显示不补零 -->
+        <span
+          v-if="showDate && video.releaseDate"
+          class="tag pill pill--date"
+          :title="`发行日期 ${video.releaseDate}`"
+        >{{ video.releaseDate }}</span>
+
         <span
           v-if="subtitleText(video.subtitleState)"
           class="tag pill pill--subtitle"
@@ -121,7 +129,9 @@ const props = defineProps({
   /** 点整张卡片做什么：browse 进详情 / select 勾选 / pick 选一个去编辑 */
   clickAction: { type: String, default: 'browse' },
   selectable: { type: Boolean, default: false },
-  selected: { type: Boolean, default: false }
+  selected: { type: Boolean, default: false },
+  /** 按发行时间排的列表（演员页）才把日期标出来，别的页面不加这颗胶囊 */
+  showDate: { type: Boolean, default: false }
 })
 
 const router = useRouter()
@@ -145,11 +155,12 @@ const onCoverLoad = (event) => {
   isPortrait.value = img.naturalHeight > img.naturalWidth
 }
 
-// 卡片封面的档位由设置里「列表封面清晰度」说了算（s=160 / n=240 / m=400）：
+// 卡片封面的档位由设置里「列表封面清晰度」说了算（s=160 / n=240 / m=400 / orig=不缩略）：
 // 画框只有一两百 CSS 像素宽，而原图在挂载卷上，一屏 24 张时 160 档约 177KB、400 档约 844KB，
 // 弱网下是"能不能看"的差别，但糊不糊只有他自己说了算，所以做成可设的、默认给清晰。
-// 详情页大图与"另存封面"仍走原图那条路由，不受这个设置影响。
-const coverUrl = computed(() => videoApi.getCoverUrl(props.video.id, app.coverSize))
+// 原图那档就是给宽带环境留的：一张中位 141KB、最大的到 2.5MB，走的是详情页那条不缩略的路由。
+const coverUrl = computed(() =>
+  videoApi.getCoverUrl(props.video.id, app.coverSize === 'orig' ? '' : app.coverSize))
 
 // 榜单里的这张卡：赞的版本不是影片口径那一版时才打标识（同一部片多个版本各算一条，不去重）
 const likedOtherVersion = computed(() => {
@@ -305,6 +316,12 @@ const handleClick = () => {
 /* 布局走全局 .pills；这里只约束单个胶囊不撑破容器 */
 .pill {
   max-width: 100%;
+}
+
+/* 日期用等宽数字：按时间排的列表里一列下来要对得齐 */
+.pill--date {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
 }
 
 /* 只有两种形态：默认迷你（片源/大小/点赞），视口 ≥900px 且这张卡片本身有 200px
