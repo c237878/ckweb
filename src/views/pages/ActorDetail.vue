@@ -128,7 +128,7 @@ import { actorApi } from '@/scripts/api'
 import { useAppStore } from '@/scripts/store/app'
 import {
   isBlankFilter, rememberFilter, rememberedFilter, rememberedPage, rememberPage, sameFilter
-} from '@/scripts/utils/browseMemory'
+} from '@/scripts/utils/filterPersist'
 import { useUiStore, errText } from '@/scripts/store/ui'
 import {
   SUBTITLE_OPTIONS, WATERMARK_OPTIONS, RESOLUTION_OPTIONS, linkKindLabel
@@ -188,7 +188,7 @@ const sort = ref('date')
 
 /**
  * 看到第几页、按哪一筛看，都按演员各自记在本地：一人能有九十部、四五页，
- * 每次进来都从第一页重筛一遍等于把"我看到哪儿了"当没发生。口径在 utils/browseMemory（系列页同一份）。
+ * 每次进来都从第一页重筛一遍等于把"我看到哪儿了"当没发生。口径在 utils/filterPersist 的详情页那一层（系列页同一份）。
  */
 const pageKey = () => `actor_videos_page_${route.params.id}`
 const filterKey = () => `actor_videos_filter_${route.params.id}`

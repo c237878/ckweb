@@ -129,7 +129,7 @@ import { seriesApi } from '@/scripts/api'
 import { useAppStore } from '@/scripts/store/app'
 import {
   isBlankFilter, rememberFilter, rememberedFilter, rememberedPage, rememberPage, sameFilter
-} from '@/scripts/utils/browseMemory'
+} from '@/scripts/utils/filterPersist'
 import { useUiStore, errText } from '@/scripts/store/ui'
 import { SUBTITLE_OPTIONS, WATERMARK_OPTIONS, RESOLUTION_OPTIONS } from '@/scripts/constants'
 import VideoCard from '@/views/components/VideoCard.vue'
@@ -179,7 +179,7 @@ const pageSize = computed(() => app.pageSize)
 
 /**
  * 一个系列常有大几十部、好几页，每次进来都从第一页重筛等于把"我看到哪儿了"当没发生。
- * 与演员页共用 utils/browseMemory 那一份口径：只记非默认状态，越界页码由 loadVideos 收回。
+ * 与演员页共用 utils/filterPersist 里详情页那一层：只记非默认状态，越界页码由 loadVideos 收回。
  */
 const pageKey = () => `series_videos_page_${route.params.id}`
 const filterKey = () => `series_videos_filter_${route.params.id}`
