@@ -150,6 +150,9 @@
             <button class="btn btn--sm" @click="openAddFriendLinkDialog">添加</button>
           </div>
 
+          <!-- 顺序换完要不要存、存没存上，都写在这一行；空着也占位，免得文字一跳整块列表跟着跳 -->
+          <p class="link-status" :class="{ 'is-busy': orderSaving }" role="status">{{ orderStatus }}</p>
+
           <div v-if="loadingFriendLinks" class="rows" aria-busy="true">
             <div v-for="n in 3" :key="n" class="skeleton row-skeleton"></div>
           </div>
@@ -165,24 +168,45 @@
                 </div>
               </div>
               <div class="row-actions">
-                <!-- 排序以前只能手填数字，改一位要把后面挨个重填；上下调一个位置就够 -->
+                <!-- 点一下就在本地换序、攒一下整列存一次：
+                     以前每点一次都重拉清单，那块列表被骨架屏顶掉、页面高度突变，滚动位置直接回顶，
+                     而挪一条要点好几下——等于每一下都被扔回页面开头。
+                     排序数字以前只能手填，改一位要把后面挨个重填，所以留着上下键，另加置顶/置底。 -->
                 <button
                   class="btn btn--sm btn--ghost"
-                  :disabled="i === 0 || movingLink"
+                  :disabled="i === 0"
                   :aria-label="`上移 ${item.name}`"
                   title="上移一位"
-                  @click="moveFriendLink(item, 'up')"
+                  @click="moveFriendLink(i, i - 1)"
                 >
                   &uarr;
                 </button>
                 <button
                   class="btn btn--sm btn--ghost"
-                  :disabled="i === friendLinkList.length - 1 || movingLink"
+                  :disabled="i === friendLinkList.length - 1"
                   :aria-label="`下移 ${item.name}`"
                   title="下移一位"
-                  @click="moveFriendLink(item, 'down')"
+                  @click="moveFriendLink(i, i + 1)"
                 >
                   &darr;
+                </button>
+                <button
+                  class="btn btn--sm btn--ghost"
+                  :disabled="i === 0"
+                  :aria-label="`把 ${item.name} 置顶`"
+                  title="移到最前"
+                  @click="moveFriendLink(i, 0)"
+                >
+                  &#8657;
+                </button>
+                <button
+                  class="btn btn--sm btn--ghost"
+                  :disabled="i === friendLinkList.length - 1"
+                  :aria-label="`把 ${item.name} 置底`"
+                  title="移到最后"
+                  @click="moveFriendLink(i, friendLinkList.length - 1)"
+                >
+                  &#8659;
                 </button>
                 <button class="btn btn--sm" @click="openEditFriendLinkDialog(item)">编辑</button>
                 <button class="btn btn--sm btn--danger" @click="deleteFriendLink(item)">删除</button>
@@ -450,10 +474,10 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import api, { settingApi, friendLinkApi, scanDirectoryApi, taxonomyApi } from '@/scripts/api'
 import { useAppStore } from '@/scripts/store/app'
-import { useUiStore } from '@/scripts/store/ui'
+import { useUiStore, errText } from '@/scripts/store/ui'
 import TaxonomyTable from '@/views/components/TaxonomyTable.vue'
 import ScrapeChannelsPanel from '@/views/components/ScrapeChannelsPanel.vue'
 import StudioManager from '@/views/pages/StudioManager.vue'
@@ -808,27 +832,60 @@ const openEditFriendLinkDialog = (item) => {
   showFriendLinkDialog.value = true
 }
 
-const movingLink = ref(false)
+// 顺序：本地立刻换序，攒一下再整列存一次。
+// 为什么不走"点一次发一个请求 + 重拉清单"：那块列表会被骨架屏顶掉、页面高度突变，
+// 浏览器把滚动位置钳回顶部——挪一条要点好几下，等于每一下都被扔回页面开头，
+// 而且 focused 的按钮在请求期间被 disabled，焦点掉回 body 也会再跳一次。
+const orderSaving = ref(false)
+const orderStatus = ref('')
+let orderTimer = null
 
-/** 移一位：后端会把整列重排成 1..N，所以移完必须重新拉一次清单（页脚也要跟着换序） */
-const moveFriendLink = async (item, dir) => {
-  if (movingLink.value) return
-  movingLink.value = true
+/** 换序：from 这一条挪到 to 那个下标（0 与末尾就是置顶/置底） */
+const moveFriendLink = (from, to) => {
+  const list = friendLinkList.value
+  if (from === to || to < 0 || to >= list.length) return
+  const [row] = list.splice(from, 1)
+  list.splice(to, 0, row)
+  // 行上那个「排序 N」跟着现实一起改，否则显示的还是库里的旧值，看着像没生效
+  list.forEach((x, i) => { x.sortorder = i + 1 })
+  queueOrderSave()
+}
+
+// 连点↑↓时只发最后一次：整列顺序是幂等的，中间那几次发出去也只是排队
+const queueOrderSave = () => {
+  orderStatus.value = '顺序改了，正在攒着写…'
+  if (orderTimer) clearTimeout(orderTimer)
+  orderTimer = setTimeout(persistOrder, 400)
+}
+
+const persistOrder = async () => {
+  if (orderTimer) { clearTimeout(orderTimer); orderTimer = null }
+  const ids = friendLinkList.value.map((x) => x.id)
+  if (!ids.length) return
+  orderSaving.value = true
   try {
-    const res = await friendLinkApi.move(item.id, dir)
-    if (!res.success) {
-      say(res.message || '没移动', 'error')
+    const res = await friendLinkApi.sort(ids)
+    if (!res?.success) {
+      // 条数对不上多半是别处刚加过或删过一条：这时候把界面这份写进去会挤掉新记录，
+      // 所以取回服务器那份覆盖界面，让人重新排
+      orderStatus.value = (res?.message || '保存失败') + '（已取回服务器上的清单）'
+      await loadFriendLinkList()
       return
     }
-    await loadFriendLinkList()
+    orderStatus.value = res.message || '顺序已保存'
     window.dispatchEvent(new CustomEvent('friendLinksUpdated'))
   } catch (err) {
-    console.error('移动链接失败:', err)
-    say('移动失败：' + (err.message || err), 'error')
+    console.error('保存链接顺序失败:', err)
+    orderStatus.value = '保存失败：' + errText(err) + '（界面上的顺序还没落到库，再点一下箭头会重试）'
   } finally {
-    movingLink.value = false
+    orderSaving.value = false
   }
 }
+
+// 攒的那 400 毫秒里他可能直接切分区或关页面：切走时先把这一笔写完
+const flushOrder = () => { if (orderTimer) persistOrder() }
+watch(activeGroup, flushOrder)
+onBeforeUnmount(flushOrder)
 
 function closeFriendLinkDialog() {
   showFriendLinkDialog.value = false
@@ -1032,6 +1089,18 @@ const deleteFriendLink = async (item) => {
   border-color: var(--success);
   background: var(--success-soft);
   color: var(--success);
+}
+
+/* 顺序换完存没存上写在这一行；空着也占位，免得文字一跳整块列表跟着跳 */
+.link-status {
+  margin: 0 0 var(--s2);
+  min-height: 1.5em;
+  color: var(--text-dim);
+  font-size: var(--f-sm);
+}
+
+.link-status.is-busy {
+  color: var(--accent);
 }
 
 .rows {

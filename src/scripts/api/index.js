@@ -340,8 +340,8 @@ export const friendLinkApi = {
   add: (data) => api.post('/FriendLink', data),
   update: (id, data) => api.put(`/FriendLink/${id}`, data),
   delete: (id) => api.delete(`/FriendLink/${id}`),
-  /** 上移 / 下移一位：dir = 'up' | 'down'，后端按显示顺序整体重排 */
-  move: (id, dir) => api.post(`/FriendLink/${id}/move`, null, { params: { dir } })
+  /** 整列顺序一次提交：ids 是界面上从上到下的 id 顺序，后端重排成 1..N 并回改动条数 */
+  sort: (ids) => api.post('/FriendLink/sort', ids)
 }
 
 export default api
