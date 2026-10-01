@@ -127,7 +127,9 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { seriesApi } from '@/scripts/api'
 import { useAppStore } from '@/scripts/store/app'
-import { rememberedPage, rememberPage } from '@/scripts/utils/pageMemory'
+import {
+  isBlankFilter, rememberFilter, rememberedFilter, rememberedPage, rememberPage, sameFilter
+} from '@/scripts/utils/browseMemory'
 import { useUiStore, errText } from '@/scripts/store/ui'
 import { SUBTITLE_OPTIONS, WATERMARK_OPTIONS, RESOLUTION_OPTIONS } from '@/scripts/constants'
 import VideoCard from '@/views/components/VideoCard.vue'
@@ -151,9 +153,20 @@ const videosLoading = ref(false)
 const videosError = ref('')
 
 // 片源三维筛选（都下沉到后端，"未标记"是一个真实筛选值而不是不排除）
-const sourceFilter = ref({ subtitle: '', watermark: '', resolution: '' })
-const hasSourceFilter = computed(() => Object.values(sourceFilter.value).some((v) => v !== ''))
-const clearSourceFilter = () => { sourceFilter.value = { subtitle: '', watermark: '', resolution: '' } }
+const EMPTY_FILTER = { subtitle: '', watermark: '', resolution: '' }
+const sourceFilter = ref({ ...EMPTY_FILTER })
+const hasSourceFilter = computed(() => !isBlankFilter(sourceFilter.value))
+// 已经空了就别再换引用：deep watcher 只看引用变没变，会因此多跑一次"回第一页重取"
+const clearSourceFilter = () => {
+  if (!hasSourceFilter.value) return
+  sourceFilter.value = { ...EMPTY_FILTER }
+}
+// 切实体 / 进来时按这个系列自己记下的那一筛恢复；内容没变就别换引用
+const applyRememberedFilter = () => {
+  const saved = rememberedFilter(filterKey(), EMPTY_FILTER)
+  if (sameFilter(saved, sourceFilter.value)) return
+  sourceFilter.value = saved
+}
 const showEditDialog = ref(false)
 
 // 排序相关
@@ -165,10 +178,11 @@ const savingSort = ref(false)
 const pageSize = computed(() => app.pageSize)
 
 /**
- * 一个系列常有大几十部、好几页，每次进来都从第一页重翻等于把"我看到哪儿了"当没发生。
- * 与演员页共用 utils/pageMemory 那一份口径：只记大于 1 的页，越界的页码由 loadVideos 收回。
+ * 一个系列常有大几十部、好几页，每次进来都从第一页重筛等于把"我看到哪儿了"当没发生。
+ * 与演员页共用 utils/browseMemory 那一份口径：只记非默认状态，越界页码由 loadVideos 收回。
  */
 const pageKey = () => `series_videos_page_${route.params.id}`
+const filterKey = () => `series_videos_filter_${route.params.id}`
 
 const openEditDialog = () => {
   showEditDialog.value = true
@@ -388,8 +402,9 @@ const decodeUrl = (url) => {
 
 onMounted(async () => {
   await app.init()
-  // 每页条数是在设置里配的，页数只是"翻到哪儿了"：进来先回到上次那一页
+  // 每页条数是在设置里配的，页数与筛选只是"翻到哪儿、按哪一筛看"：进来先回到上次那一屏
   page.value = rememberedPage(pageKey())
+  applyRememberedFilter()
   await loadAll()
 })
 
@@ -399,11 +414,14 @@ watch(
     if (!newId) return
     series.value = null
     page.value = rememberedPage(pageKey())   // 每个系列各记各的那一页
-    clearSourceFilter()
+    applyRememberedFilter()                  // 以及各记各的那一筛
     sorting.value = false
     loadAll()
   }
 )
+
+// 筛选一变就落本地；三维全空等于没记忆
+watch(sourceFilter, () => rememberFilter(filterKey(), sourceFilter.value), { deep: true })
 
 // 翻页就落一次本地，不等退出页面再攒（保存排序后回到第一页，这条记忆也就跟着清掉）
 watch(page, (n) => rememberPage(pageKey(), n))

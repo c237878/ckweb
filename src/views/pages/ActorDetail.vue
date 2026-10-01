@@ -126,7 +126,9 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { actorApi } from '@/scripts/api'
 import { useAppStore } from '@/scripts/store/app'
-import { rememberedPage, rememberPage } from '@/scripts/utils/pageMemory'
+import {
+  isBlankFilter, rememberFilter, rememberedFilter, rememberedPage, rememberPage, sameFilter
+} from '@/scripts/utils/browseMemory'
 import { useUiStore, errText } from '@/scripts/store/ui'
 import {
   SUBTITLE_OPTIONS, WATERMARK_OPTIONS, RESOLUTION_OPTIONS, linkKindLabel
@@ -157,13 +159,20 @@ const videosLoading = ref(false)
 const videosError = ref('')
 
 // 片源三维筛选（都下沉到后端，所以"未标记"是一个真实筛选值而不是排除）
-const sourceFilter = ref({ subtitle: '', watermark: '', resolution: '' })
-const hasSourceFilter = computed(() => Object.values(sourceFilter.value).some((v) => v !== ''))
+const EMPTY_FILTER = { subtitle: '', watermark: '', resolution: '' }
+const sourceFilter = ref({ ...EMPTY_FILTER })
+const hasSourceFilter = computed(() => !isBlankFilter(sourceFilter.value))
 // 已经空了就别再换引用：deep watcher 只看引用变没变，切演员时会因此多跑一次，
 // 表现是先回第一页、又跳回记下的那一页，闪一下
 const clearSourceFilter = () => {
   if (!hasSourceFilter.value) return
-  sourceFilter.value = { subtitle: '', watermark: '', resolution: '' }
+  sourceFilter.value = { ...EMPTY_FILTER }
+}
+// 切演员 / 进来时按这位演员自己记下的那一筛恢复；同样要先比一下，内容没变就别换引用
+const applyRememberedFilter = () => {
+  const saved = rememberedFilter(filterKey(), EMPTY_FILTER)
+  if (sameFilter(saved, sourceFilter.value)) return
+  sourceFilter.value = saved
 }
 const showEditDialog = ref(false)
 
@@ -178,10 +187,11 @@ const SORT_OPTIONS = [
 const sort = ref('date')
 
 /**
- * 看到第几页按演员各自记在本地：一人能有九十部、四五页，每次进来都从第一页重翻，
- * 等于把"我看到哪儿了"当没发生。具体口径在 utils/pageMemory（系列页用的是同一份）。
+ * 看到第几页、按哪一筛看，都按演员各自记在本地：一人能有九十部、四五页，
+ * 每次进来都从第一页重筛一遍等于把"我看到哪儿了"当没发生。口径在 utils/browseMemory（系列页同一份）。
  */
 const pageKey = () => `actor_videos_page_${route.params.id}`
+const filterKey = () => `actor_videos_filter_${route.params.id}`
 
 // 后端写入时已校验过 scheme，这里再挡一道：非 http(s) 不渲染成链接，
 // 免得哪天直接改库把 javascript: 塞进来就是一条现成的 XSS
@@ -389,8 +399,9 @@ const loadAll = async () => {
 
 onMounted(async () => {
   await app.init()
-  // 每页条数是在设置里配的，页数只是"翻到哪儿了"：进来先回到上次那一页
+  // 每页条数是在设置里配的，页数与筛选只是"翻到哪儿、按哪一筛看"：进来先回到上次那一屏
   page.value = rememberedPage(pageKey())
+  applyRememberedFilter()
   await loadAll()
 })
 
@@ -401,7 +412,7 @@ watch(
     if (!newId) return
     actor.value = null
     page.value = rememberedPage(pageKey())      // 每个演员各记各的那一页
-    clearSourceFilter()
+    applyRememberedFilter()                     // 以及各记各的那一筛
     loadAll()
   }
 )
@@ -423,6 +434,9 @@ watch(sort, () => {
   page.value = 1
   loadVideos()
 })
+
+// 筛选一变就落本地；三维全空等于没记忆（上面那个 watcher 先回第一页，这里只管存）
+watch(sourceFilter, () => rememberFilter(filterKey(), sourceFilter.value), { deep: true })
 
 // 翻页就落一次本地，不等退出页面再攒
 watch(page, (n) => rememberPage(pageKey(), n))
