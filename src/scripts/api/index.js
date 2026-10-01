@@ -190,7 +190,11 @@ export const scrapeApi = {
   resetChannel: (id) => api.post(`/scrape/channel/${id}/reset`),
   toggleChannel: (id) => api.post(`/scrape/channel/${id}/toggle`),
   testChannel: (id, params) => api.post(`/scrape/channel/${id}/test`, null, { params }),
-  applyChannel: (id, entityId) => api.post(`/scrape/channel/${id}/apply`, null, { params: { entityId } })
+  applyChannel: (id, entityId) => api.post(`/scrape/channel/${id}/apply`, null, { params: { entityId } }),
+  // 批量补：起完立刻返回，进度靠 batchStatus 轮询（一次几百条要跑几分钟）
+  startBatch: (id, limit) => api.post(`/scrape/channel/${id}/batch`, null, { params: { limit } }),
+  batchStatus: () => api.get('/scrape/channel/batch/status'),
+  stopBatch: () => api.post('/scrape/channel/batch/stop')
 }
 
 // AI 接口（MCP）：设置页只用得到查状态与换密钥，工具调用是大模型自己的事

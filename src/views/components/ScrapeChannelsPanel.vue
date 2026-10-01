@@ -28,7 +28,10 @@
             <span class="tag" :class="c.usable ? 'tag--success' : 'tag--warn'">{{ c.why }}</span>
             <div v-if="c.lastError" class="dim small">{{ c.lastError }}</div>
           </td>
-          <td class="num">{{ c.usedToday }}/{{ c.dailyQuota }}</td>
+          <td class="num">
+            {{ c.usedToday }}/{{ c.dailyQuota }}
+            <div v-if="c.fetchKind !== 'builtin'" class="dim small">还能补 {{ c.missingCount }}</div>
+          </td>
           <td class="num">{{ (c.minIntervalMs / 1000).toFixed(1) }}s</td>
           <td class="ops">
             <!-- 站点翻脸时先一键关掉，比进对话框翻一圈快；配置原样留着 -->
@@ -41,6 +44,13 @@
             </button>
             <button class="btn btn--sm btn--ghost" @click="edit(c)">编辑</button>
             <button class="btn btn--sm btn--ghost" @click="test(c)">试抓</button>
+            <button
+              v-if="c.fetchKind !== 'builtin'"
+              class="btn btn--sm btn--ghost"
+              :disabled="!c.usable || !c.missingCount"
+              :title="`按这条通道自己的间隔与配额，一次问 limit 条缺该字段的记录；只填空着的位置`"
+              @click="openBatch(c)"
+            >批量补</button>
             <button
               class="btn btn--sm btn--ghost"
               :disabled="!c.consecutiveFails && !c.blockedUntil && !c.usedToday"
@@ -90,6 +100,16 @@
               <label>Referer（可选）<input v-model="draft.referer" class="input" placeholder="https://站点/" /></label>
               <label>User-Agent（可选，留空用内置）<input v-model="draft.userAgent" class="input" /></label>
             </div>
+            <label
+              title="很多站查无此人时不回 404，而是 200 把首页或列表页给你——页面上正好夹着别人的资料，抽第一个命中就会写错人。填了它，抽出的值不含查询词就整条作废（实测 javcup 就是这个行为）"
+            >身份校验（可选，正则取第一个捕获组）
+              <input
+                v-model="draft.identityRegex"
+                class="input"
+                placeholder="例：&lt;title[^&gt;]*&gt;(.{1,80}?) - 站名"
+                spellcheck="false"
+              />
+            </label>
 
             <div class="rules">
               <div class="rules__head">
@@ -169,11 +189,60 @@
         </div>
       </div>
     </div>
+    <!-- 批量补：起完立刻返回，进度在这儿轮询；关掉窗口不会停任务 -->
+    <div v-if="batch" class="overlay" @click.self="closeBatch">
+      <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="batch-title">
+        <div class="dialog__head">
+          <h3 class="dialog__title" id="batch-title">批量补 · {{ batch.name }}</h3>
+          <button class="dialog__close" aria-label="关闭" @click="closeBatch">&times;</button>
+        </div>
+        <div class="dialog__body">
+          <p class="panel-desc">
+            按这条通道自己的间隔一条一条问，只填空着的位置；配额用满或连续被拒就自己停。
+          </p>
+
+          <template v-if="!run || !run.running">
+            <label>这次问多少条
+              <input v-model.number="limit" class="input" type="number" min="1" max="500" />
+            </label>
+            <p class="hint">
+              还缺这条通道字段的记录 {{ batch.missing }} 条，一次最多 500 条；
+              今日还能问 {{ batch.quotaLeft }} 次；按每条 {{ (batch.interval / 1000).toFixed(1) }} 秒算，
+              {{ limit }} 条大约要 {{ eta(limit) }}。
+            </p>
+            <p v-if="run && !run.running" class="test-out__msg">
+              上一轮：问 {{ run.done }} 条，写入 {{ run.written }} 项 —— {{ run.reason || '已结束' }}
+            </p>
+          </template>
+
+          <dl v-else class="test-out__list">
+            <dt>进度</dt><dd>{{ run.done }}/{{ run.planned }}</dd>
+            <dt>写入</dt><dd>{{ run.written }} 项</dd>
+            <dt>没写入</dt><dd>{{ run.foundNothing }} 条</dd>
+            <dt>出错</dt><dd>{{ run.failed }} 条</dd>
+            <dt>今日剩余配额</dt><dd>{{ run.quotaLeft }}</dd>
+            <dt>说明</dt><dd>{{ run.reason || '正在问…' }}</dd>
+          </dl>
+        </div>
+        <div class="dialog__foot">
+          <button
+            v-if="!run || !run.running"
+            class="btn btn--primary"
+            :disabled="busy || !limit"
+            @click="start"
+          >
+            {{ busy ? '请求中…' : `开始问 ${limit} 条` }}
+          </button>
+          <button v-else class="btn btn--danger" @click="stop">停止</button>
+          <button class="btn btn--ghost" @click="closeBatch">关闭</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { scrapeApi } from '@/scripts/api'
 import { useUiStore, errText } from '@/scripts/store/ui'
 import SelectList from '@/views/components/SelectList.vue'
@@ -187,6 +256,13 @@ const testing = ref(null)
 const testQuery = ref('')
 const testResult = ref(null)
 const busy = ref(false)
+
+// 批量补：batch 是"这条通道能不能补"的静态信息，run 是服务端那一份进度快照。
+// tick 是轮询定时器——任务在服务端跑，关掉窗口只是不看了，不是把它停了。
+const batch = ref(null)
+const run = ref(null)
+const limit = ref(20)
+let tick = null
 
 const ENTITY_OPTIONS = [{ value: 'video', label: '影片' }, { value: 'actor', label: '演员' }]
 const SOURCE_OPTIONS = [
@@ -223,7 +299,7 @@ const load = async () => {
 
 const blank = () => ({
   id: '', name: '', entity: 'video', enabled: true, querySource: 'code',
-  fetchUrl: '', fetchKind: 'json', referer: '', userAgent: '',
+  fetchUrl: '', fetchKind: 'json', referer: '', userAgent: '', identityRegex: '',
   minIntervalMs: 1500, dailyQuota: 300, failLimit: 3, cooldownMinutes: 120, note: '', rules: '[]'
 })
 
@@ -233,7 +309,7 @@ const create = () => {
 }
 
 const edit = (c) => {
-  draft.value = { ...c }
+  draft.value = { ...c, identityRegex: c.identityRegex || '' }
   try {
     ruleList.value = JSON.parse(c.rules || '[]')
   } catch {
@@ -303,7 +379,75 @@ const runTest = async () => {
   }
 }
 
+const eta = (n) => {
+  const total = Math.round((n * (batch.value?.interval || 0)) / 1000)
+  if (!total) return '很快'
+  const m = Math.floor(total / 60)
+  const s = total % 60
+  return m ? `${m} 分 ${s} 秒` : `${s} 秒`
+}
+
+const stopTick = () => {
+  if (tick) clearInterval(tick)
+  tick = null
+}
+
+const readProgress = async () => {
+  try {
+    const res = await scrapeApi.batchStatus()
+    const s = res.data
+    if (!s || s.channelId !== batch.value?.id) return
+    run.value = s
+    // 服务端说没在跑了：把最后一帧留下给人看，然后停轮询并刷新列表（今日计数与"还能补"都变了）
+    if (!s.running) {
+      stopTick()
+      load()
+    }
+  } catch {
+    // 轮询失败不打扰他，下一轮自然再试；真停了最后一帧会停在原地
+  }
+}
+
+const openBatch = (c) => {
+  batch.value = {
+    id: c.id, name: c.name, missing: c.missingCount,
+    interval: c.minIntervalMs, quotaLeft: c.quotaLeft
+  }
+  // 默认值取"三个数里最小的"：别一上手就让人排 500 条、今天却只剩 8 次配额
+  limit.value = Math.max(1, Math.min(20, c.missingCount, c.quotaLeft))
+  run.value = null
+  readProgress()
+  tick = setInterval(readProgress, 2000)
+}
+
+const closeBatch = () => {
+  stopTick()
+  batch.value = null
+  run.value = null
+}
+
+const start = async () => {
+  busy.value = true
+  try {
+    const res = await scrapeApi.startBatch(batch.value.id, limit.value)
+    if (!res.success) return ui.warn(res.message || '没开始')
+    ui.success(res.message)
+    run.value = res.data
+    if (!tick) tick = setInterval(readProgress, 2000)
+  } catch (err) {
+    ui.error('起不来：' + errText(err))
+  } finally {
+    busy.value = false
+  }
+}
+
+const stop = async () => {
+  const res = await scrapeApi.stopBatch()
+  ui[res.success ? 'success' : 'error'](res.message || '没停')
+}
+
 onMounted(load)
+onBeforeUnmount(stopTick)
 </script>
 
 <style scoped>
