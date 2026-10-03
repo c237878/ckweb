@@ -69,7 +69,7 @@
         v-model="keyword"
         class="input grow"
         type="search"
-        placeholder="搜索演员姓名或别名..."
+        placeholder="输入完整演员名或曾用名"
         @keyup.enter="applyFilter"
         @input="debouncedSearch"
       />
@@ -181,7 +181,7 @@ const pageSize = computed(() => app.personPageSize)
 
 // 关键词单独不入库：下次进来仍是半截搜索很烦
 const hasActiveFilter = computed(
-  () => keyword.value !== '' || Object.values(filters.value).some((v) => v !== '' && v !== null)
+  () => keyword.value.trim() !== '' || Object.values(filters.value).some((v) => v !== '' && v !== null)
 )
 
 const isAllSelected = computed(
@@ -238,7 +238,7 @@ const loadActors = async () => {
     const params = {
       page: page.value,
       pageSize: pageSize.value,
-      keyword: keyword.value
+      keyword: keyword.value.trim()
     }
     if (filters.value.country) params.country = filters.value.country
     if (filters.value.hasPortrait) params.hasPortrait = filters.value.hasPortrait

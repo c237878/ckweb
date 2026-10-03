@@ -245,7 +245,7 @@
                 v-model="actorSearch"
                 class="input"
                 type="text"
-                placeholder="搜索演员并添加"
+                placeholder="输入演员全名或曾用名"
                 autocomplete="off"
                 @input="onActorSearchInput"
               />
@@ -521,14 +521,20 @@ const actorRows = (data) => (Array.isArray(data) ? data : data?.list || [])
 
 /** 命中了哪个曾用名：姓名本身匹配时返回空，否则回显曾用名，免得搜"加藤ゆかり"出来个"松冈铃"看不懂 */
 const matchedAlias = (actor, keyword) => {
-  if (!keyword || (actor.name || '').toLowerCase().includes(keyword)) return ''
-  return (actor.aliases || []).find((a) => a.toLowerCase().includes(keyword)) || ''
+  if (!keyword || sameName(actor.name, keyword)) return ''
+  return (actor.aliases || []).find((a) => sameName(a, keyword)) || ''
 }
+
+/**
+ * 整名相等才算命中，不再用 includes：别名已经一行一个存进 actor_aliases，
+ * "输入的是不是某个人的全名或曾用名"可以直接判等，模糊匹配反而会把一串人捞出来。
+ * 大小写与首尾空格不参与比较（罗马音有人打全小写），服务端同一口径。
+ */
+const sameName = (value, keyword) => (value || '').trim().toLowerCase() === keyword
 
 const candidate = (actor, keyword, picked) =>
   !picked.has(actor.id)
-  && ((actor.name || '').toLowerCase().includes(keyword)
-    || (actor.aliases || []).some((a) => a.toLowerCase().includes(keyword)))
+  && (sameName(actor.name, keyword) || (actor.aliases || []).some((a) => sameName(a, keyword)))
 
 const searchKeyword = computed(() => actorSearch.value.trim().toLowerCase())
 
