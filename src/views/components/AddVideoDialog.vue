@@ -519,22 +519,38 @@ const doUpload = async (type, directory, file) => {
 
 const actorRows = (data) => (Array.isArray(data) ? data : data?.list || [])
 
-/** 命中了哪个曾用名：姓名本身匹配时返回空，否则回显曾用名，免得搜"加藤ゆかり"出来个"松冈铃"看不懂 */
-const matchedAlias = (actor, keyword) => {
-  if (!keyword || sameName(actor.name, keyword)) return ''
-  return (actor.aliases || []).find((a) => sameName(a, keyword)) || ''
+/**
+ * 整名相等是主口径，一条相等都没有才允许模糊（服务端 /api/actor 同一套，见 ActorController）。
+ * 大小写与首尾空格不参与比较；`Airi Suzumura` 少打空格时靠这一档还能搜到人。
+ */
+const sameName = (value, keyword) => (value || '').trim().toLowerCase() === keyword
+const hasName = (value, keyword) => (value || '').toLowerCase().includes(keyword)
+
+/** 这个人是否命中：姓名或任一曾用名；exact=true 时要求整串相等 */
+const nameHit = (actor, keyword, exact) => {
+  const test = (v) => (exact ? sameName(v, keyword) : hasName(v, keyword))
+  return test(actor.name) || (actor.aliases || []).some(test)
 }
 
 /**
- * 整名相等才算命中，不再用 includes：别名已经一行一个存进 actor_aliases，
- * "输入的是不是某个人的全名或曾用名"可以直接判等，模糊匹配反而会把一串人捞出来。
- * 大小写与首尾空格不参与比较（罗马音有人打全小写），服务端同一口径。
+ * 先取"整名相等"的那批，一批都没有才退到模糊。
+ * 分档必须在这一份候选集里做，不能逐行判：逐行的话精确的和模糊的会混在同一列表里，
+ * 打全名也照样拖出一串人，正是这次要消掉的东西。
  */
-const sameName = (value, keyword) => (value || '').trim().toLowerCase() === keyword
+const tiered = (rows, keyword, picked) => {
+  const free = rows.filter((a) => !picked.has(a.id))
+  const exact = free.filter((a) => nameHit(a, keyword, true))
+  return exact.length ? exact : free.filter((a) => nameHit(a, keyword, false))
+}
 
-const candidate = (actor, keyword, picked) =>
-  !picked.has(actor.id)
-  && (sameName(actor.name, keyword) || (actor.aliases || []).some((a) => sameName(a, keyword)))
+/** 命中了哪个曾用名：姓名本身匹配时返回空，否则回显曾用名，免得搜"加藤ゆかり"出来个"松冈铃"看不懂 */
+const matchedAlias = (actor, keyword) => {
+  if (!keyword || sameName(actor.name, keyword)) return ''
+  const aliases = actor.aliases || []
+  return aliases.find((a) => sameName(a, keyword))
+    || aliases.find((a) => hasName(a, keyword))
+    || ''
+}
 
 const searchKeyword = computed(() => actorSearch.value.trim().toLowerCase())
 
@@ -542,10 +558,10 @@ const actorCandidates = computed(() => {
   const kw = searchKeyword.value
   if (!kw) return []
   const picked = new Set(selectedActors.value.map((a) => a.id))
-  const local = actorList.value.filter((a) => candidate(a, kw, picked))
+  const local = tiered(actorList.value, kw, picked)
   // 演员总数没超过单次取回上限时根本不会发请求，本地这份就是全集
   if (local.length || actorList.value.length < ACTOR_FETCH_SIZE) return local.slice(0, SUGGEST_LIMIT)
-  return remoteActors.value.filter((a) => candidate(a, kw, picked)).slice(0, SUGGEST_LIMIT)
+  return tiered(remoteActors.value, kw, picked).slice(0, SUGGEST_LIMIT)
 })
 
 // 候选面板和下拉框一样会被 .dialog__body 裁掉，用同一套自适应
@@ -580,7 +596,9 @@ const searchRemoteActors = debounce(async (kw) => {
     const res = await actorApi.getList({ keyword: kw, pageSize: 50 })
     if (actorSearch.value.trim() !== kw) return // 关键词已经变了
     const picked = new Set(selectedActors.value.map((a) => a.id))
-    remoteActors.value = actorRows(res.data).filter((a) => candidate(a, kw.toLowerCase(), picked))
+    // 服务端已经按"精确优先、没有精确才模糊"选过一轮，这里只去掉已经选上的，
+    // 不再自己 filter——否则模糊兜底那批会被本地再筛一次给筛掉
+    remoteActors.value = actorRows(res.data).filter((a) => !picked.has(a.id))
   } catch (error) {
     console.error('搜索演员失败:', error)
     remoteActors.value = []
