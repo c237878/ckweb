@@ -108,7 +108,8 @@
       <ComboBox
         v-model="filters.seriesId"
         :options="seriesList"
-        placeholder="筛选系列..."
+        :remote="searchSeries"
+        placeholder="筛选系列，日文原名也能搜"
         all-label="全部系列"
         @change="applyFilter"
       />
@@ -211,7 +212,7 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { videoApi, studioApi, versionTypeApi } from '@/scripts/api'
+import { videoApi, studioApi, versionTypeApi, seriesApi } from '@/scripts/api'
 import { useAppStore } from '@/scripts/store/app'
 import { useUiStore, errText } from '@/scripts/store/ui'
 import { SORT_OPTIONS, SUBTITLE_OPTIONS, WATERMARK_OPTIONS, RESOLUTION_OPTIONS, CODEC_OPTIONS } from '@/scripts/constants'
@@ -242,6 +243,16 @@ const total = ref(0)
 const categories = ref([])
 const countries = ref([])
 const seriesList = ref([])
+
+/**
+ * 系列的曾用名不塞进 meta（675 条会把列表页要拉的接口加上四成体积），
+ * 本地这份按正名搜不到时才现查一次 /api/series——它的 keyword 本来就同时打 name 与 alias。
+ */
+const searchSeries = async (kw) => {
+  const res = await seriesApi.getList({ keyword: kw, pageSize: 30 })
+  if (!res.success) return []
+  return (res.data || []).map((s) => ({ id: s.id, name: s.name, alias: s.alias }))
+}
 const loading = ref(true)
 const error = ref('')
 const renaming = ref(false)

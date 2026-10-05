@@ -87,7 +87,8 @@
           <ComboBox
             v-model="form.seriesId"
             :options="seriesOptions"
-            placeholder="选择或输入系列名称"
+            :remote="searchSeries"
+            placeholder="选择或输入系列名称、曾用名"
             all-label="（无系列）"
           />
         </label>
@@ -98,7 +99,7 @@
           <ComboBox
             v-model="form.studioId"
             :options="studioOptions"
-            placeholder="选择或输入片商，没有的去 设置 → 片商 添加"
+            placeholder="选择或输入片商正名或曾用名，没有的去 设置 → 片商 添加"
             all-label="（无片商）"
           />
           <!-- 只有"选了片商 + 属于某个系列"时这颗勾才有意义：没系列的话后端直接返回 0，
@@ -285,7 +286,7 @@
 
 <script setup>
 import { computed, nextTick, ref, watch, onUnmounted } from 'vue'
-import { videoApi, actorApi, scanDirectoryApi, uploadApi, studioApi } from '@/scripts/api'
+import { videoApi, actorApi, scanDirectoryApi, uploadApi, studioApi, seriesApi } from '@/scripts/api'
 import { useUiStore, errText } from '@/scripts/store/ui'
 import { formatSize } from '@/scripts/utils/format'
 import { debounce } from '@/scripts/utils/debounce'
@@ -368,6 +369,17 @@ const categoryOptions = computed(() => toOptions(meta.value.categories, form.val
 
 // meta 已经是 [{ id, name }]，直接给 ComboBox
 const seriesOptions = computed(() => meta.value.series || [])
+
+/**
+ * 系列别名（675 条）不塞进 meta：那会让影片列表页每次都要多拉四成的载荷，
+ * 而这个搜索框只在有人输日文原名时才需要它。所以本地这份搜不到时，现查一次
+ * /api/series（它的 keyword 本来就同时打 name 与 alias）。
+ */
+const searchSeries = async (kw) => {
+  const res = await seriesApi.getList({ keyword: kw, pageSize: 30 })
+  if (!res.success) return []
+  return (res.data || []).map((s) => ({ id: s.id, name: s.name, alias: s.alias }))
+}
 
 const videoDirs = computed(() => scanDirectories.value.filter((d) => d.category === '视频'))
 const coverDirs = computed(() => scanDirectories.value.filter((d) => d.category === '封面'))
