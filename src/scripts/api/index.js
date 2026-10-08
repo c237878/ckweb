@@ -136,6 +136,11 @@ export const videoApi = {
   getDuplicates: () => api.get('/video/duplicates'),
   // 体积分析：按目标码率算"重编码还能省多少"，只读
   optimize: (params) => api.get('/video/optimize', { params }),
+  // 搬移选中的版本文件到别的目录。默认 dryRun 只出预检清单，执行才带 dryRun=false
+  relocatePlan: (body) => api.post('/video/relocate', body),
+  relocateRun: (body) => api.post('/video/relocate', body, { params: { dryRun: false } }),
+  relocateStatus: () => api.get('/video/relocate/status'),
+  relocateStop: () => api.delete('/video/relocate'),
   /** 全站扫描：任务在服务端后台跑，force=true 连量过的一起重扫（候选是"版本行"，不再按影片） */
   startScanAll: (force = false) => api.post('/video/scan/all', null, { params: { force } }),
   scanStatus: () => api.get('/video/scan/status'),

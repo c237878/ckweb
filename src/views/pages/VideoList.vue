@@ -224,6 +224,7 @@ import Pagination from '@/views/components/Pagination.vue'
 import ComboBox from '@/views/components/ComboBox.vue'
 import SelectList from '@/views/components/SelectList.vue'
 import { loadFilterState, saveFilterState } from '@/scripts/utils/filterPersist'
+import { formatEta } from '@/scripts/utils/format'
 
 const STORAGE_KEY = 'video-list'
 
@@ -482,12 +483,11 @@ let scanTimer = null
 let scanWatching = false
 
 const scanRunning = computed(() => !!scan.value?.running)
-const fmtEta = (sec) => (sec >= 60 ? `约剩 ${Math.round(sec / 60)} 分钟` : `约剩 ${sec} 秒`)
 const scanText = computed(() => {
   const s = scan.value
   if (!s) return ''
   if (!s.total) return '正在清点要扫的影片…'
-  const tail = s.etaSeconds ? ` · ${fmtEta(s.etaSeconds)}` : ''
+  const tail = s.etaSeconds ? ` · ${formatEta(s.etaSeconds)}` : ''
   // 读不出分两种：文件根本不在盘上（卷掉了/搬走了）与文件在但读不出容器头（多半没下完）。
   // 只有前者值得人去看一眼，所以单独报出来
   const gone = s.missing ? `（其中 ${s.missing} 个不在盘上）` : ''

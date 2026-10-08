@@ -30,6 +30,15 @@ export function formatDuration(seconds) {
 }
 
 /**
+ * 后台任务的"还剩多久"：拿已完成的那部分推的，头一两个样本不准（调用方一般凑够 2 个才报）。
+ * 扫描片源、搬移文件这类十分钟到小时级的活都要这句，所以只在这儿写一份。
+ */
+export function formatEta(seconds) {
+  const s = Math.max(0, Math.round(Number(seconds) || 0))
+  return s >= 60 ? `约剩 ${Math.round(s / 60)} 分钟` : `约剩 ${s} 秒`
+}
+
+/**
  * 容器里的 fourcc → 平时叫的那个名字。库里存的是原始 fourcc（不转写，见后端 SourceStates.Codecs 注释），
  * 所以只在显示这一层翻译；认不出的原样显示，别把看不懂的编码悄悄藏起来。
  */

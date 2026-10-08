@@ -6,7 +6,8 @@
         <p class="panel-desc">
           把「编码 + 时长 + 大小」凑在一起算平均码率，按"按目标码率重编能省下多少"排序 ——
           只看体积会挑错对象：同样 6 GB，一小时的片还有压缩空间，两小时的片多半已经压到底了。
-          这里只出证据，不碰盘上任何文件。
+          分析这一趟只读库、不碰盘上文件；只有下面勾选之后点「搬移」那一步才会真的动文件，
+          而且必须先预检看清清单。
         </p>
       </div>
       <button class="btn btn--sm btn--ghost" :disabled="loading" @click="load()">重新计算</button>
@@ -90,6 +91,10 @@
         </div>
       </div>
 
+      <!-- 搬移是批次级动作，进度得离开弹窗也看得见：跨卷拷几个 GB 是十分钟到小时级的活，
+           中途关掉对话框不该看不到它走到哪了 -->
+      <JobBar v-if="relRunning && !showRelocate" :text="relText" :percent="relJob.percent" />
+
       <div class="ops">
         <label class="chk">
           <input type="checkbox" :checked="allChecked" @change="toggleAll" />全选本页
@@ -102,6 +107,9 @@
         </button>
         <button class="btn btn--sm btn--ghost" :disabled="!selected.length" @click="copyCsv">
           复制选中 {{ selected.length }} 行为 CSV
+        </button>
+        <button class="btn btn--sm btn--primary" :disabled="!selected.length && !relRunning" @click="openRelocate">
+          {{ relRunning ? '搬移中 · 看进度' : `搬移选中的 ${selected.length} 个…` }}
         </button>
       </div>
 
@@ -143,18 +151,97 @@
         在挂载卷上不划算，也没存。
       </p>
     </template>
+
+    <!-- 搬移文件：这是本面板唯一一个会动盘上真实文件的动作，所以三步走 ——
+         填目标 → 预检（一份"要动哪几个、哪几个不能动以及为什么"）→ 才让点执行。
+         预检和执行走的是后端同一段判定，看到的就是会发生的 -->
+    <div v-if="showRelocate" class="overlay" @click.self="showRelocate = false">
+      <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="rel-title">
+        <div class="dialog__head">
+          <h3 class="dialog__title" id="rel-title">
+            {{ relRunning ? '正在搬移文件' : `搬移选中的 ${selected.length} 个文件` }}
+          </h3>
+          <button class="dialog__close" aria-label="关闭" @click="showRelocate = false">&times;</button>
+        </div>
+
+        <div class="dialog__body">
+          <template v-if="relRunning">
+            <JobBar :text="relText" :percent="relJob.percent" />
+            <p class="hint">
+              一次只搬一个，按顺序来 —— 不可逆的批量动作，说清"现在在弄哪一个、哪一个没弄成"比快重要。
+              中途关这个窗口不影响任务，它在后端继续跑。
+            </p>
+          </template>
+
+          <template v-else>
+            <label class="fld" for="opt-dest">目标目录
+              <input id="opt-dest" v-model="dest" class="input" type="text" spellcheck="false"
+                     placeholder="绝对路径，且得已经存在，例如 /Volumes/external/to-encode" />
+            </label>
+
+            <div class="mode">
+              <label class="chk">
+                <input v-model="mode" type="radio" name="opt-rel-mode" value="move" />移动（搬走，库里跟着指向新位置）
+              </label>
+              <label class="chk">
+                <input v-model="mode" type="radio" name="opt-rel-mode" value="copy" />复制（只拷一份过去，库里仍指原文件）
+              </label>
+            </div>
+
+            <p v-if="plan" class="summary">
+              可{{ modeName }} <strong>{{ plan.okCount }}</strong> 个 · 合计 {{ gb(plan.totalSize) }}
+              <template v-if="plan.skipCount"> · 跳过 {{ plan.skipCount }} 个</template>
+            </p>
+            <p v-for="(p, i) in plan?.problems || []" :key="'p' + i" class="notice notice--error">{{ p }}</p>
+
+            <ul v-if="plan" class="detail-list">
+              <li v-for="r in planRows" :key="r.fileId" :class="{ failed: !r.ok }">
+                <strong>{{ r.videoCode || baseName(r.path) || '—' }}</strong>
+                <em class="kind">{{ r.ok ? modeName : '跳过' }}</em>
+                <span class="why">{{ r.ok ? baseName(r.target) : r.reason }}</span>
+                <span class="sz">{{ gb(r.size) }}</span>
+              </li>
+            </ul>
+
+            <p v-if="!plan" class="hint">
+              预检只读目录和文件是否存在，一个字节都不动。<strong>移动</strong>会把库里那份的路径改口到目标盘：
+              目标盘拔掉之后这些片子会变死链（每日盘上核对会报出来）。想先验货再决定就用<strong>复制</strong>。
+              同名文件一律不覆盖，会跳出来让你先处理。
+            </p>
+          </template>
+        </div>
+
+        <div class="dialog__foot">
+          <button v-if="relRunning" class="btn btn--danger" @click="stopRelocate">停止搬移</button>
+          <button v-else class="btn" :disabled="checking" @click="precheck">
+            {{ checking ? '预检中…' : (plan ? '重新预检' : '预检') }}
+          </button>
+          <button class="btn" @click="showRelocate = false">关闭</button>
+          <button
+            v-if="!relRunning && plan && plan.okCount"
+            class="btn btn--primary"
+            :disabled="starting"
+            @click="runRelocate"
+          >
+            {{ starting ? '启动中…' : `执行${modeName}（${plan.okCount} 个 · ${gb(plan.totalSize)}）` }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { videoApi } from '@/scripts/api'
 import { useUiStore, errText } from '@/scripts/store/ui'
-import { formatDuration, codecLabel } from '@/scripts/utils/format'
+import { formatDuration, formatEta, codecLabel } from '@/scripts/utils/format'
 import { copyText } from '@/scripts/utils/clipboard'
+import { loadFilterState, saveFilterState } from '@/scripts/utils/filterPersist'
 import { CODEC_OPTIONS } from '@/scripts/constants'
 import SelectList from '@/views/components/SelectList.vue'
 import Pagination from '@/views/components/Pagination.vue'
+import JobBar from '@/views/components/JobBar.vue'
 
 const ui = useUiStore()
 
@@ -232,7 +319,150 @@ const csvCell = (v) => {
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
 }
 
-onMounted(load)
+// ------------------------------------------------------------ 把选中的文件搬到别的目录
+//
+// 三条设计上的坚持（和后端 FileRelocateJob 对齐）：
+//   · 一定要先预检：不可逆的批量文件动作，得先看清"要动哪几个、哪几个不能动、为什么"；
+//   · 预检和执行发的是同一份参数（整个勾选列表，不是"可动的那几个"），
+//     由后端一遍判定，保证界面上看到的清单和真正发生的动作不是两回事；
+//   · 进度挂在后端任务上，这里只每 2 秒看一眼：跨卷搬几个 GB 是小时级的活，
+//     关窗口、换页面都不该把它带走，反过来页面中途打开也得能接上正在跑的那一批。
+
+// 目标目录要记住 —— 这是"拷去哪台设备"的固定答案，每次重打一遍没道理。
+// 用列表页那一层的持久化（整块一份），不为它新造一套键名规则
+const MEMO_KEY = 'optimize-relocate'
+const memo = loadFilterState(MEMO_KEY) || {}
+const dest = ref(memo.dest || '')
+const mode = ref(memo.mode === 'copy' ? 'copy' : 'move')
+const modeName = computed(() => (mode.value === 'copy' ? '复制' : '移动'))
+
+const showRelocate = ref(false)
+const plan = ref(null)
+const checking = ref(false)
+const starting = ref(false)
+const relJob = ref(null)
+let relTimer = null
+let relWatching = false
+
+const relRunning = computed(() => !!relJob.value?.running)
+const baseName = (p) => (p || '').split('/').pop() || ''
+
+/** 动不了的排在前面：那几行才是要人先去处理的 */
+const planRows = computed(() =>
+  [...(plan.value?.rows || [])].sort((a, b) => (a.ok === b.ok ? b.size - a.size : a.ok ? 1 : -1))
+)
+
+// 预检结论只对"这一批 + 这一个目标 + 这一个模式"成立，三样任一变了就作废，逼人重新看一眼
+watch([dest, mode, selected], () => { plan.value = null })
+watch([dest, mode], () => saveFilterState(MEMO_KEY, { dest: dest.value, mode: mode.value }))
+
+const relText = computed(() => {
+  const s = relJob.value
+  if (!s) return ''
+  const bad = s.failed ? ` · 没搬成 ${s.failed} 个` : ''
+  const cur = s.current ? ` · 正在 ${s.current}` : ''
+  const tail = s.etaSeconds ? ` · ${formatEta(s.etaSeconds)}` : ''
+  return `${s.what} · 已搬 ${s.processed}/${s.total} · ${gb(s.bytes)}${bad}${cur}${tail}`
+})
+
+const stopRelocatePoll = () => {
+  if (relTimer) {
+    clearInterval(relTimer)
+    relTimer = null
+  }
+}
+
+const ensureRelocatePolling = () => {
+  if (!relTimer) relTimer = setInterval(pollRelocate, 2000)
+}
+
+const pollRelocate = async () => {
+  let res
+  try {
+    res = await videoApi.relocateStatus()
+  } catch {
+    return // 轮询失败下一轮再来，不值得弹错误
+  }
+  if (!res.success) return
+
+  if (res.data.running) {
+    relJob.value = res.data
+    relWatching = true
+    ensureRelocatePolling()
+    return
+  }
+
+  relJob.value = null
+  if (!relWatching) return
+  relWatching = false
+  stopRelocatePoll()
+
+  const last = res.data.lastRun
+  const verb = last?.mode === 'copy' ? '复制' : '搬移'
+  ui[last?.failed || last?.cancelled ? 'warn' : 'success'](
+    `${verb}结束：${last?.done ?? 0} / ${last?.total ?? 0} 个 · ${gb(last?.bytes || 0)}` +
+    (last?.failed ? ` · 失败 ${last.failed} 个` : '') + (last?.note ? ` · ${last.note}` : '')
+  )
+  // 移动会把 file_path 改掉，这一屏的路径列和"可省"都得按新状态重取
+  if (last?.mode === 'move') load()
+}
+
+const openRelocate = () => { showRelocate.value = true }
+
+const precheck = async () => {
+  if (!selected.value.length) return ui.warn('先在下面勾要搬的文件')
+  if (!dest.value.trim()) return ui.warn('要先给一个目标目录')
+  checking.value = true
+  try {
+    const res = await videoApi.relocatePlan({ fileIds: selected.value, dest: dest.value.trim(), mode: mode.value })
+    plan.value = res.data || null
+    if (!plan.value) ui.error(res.message || '预检失败')
+    else if (!res.data.okCount) ui.warn('这些一个都动不了，原因列在清单里')
+  } catch (err) {
+    ui.error('预检失败：' + errText(err))
+  } finally {
+    checking.value = false
+  }
+}
+
+const runRelocate = async () => {
+  starting.value = true
+  try {
+    const res = await videoApi.relocateRun({ fileIds: selected.value, dest: dest.value.trim(), mode: mode.value })
+    if (!res.success) return ui.error(res.message || '没能启动')
+    ui.info(res.message)
+    plan.value = null
+    relWatching = true
+    relJob.value = res.data
+    ensureRelocatePolling()
+  } catch (err) {
+    ui.error('启动失败：' + errText(err))
+  } finally {
+    starting.value = false
+  }
+}
+
+const stopRelocate = async () => {
+  try {
+    const res = await videoApi.relocateStop()
+    ui.info(res.message || '已请求停止')
+  } catch (err) {
+    ui.error('停止失败：' + errText(err))
+  }
+}
+
+onMounted(() => {
+  load()
+  // 面板挂着就一直看着：这一批可能是从另一个标签页、另一台设备启的，
+  // 只在打开那一刻看一眼接不上这种（进度条会永远不出来）。一次 status 只读几个内存计数，
+  // 2 秒一次不贵，而且和跑起来之后用的是同一个定时器
+  ensureRelocatePolling()
+  pollRelocate()
+})
+onBeforeUnmount(() => {
+  stopRelocatePoll()
+  // 只摘轮询：任务在后端，不该被页面卸载带走
+})
 </script>
 
 <style scoped>
@@ -381,4 +611,93 @@ onMounted(load)
 
 .dim { color: var(--text-dim); }
 .small { font-size: var(--f-xs); }
+
+/* ---------------- 搬移对话框 ---------------- */
+
+.fld {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+  font-size: var(--f-sm);
+  color: var(--text-dim);
+}
+
+/* 路径这种东西，中间省略比尾部裁切好用：看得出头在哪、在哪个卷下 */
+.fld .input {
+  width: 100%;
+  text-overflow: ellipsis;
+}
+
+.mode {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s4);
+}
+
+.summary {
+  margin: 0;
+  font-size: var(--f-sm);
+  color: var(--text-dim);
+}
+
+.summary strong {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.detail-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+  max-height: 42vh;
+  overflow-y: auto;
+  font-size: var(--f-sm);
+}
+
+.detail-list li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s2);
+  padding: 5px 8px;
+  border-radius: var(--r1);
+  background: var(--bg-elev-2);
+  color: var(--text-dim);
+}
+
+.detail-list strong {
+  color: var(--accent);
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.detail-list .kind {
+  font-style: normal;
+  color: var(--text-faint);
+  flex-shrink: 0;
+}
+
+.detail-list .why {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail-list .sz {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-faint);
+}
+
+.detail-list li.failed {
+  background: var(--danger-soft);
+}
+
+.detail-list li.failed strong {
+  color: var(--danger);
+}
 </style>
