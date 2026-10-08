@@ -305,6 +305,18 @@
           <SystemStatusPanel />
         </section>
 
+        <!-- 体积分析：读的是扫描存下来的编码/时长/大小，只出候选清单，不碰盘上文件 -->
+        <section
+          v-else-if="activeGroup === 'optimize'"
+          id="panel-optimize"
+          class="panel settings-group"
+          role="tabpanel"
+          aria-labelledby="tab-optimize"
+          tabindex="-1"
+        >
+          <OptimizePanel />
+        </section>
+
         <!-- AI 接口：端点、密钥、工具清单与打标口径，整块在组件里 -->
         <section
           v-else-if="activeGroup === 'mcp'"
@@ -483,6 +495,7 @@ import ScrapeChannelsPanel from '@/views/components/ScrapeChannelsPanel.vue'
 import StudioManager from '@/views/pages/StudioManager.vue'
 import VersionTypeManager from '@/views/pages/VersionTypeManager.vue'
 import SystemStatusPanel from '@/views/components/SystemStatusPanel.vue'
+import OptimizePanel from '@/views/components/OptimizePanel.vue'
 import SecurityPanel from '@/views/components/SecurityPanel.vue'
 import McpPanel from '@/views/components/McpPanel.vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -511,6 +524,7 @@ const GROUPS = [
   { id: 'mcp', label: 'AI 接口' },
   { id: 'security', label: '安全', desc: '给删除、改名、批量写这几类破坏性接口加一道管理口令；浏览与播放不受影响。' },
   { id: 'status', label: '运行状态', desc: '数据库结构版本、并发模式，以及"每部片恰好一条默认版本"这类不变量的自检结果。后台那轮体检（盘上核对 + 增量扫描）的开关和频率也在这儿。' },
+  { id: 'optimize', label: '体积分析', desc: '按平均码率挑哪些文件还值得重编码：编码、时长、大小三个一起看，只出清单不碰文件。' },
   { id: 'links', label: '友情链接', desc: '显示在页脚：用每行的 ↑ ↓ 调位置，也可以直接改排序数字。' }
 ]
 

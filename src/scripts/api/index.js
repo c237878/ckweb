@@ -134,6 +134,8 @@ export const videoApi = {
   }),
   /** 疑似重复：内容指纹相同但挂在不同影片上的文件。只报证据，不自动处理 */
   getDuplicates: () => api.get('/video/duplicates'),
+  // 体积分析：按目标码率算"重编码还能省多少"，只读
+  optimize: (params) => api.get('/video/optimize', { params }),
   /** 全站扫描：任务在服务端后台跑，force=true 连量过的一起重扫（候选是"版本行"，不再按影片） */
   startScanAll: (force = false) => api.post('/video/scan/all', null, { params: { force } }),
   scanStatus: () => api.get('/video/scan/status'),
