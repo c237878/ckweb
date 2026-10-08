@@ -57,7 +57,7 @@
                         <span v-if="video.country" class="tag tag--accent">{{ video.country }}</span>
                         <span v-if="video.category" class="tag tag--success">{{ video.category }}</span>
                         <span v-if="likeCount > 0" class="tag tag--like">♥ {{ likeCount }}</span>
-                        <span class="tag tag--muted">{{ shown.fileSize ? formatSize(shown.fileSize) : '无文件' }}</span>
+                        <span class="tag tag--muted">{{ fileMetaText }}</span>
                     </div>
                     <!-- 版本（v11）：一部片名下一份文件一行。下拉只切"现在看哪一版"，改的是播放器与下面几行；
                          「设为默认」才动影片口径（列表筛选与统计跟着那一版走），所以它单独要二次确认。
@@ -297,7 +297,7 @@ import AddVideoDialog from '@/views/components/AddVideoDialog.vue'
 import AddVersionDialog from '@/views/components/AddVersionDialog.vue'
 import SelectList from '@/views/components/SelectList.vue'
 import VideoCard from '@/views/components/VideoCard.vue'
-import { formatSize, ageAt, formatClock } from '@/scripts/utils/format'
+import { formatSize, formatDuration, codecLabel, ageAt, formatClock } from '@/scripts/utils/format'
 import {
     SUBTITLE_STATES, WATERMARK_STATES, SUBTITLE_MARK_OPTIONS, WATERMARK_MARK_OPTIONS,
     subtitleClass, watermarkClass, subtitleText, watermarkText
@@ -317,6 +317,18 @@ const showVersionDialog = ref(false)
 const active = computed(() => versions.value.find((v) => v.id === activeFileId.value) || versions.value[0] || null)
 // 信息区与播放器都读这一份：没有版本行时退回影片对象（旧数据/异常兜底，不让页面空白）
 const shown = computed(() => active.value || video.value || {})
+
+/**
+ * 这一版文件的摘要：编码 · 时长 · 大小。三个摆在一起才看得出该不该重编码——
+ * 只报体积会挑错对象：同样 6 GB，一小时的片码率高、还有压缩空间，两小时的片多半已经压到骨头了。
+ * 编码与时长都要扫描跑过才有，没扫到时这一项直接不出现，不拿"未知"占位。
+ */
+const fileMetaText = computed(() => {
+    const v = shown.value
+    if (!v.fileSize) return '无文件'
+    return [codecLabel(v.codec), formatDuration(v.duration), formatSize(v.fileSize)]
+        .filter(Boolean).join(' · ')
+})
 const versionOptions = computed(() => {
     // 下拉里只放短名：类型名（湿姐）或"原版"，默认那一版标出来，长标题走副标题那一行。
     // 但同一部片可能有两版都挂在同一个类型下（那四家频道的尾巴都是 C），

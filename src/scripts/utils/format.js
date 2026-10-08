@@ -17,6 +17,36 @@ export function formatSize(bytes) {
 }
 
 /**
+ * 时长（秒）→ 人话。整片时长来自扫描读的 mvhd，没扫到时是 0/空，这时什么都不显示。
+ * 不到一分钟的片子（预告片、GIF 类）也报出来，别显示成"0 分"看着像坏了。
+ */
+export function formatDuration(seconds) {
+  const s = Number(seconds)
+  if (!s || s <= 0) return ''
+  const min = Math.round(s / 60)
+  if (min < 1) return '不到 1 分'
+  if (min < 60) return `${min} 分`
+  return `${Math.floor(min / 60)} 小时 ${min % 60} 分`
+}
+
+/**
+ * 容器里的 fourcc → 平时叫的那个名字。库里存的是原始 fourcc（不转写，见后端 SourceStates.Codecs 注释），
+ * 所以只在显示这一层翻译；认不出的原样显示，别把看不懂的编码悄悄藏起来。
+ */
+const CODEC_LABELS = {
+  avc1: 'H.264', avc3: 'H.264',
+  hev1: 'H.265', hvc1: 'H.265', hev2: 'H.265', hvc2: 'H.265',
+  av01: 'AV1', vp09: 'VP9',
+  mp4v: 'MPEG-4', xvid: 'Xvid', dx50: 'DivX', divx: 'DivX'
+}
+
+export function codecLabel(fourcc) {
+  const raw = (fourcc || '').trim()
+  if (!raw) return ''
+  return CODEC_LABELS[raw.toLowerCase()] || raw
+}
+
+/**
  * 格式化后端时间。
  * 后端存的是 "yyyy-MM-dd HH:mm:ss" 本地时间字符串，直接丢给 new Date() 会按 UTC 解析再偏移，
  * 所以这里手工取字段。
