@@ -31,19 +31,38 @@
                     </div>
 
                     <!-- 被点赞的时间点（v12 的 play_time 攒出来的）：点一下就跳到那一处播。
-                         大部分片子一个都没有，所以整块是有的才出现，不占位。 -->
+                         大部分片子一个都没有，所以整块是有的才出现，不占位。
+                         摆成时间轴而不是一排标签：这些值的意义是"在片中的哪个位置"，
+                         标签只能按顺序读，看不出前后差多远、也看不出全片多长。
+                         一版一条轴（后端的数据本来就是按版本排的）：解说版常常比原版短一半，
+                         共用一条标尺会把别的版本的点摆到错的位置上 -->
                     <div v-if="moments.length" class="moments">
-                        <span class="moments__label">点赞时间点</span>
-                        <button
-                            v-for="m in moments"
-                            :key="m.likeId"
-                            type="button"
-                            class="tag moments__chip"
-                            :title="`${m.versionName} · ${m.likedAt} 点赞，跳到 ${formatClock(m.position)}`"
-                            @click="jumpToMoment(m)"
-                        >
-{{ formatClock(m.position) }}
-                        </button>
+                        <div v-for="g in momentGroups" :key="g.fileId" class="moments__row">
+                            <div class="moments__head">
+                                <span class="moments__label">
+                                    点赞时间点<template v-if="momentGroups.length > 1"> · {{ g.name }}</template>
+                                </span>
+                                <span class="moments__count">{{ g.dots.length }} 处</span>
+                                <span v-if="g.total" class="moments__total">全片 {{ g.total }}</span>
+                            </div>
+                            <div class="moments__track">
+                                <button
+                                    v-for="m in g.dots"
+                                    :key="m.likeId"
+                                    type="button"
+                                    class="moments__dot"
+                                    :class="{ 'is-other': !g.current, 'is-left': m.pct < 8, 'is-right': m.pct > 92 }"
+                                    :style="{ left: m.pct + '%' }"
+                                    :aria-label="`${m.clock}，${g.name}，点击跳到那一处播放`"
+                                    @click="jumpToMoment(m)"
+                                >
+                                    <span class="moments__pop">
+                                        <span class="moments__pop-t">{{ m.clock }}</span>
+                                        <span v-if="!g.current" class="moments__pop-v">{{ g.name }}</span>
+                                    </span>
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="info-section">
@@ -782,6 +801,49 @@ const jumpToMoment = (m) => {
     el.play().catch(() => {})
 }
 
+/** 播放器报上来的真实时长（秒）。版本行没扫到时长时用它兜底 */
+const playerDuration = ref(0)
+
+/**
+ * 一个时间点该落在轴的哪个位置：按**它自己那一版**的时长折算，
+ * 不同版本长度差不少（解说版通常更短），全用当前在看的这一版当标尺会把别的版本的点摆歪。
+ * 版本行没扫到时长（没扫过 / fragmented MP4）就退到播放器给的时长；两样都没有才拿
+ * 最大的那个时间点凑一把标尺 —— 至少点与点之间的相对距离是真的，界面不会整条空掉。
+ */
+const durationFor = (fileId) => {
+    const row = versions.value.find((v) => v.id === fileId)
+    return Number(row?.duration) > 0 ? Number(row.duration) : (playerDuration.value > 0 ? playerDuration.value : 0)
+}
+
+const momentGroups = computed(() => {
+    const list = moments.value
+    if (!list.length) return []
+    const currentId = active.value?.id || activeFileId.value
+    const byFile = new Map()
+    for (const m of list) {
+        const key = m.fileId || ''
+        if (!byFile.has(key)) byFile.set(key, [])
+        byFile.get(key).push(m)
+    }
+    // 标尺用**这一版自己的时长**：一条轴上的点全来自同一版，"58:20 摆在中间"才是真的中间
+    const groups = [...byFile.entries()].map(([fileId, ms]) => {
+        const known = durationFor(fileId)
+        const ruler = known || Math.max(...ms.map((m) => Number(m.position) || 0)) * 1.25
+        return {
+            fileId,
+            name: ms[0].versionName || '原版',
+            current: fileId === currentId,
+            total: formatDuration(known),
+            dots: ms.map((m) => ({
+                ...m,
+                pct: ruler > 0 ? Math.max(0, Math.min(100, ((Number(m.position) || 0) / ruler) * 100)) : 0,
+                clock: formatClock(m.position)
+            }))
+        }
+    })
+    return groups.sort((a, b) => (a.current === b.current ? a.name.localeCompare(b.name) : a.current ? -1 : 1))
+})
+
 // 进度：时间事件只更新内存值，每 10 秒落一次盘。
 // 不用定时器挂：暂停时本来就没有事件，也就不用清任务
 let lastFlushAt = 0
@@ -804,10 +866,11 @@ const onPlayerEnded = () => {
 }
 
 // 真实分辨率：竖屏/非 16:9 的片子靠它撑外壳的宽高比，旋转后换成倒数
-const onPlayerMetadata = ({ width, height }) => {
+const onPlayerMetadata = ({ width, height, duration }) => {
     naturalFileId = playingOwner?.fileId || ''
     videoNaturalWidth.value = width || 1920
     videoNaturalHeight.value = height || 1080
+    playerDuration.value = Number(duration) > 0 ? Number(duration) : 0
     if (pendingSeek !== null) {
         const el = playerRef.value?.videoEl()
         if (el) { el.currentTime = pendingSeek; el.play().catch(() => {}) }
@@ -1131,27 +1194,141 @@ const handleLike = async () => {
 
 .moments {
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--s1);
+    flex-direction: column;
+    gap: var(--s3);
     padding-top: var(--s2);
+}
+
+/* 一版一条轴 */
+.moments__row {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s1);
+}
+
+/* 标题与时间点分行：上面这行只说"这是什么、有几处、全片多长"，下面那条轴只管位置 */
+.moments__head {
+    display: flex;
+    align-items: baseline;
+    gap: var(--s2);
+    font-size: var(--f-sm);
 }
 
 .moments__label {
     color: var(--text-dim);
-    font-size: var(--f-sm);
-    margin-right: var(--s1);
 }
 
-.moments__chip {
+.moments__count {
+    color: var(--text-faint);
     font-variant-numeric: tabular-nums;
-    cursor: pointer;
 }
 
+.moments__total {
+    margin-left: auto;
+    color: var(--text-faint);
+    font-size: var(--f-xs);
+    font-variant-numeric: tabular-nums;
+}
+
+/* 圆点半径要让出来，否则最左/最右那两颗会露半截在轴外 */
+.moments__track {
+    position: relative;
+    height: var(--ctl-h-sm);
+    margin: 0 var(--s2);
+}
+
+.moments__track::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 2px;
+    border-radius: var(--rp);
+    background: var(--border);
+    transform: translateY(-50%);
+}
+
+.moments__dot {
+    position: absolute;
+    top: 50%;
+    width: 12px;
+    height: 12px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: var(--like);
+    cursor: pointer;
+    transform: translate(-50%, -50%);
+    transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+
+.moments__dot:hover,
+.moments__dot:focus-visible {
+    outline: none;
+    transform: translate(-50%, -50%) scale(1.35);
+    box-shadow: 0 0 0 4px var(--like-soft);
+}
+
+/* 别的版本上点出来的赞：位置按那一版自己的时长折算，颜色分开标，免得以为就在眼前这一版里 */
+.moments__dot.is-other {
+    background: var(--text-faint);
+}
+
+.moments__dot.is-other:hover,
+.moments__dot.is-other:focus-visible {
+    box-shadow: 0 0 0 4px var(--bg-hover);
+}
+
+/* 悬停报时间。横向对齐走 --shift，两端那两颗的气泡才不会飘到页面外 */
+.moments__pop {
+    --shift: -50%;
+    position: absolute;
+    left: 0;
+    bottom: calc(100% + 6px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--s1);
+    padding: var(--s1) var(--s2);
+    border-radius: var(--r1);
+    background: var(--text);
+    color: var(--text-invert);
+    font-size: var(--f-xs);
+    line-height: 1.4;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(var(--shift));
+    transition: opacity var(--dur) var(--ease);
+}
+
+.moments__dot:hover .moments__pop,
+.moments__dot:focus-visible .moments__pop {
+    opacity: 1;
+}
+
+.moments__dot.is-left .moments__pop {
+    --shift: -8px;
+}
+
+.moments__dot.is-right .moments__pop {
+    --shift: calc(-100% + 8px);
+}
+
+.moments__pop-t {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.moments__pop-v {
+    opacity: .65;
+}
+
+/* 外壳不再有黑底：黑边是 .player-wrapper 自己的事（画面不是 16:9 时要靠它垫），
+   以前连下面"点赞时间点"那一行都压在黑块上，看着像播放器的一部分 */
 .player-section {
     width: 100%;
-    background: #000;
-    border-radius: var(--r2);
     overflow: visible;
 }
 
