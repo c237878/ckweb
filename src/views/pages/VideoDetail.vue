@@ -261,9 +261,6 @@
                         <button class="action-btn" @click="openEditDialog">
                             <span>编辑</span>
                         </button>
-                        <button class="action-btn" @click="handlePictureInPicture">
-                            <span>画中画</span>
-                        </button>
                         <button class="action-btn" @click="resetFileSize" :disabled="resetting">
                             <span>重置</span>
                         </button>
@@ -1051,30 +1048,6 @@ const handleDeleteFile = async () => {
         ui.error('删除失败：' + errText(error))
     }
     deletingFile.value = false
-}
-
-// 画中画：原生能力，直接把 VideoPlayer 里的元素交给浏览器
-const handlePictureInPicture = async () => {
-    if (!playerSrc.value) {
-        // 没有文件时 metadata 都没加载，浏览器会直接拒绝进画中画，先给个说得通的话
-        ui.error('这一版还没有文件，放不了')
-        return
-    }
-    const videoEl = playerRef.value?.videoEl()
-    if (!videoEl) {
-        ui.error('播放器还没准备好')
-        return
-    }
-    try {
-        if (document.pictureInPictureElement) {
-            await document.exitPictureInPicture()
-        } else {
-            await videoEl.requestPictureInPicture()
-        }
-    } catch (error) {
-        console.error('画中画失败:', error)
-        ui.error('画中画失败：' + errText(error, '浏览器不支持'))
-    }
 }
 
 const onEditSave = async (formData) => {
