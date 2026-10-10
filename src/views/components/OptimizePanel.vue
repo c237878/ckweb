@@ -2,11 +2,13 @@
   <div class="optimize">
     <div class="panel-head">
       <div class="panel-head__text">
-        <h3 class="panel-title">视频体积分析</h3>
+        <h3 class="panel-title">文件分析</h3>
         <p class="panel-desc">
-          把「编码 + 时长 + 大小」凑在一起算平均码率，按"按目标码率重编能省下多少"排序 ——
-          只看体积会挑错对象：同样 6 GB，一小时的片还有压缩空间，两小时的片多半已经压到底了。
-          分析这一趟只读库、不碰盘上文件；只有下面勾选之后点「搬移」那一步才会真的动文件，
+          两件事放一起：按「编码 + 时长 + 大小」算平均码率，看哪些文件还值得重编码；按文件内容指纹，
+          看哪些文件其实是同一份东西。前者挑出来是要搬去重编码的，后者挑出来是要留一条删一条的。
+          排序按"折到目标码率能省下多少"而不是体积 —— 只看体积会挑错对象：同样 6 GB，
+          一小时的片还有压缩空间，两小时的片多半已经压到底了。
+          分析这两趟都只读库、不碰盘上文件；只有下面勾选之后点「搬移」那一步才会真的动文件，
           而且必须先预检看清清单。
         </p>
       </div>
@@ -152,6 +154,27 @@
       </p>
     </template>
 
+    <!-- 内容重复：判据是"头 64KB + 尾 64KB + 体积"的指纹，跟上面那套按码率挑的是两回事，
+         所以单独一块，只在真有结果或还没全库扫完指纹时出现，空面板不多占一块地方 -->
+    <div v-if="dupes && (dupes.groupCount || dupes.fingerprinted)" class="dupes">
+      <div class="dupes__head">
+        <span class="tag" :class="dupes.groupCount ? 'tag--warn' : 'tag--success'">
+          {{ dupes.groupCount ? `疑似重复 ${dupes.groupCount} 组` : '没有发现内容相同的文件' }}
+        </span>
+        <span class="meta">已算指纹 {{ dupes.fingerprinted }} / {{ dupes.filesWithContent }} 个文件{{ dupes.fingerprinted < dupes.filesWithContent ? '（没扫到的那部分不参与判断）' : '' }}</span>
+      </div>
+      <div v-for="g in dupes.groups.slice(0, 8)" :key="g.fingerprint" class="dupe-group">
+        <span class="meta">指纹 {{ g.fingerprint.slice(0, 18) }}…</span>
+        <div v-for="f in g.files" :key="f.fileId" class="dupe-file">
+          <router-link :to="`/video/${f.videoId}`" class="dim">{{ f.videoCode }}</router-link>
+          <span>{{ f.videoName }}</span>
+          <span class="meta">{{ gb(f.size) }}</span>
+          <span class="dim dupe-path" :title="f.path">{{ f.path }}</span>
+        </div>
+      </div>
+      <p class="hint">这里只列证据：留哪一条、要不要删，得人来定。</p>
+    </div>
+
     <!-- 搬移文件：这是本面板唯一一个会动盘上真实文件的动作，所以三步走 ——
          填目标 → 预检（一份"要动哪几个、哪几个不能动以及为什么"）→ 才让点执行。
          预检和执行走的是后端同一段判定，看到的就是会发生的 -->
@@ -253,6 +276,8 @@ const BAND_LABELS = { 'a<1': '低于 1', 'b1-1.5': '1 ~ 1.5', 'c1.5-2.5': '1.5 ~
 const bandLabel = (b) => BAND_LABELS[b] || b
 
 const d = ref(null)
+// 内容重复（指纹分组）：判据与码率分析无关，所以不参与上面那套筛选条件
+const dupes = ref(null)
 const loading = ref(false)
 const error = ref('')
 const page = ref(1)
@@ -274,7 +299,9 @@ const load = async () => {
   error.value = ''
   try {
     const params = { ...form.value, page: page.value, pageSize: pageSize.value }
-    const res = await videoApi.optimize(params)
+    // 指纹那份是另一条判据，跟码率一起刷，免得"重新计算"只算一半
+    const [res, dup] = await Promise.all([videoApi.optimize(params), videoApi.getDuplicates()])
+    dupes.value = dup?.success ? dup.data : null
     if (!res.success) {
       error.value = res.message || '分析失败'
       return
@@ -611,6 +638,49 @@ onBeforeUnmount(() => {
 
 .dim { color: var(--text-dim); }
 .small { font-size: var(--f-xs); }
+
+/* ---------------- 内容重复（指纹分组） ---------------- */
+
+.dupes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  padding-top: var(--s3);
+  border-top: 1px solid var(--border);
+}
+
+.dupes__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--s2);
+}
+
+.dupe-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+  padding: var(--s2);
+  border: 1px solid var(--border);
+  border-radius: var(--r2);
+}
+
+.dupe-file {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--s2);
+  font-size: var(--f-sm);
+}
+
+/* 路径最长，只有它可以截断；番号与片名要完整看得见 */
+.dupe-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
 
 /* ---------------- 搬移对话框 ---------------- */
 

@@ -26,21 +26,25 @@
         aria-orientation="vertical"
         @keydown="onTabKey"
       >
-        <button
-          v-for="g in GROUPS"
-          :id="'tab-' + g.id"
-          :key="g.id"
-          type="button"
-          role="tab"
-          class="settings-nav__link"
-          :class="{ active: activeGroup === g.id }"
-          :aria-selected="activeGroup === g.id ? 'true' : 'false'"
-          :aria-controls="'panel-' + g.id"
-          :tabindex="activeGroup === g.id ? 0 : -1"
-          @click="selectGroup(g.id)"
-        >
+        <template v-for="s in navSections" :key="s.title">
+          <!-- tablist 的子元素只该是 tab，小标题挂 role=presentation 去掉语义，文字照旧看得见 -->
+          <p class="settings-nav__section" role="presentation">{{ s.title }}</p>
+          <button
+            v-for="g in s.items"
+            :id="'tab-' + g.id"
+            :key="g.id"
+            type="button"
+            role="tab"
+            class="settings-nav__link"
+            :class="{ active: activeGroup === g.id }"
+            :aria-selected="activeGroup === g.id ? 'true' : 'false'"
+            :aria-controls="'panel-' + g.id"
+            :tabindex="activeGroup === g.id ? 0 : -1"
+            @click="selectGroup(g.id)"
+          >
 {{ g.label }}
 </button>
+        </template>
       </div>
 
       <div class="settings-body">
@@ -88,48 +92,6 @@
               hint="首页展示哪几个分类，由「站点与首页」分组的「首页展示分类」决定"
               @saved="loadTaxonomy"
             />
-          </div>
-        </section>
-
-        <!-- 扫描目录 -->
-        <section
-          v-else-if="activeGroup === 'dirs'"
-          id="panel-dirs"
-          class="panel settings-group"
-          role="tabpanel"
-          aria-labelledby="tab-dirs"
-          tabindex="-1"
-        >
-          <div class="panel-head">
-            <div class="panel-head__text">
-              <h2 class="section-title">扫描目录</h2>
-              <p class="panel-desc">导入影片、封面、字幕时从哪里找文件。</p>
-            </div>
-            <button class="btn btn--sm" @click="openAddScanDirDialog">添加</button>
-          </div>
-
-          <div v-if="loadingScanDirs" class="rows" aria-busy="true">
-            <div v-for="n in 3" :key="n" class="skeleton row-skeleton"></div>
-          </div>
-
-          <ul v-else-if="scanDirList.length" class="rows">
-            <li v-for="item in scanDirList" :key="item.id" class="row">
-              <div class="row-main">
-                <span class="row-title">{{ item.path }}</span>
-                <div class="row-tags">
-                  <span v-if="item.category" class="tag tag--info">{{ item.category }}</span>
-                </div>
-              </div>
-              <div class="row-actions">
-                <button class="btn btn--sm" @click="openEditScanDirDialog(item)">编辑</button>
-                <button class="btn btn--sm btn--danger" @click="deleteScanDir(item)">删除</button>
-              </div>
-            </li>
-          </ul>
-
-          <div v-else class="empty">
-            <p>暂无扫描目录</p>
-            <button class="btn btn--sm" @click="openAddScanDirDialog">添加第一个目录</button>
           </div>
         </section>
 
@@ -286,7 +248,7 @@
           <SecurityPanel />
         </section>
 
-        <!-- 运行状态：结构版本 + 不变量自检。这些关系坏了界面不会报错，只会数字悄悄变，
+        <!-- 运行状态：只读的结构版本 + 不变量自检。这些关系坏了界面不会报错，只会数字悄悄变，
              所以给一条能随手跑一遍的检查，而不是等哪天看着列表不对再猜 -->
         <section
           v-else-if="activeGroup === 'status'"
@@ -305,7 +267,42 @@
           <SystemStatusPanel />
         </section>
 
-        <!-- 体积分析：读的是扫描存下来的编码/时长/大小，只出候选清单，不碰盘上文件 -->
+        <!-- 备份与恢复：读的是目录不是库，出问题的原因也完全不同（盘没挂上、目录没配），
+             而且这一格里的「恢复」「删」是不可逆动作，所以单独一格、不跟只读的检查混着放 -->
+        <section
+          v-else-if="activeGroup === 'backup'"
+          id="panel-backup"
+          class="panel settings-group"
+          role="tabpanel"
+          aria-labelledby="tab-backup"
+          tabindex="-1"
+        >
+          <h2 class="section-title">备份与恢复</h2>
+          <p class="panel-desc">
+            服务每小时自查一次，今天的快照没落盘就补一份；轮转留最近每日份 14 天、更早只留周日份到 60 天，
+            带标签的（迁移前、合并前、恢复前）一律不自动删。
+          </p>
+          <BackupPanel />
+        </section>
+
+        <!-- 片源核对：卷在不在 + 后台那轮逐文件核盘。两块讲的是同一件事——库登记的路径与盘上是否对得上 -->
+        <section
+          v-else-if="activeGroup === 'verify'"
+          id="panel-verify"
+          class="panel settings-group"
+          role="tabpanel"
+          aria-labelledby="tab-verify"
+          tabindex="-1"
+        >
+          <h2 class="section-title">片源核对</h2>
+          <p class="panel-desc">
+            卷没挂上时的表现是"封面全空、扫描说没文件"，而服务本身看着完全健康，
+            所以把配置里那几个目录在不在直接列出来；下面是后台那轮核对与增量扫描的节奏和结果。
+          </p>
+          <SourceVerifyPanel />
+        </section>
+
+        <!-- 文件分析：码率挑重编码对象 + 指纹挑内容重复，勾选后可以直接搬移 -->
         <section
           v-else-if="activeGroup === 'optimize'"
           id="panel-optimize"
@@ -371,6 +368,10 @@
             </div>
           </div>
 
+          <!-- 「目录与路径」这格除了上面那个图片目录输入框，还要带摄入扫描目录那张表：
+               两者都是"文件在哪儿"的配置，分开两格反而要来回跳 -->
+          <ScanDirsPanel v-if="activeGroup === 'paths'" class="paths-dirs" />
+
           <div class="panel-foot">
             <span class="hint">本组 {{ activeFieldGroup.items.length }} 项</span>
             <button class="btn btn--primary" :disabled="savingGroup !== '' || loadingSettings" @click="saveGroup(activeFieldGroup)">
@@ -379,56 +380,6 @@
             </button>
           </div>
         </section>
-      </div>
-    </div>
-
-    <!-- 文件目录弹窗 -->
-    <div v-if="showScanDirDialog" class="overlay" @click.self="closeScanDirDialog">
-      <div class="dialog dialog--form" role="dialog" aria-modal="true" aria-labelledby="scan-dialog-title">
-        <div class="dialog__head">
-          <h3 class="dialog__title" id="scan-dialog-title">
-            {{ editingScanDir ? '编辑文件目录' : '添加文件目录' }}
-          </h3>
-          <button class="dialog__close" aria-label="关闭" @click="closeScanDirDialog">&times;</button>
-        </div>
-
-        <div class="dialog__body">
-          <p v-if="scanDirFormError" class="notice notice--error" role="alert">{{ scanDirFormError }}</p>
-
-          <div class="field">
-            <label for="scan-dir-category">目录分类 *</label>
-            <input
-              id="scan-dir-category"
-              v-model="scanDirForm.category"
-              class="input"
-              list="scan-dir-category-options"
-              autocomplete="off"
-              placeholder="选择或输入分类"
-            />
-            <datalist id="scan-dir-category-options">
-              <option v-for="c in CATEGORY_OPTIONS" :key="c" :value="c"></option>
-            </datalist>
-            <span class="hint">扫描结果按分类归入对应板块，可直接输入新分类</span>
-          </div>
-
-          <div class="field">
-            <label for="scan-dir-path">目录路径 *</label>
-            <input
-              id="scan-dir-path"
-              v-model="scanDirForm.path"
-              class="input"
-              placeholder="如: /Volumes/wdc4t/视频"
-            />
-          </div>
-        </div>
-
-        <div class="dialog__foot">
-          <button class="btn" @click="closeScanDirDialog">取消</button>
-          <button class="btn btn--primary" :disabled="savingScanDir" @click="saveScanDir">
-            <span v-if="savingScanDir" class="spinner"></span>
-            {{ savingScanDir ? '保存中...' : '保存' }}
-          </button>
-        </div>
       </div>
     </div>
 
@@ -487,7 +438,7 @@
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import api, { settingApi, friendLinkApi, scanDirectoryApi, taxonomyApi } from '@/scripts/api'
+import { settingApi, friendLinkApi, taxonomyApi } from '@/scripts/api'
 import { useAppStore } from '@/scripts/store/app'
 import { useUiStore, errText } from '@/scripts/store/ui'
 import TaxonomyTable from '@/views/components/TaxonomyTable.vue'
@@ -495,6 +446,9 @@ import ScrapeChannelsPanel from '@/views/components/ScrapeChannelsPanel.vue'
 import StudioManager from '@/views/pages/StudioManager.vue'
 import VersionTypeManager from '@/views/pages/VersionTypeManager.vue'
 import SystemStatusPanel from '@/views/components/SystemStatusPanel.vue'
+import BackupPanel from '@/views/components/BackupPanel.vue'
+import SourceVerifyPanel from '@/views/components/SourceVerifyPanel.vue'
+import ScanDirsPanel from '@/views/components/ScanDirsPanel.vue'
 import OptimizePanel from '@/views/components/OptimizePanel.vue'
 import SecurityPanel from '@/views/components/SecurityPanel.vue'
 import McpPanel from '@/views/components/McpPanel.vue'
@@ -505,27 +459,27 @@ const ui = useUiStore()
 const route = useRoute()
 const router = useRouter()
 
-const CATEGORY_OPTIONS = ['视频', '封面', '字幕']
-
 /**
- * 分区的唯一来源：导航项与各分区标题读这里，新增分组只改这一份。
+ * 分区清单，分区的唯一来源：导航项、各分区标题与描述都读这里，新增分组只改这一份。
  *
- * 顺序按"先定站点长什么样 → 再定数据从哪来 → 然后是内容与词表 → 最后外部站点与页脚"排：
- * 抓取通道与词表是日常维护，友情链接几乎不动，所以垫底。
+ * `section` 只服务导航里那行小标题。一个分区干一件事：以前「运行状态」一格塞了自检、备份、
+ * 盘上核对、挂载卷、疑似重复五块，找其中任一块都得先滚一遍。
+ * 顺序按"站点长什么样 → 文件从哪儿来 → 数据与运维 → 外部站点"排。
  */
 const GROUPS = [
-  { id: 'site', label: '站点与首页', desc: '网站名称、各列表页的分页条数，以及首页取哪几个分类、每个分类显示多少条。' },
-  { id: 'media', label: '图片目录', desc: '艳图与演员海报使用的图片目录；影片扫描目录见「扫描目录」。' },
-  { id: 'dirs', label: '扫描目录', desc: '导入影片、封面、字幕时从哪里找文件。' },
-  { id: 'taxonomy', label: '地区与分类' },
-  { id: 'studios', label: '片商' },
-  { id: 'versions', label: '版本类型' },
-  { id: 'channels', label: '抓取通道', desc: '外部站点的查询地址、字段抽取规则，以及限速 / 每日配额 / 连续失败熔断。' },
-  { id: 'mcp', label: 'AI 接口' },
-  { id: 'security', label: '安全', desc: '给删除、改名、批量写这几类破坏性接口加一道管理口令；浏览与播放不受影响。' },
-  { id: 'status', label: '运行状态', desc: '数据库结构版本、并发模式，以及"每部片恰好一条默认版本"这类不变量的自检结果。后台那轮体检（盘上核对 + 增量扫描）的开关和频率也在这儿。' },
-  { id: 'optimize', label: '体积分析', desc: '按平均码率挑哪些文件还值得重编码：编码、时长、大小三个一起看，只出清单不碰文件。' },
-  { id: 'links', label: '友情链接', desc: '显示在页脚：用每行的 ↑ ↓ 调位置，也可以直接改排序数字。' }
+  { id: 'site', section: '站点与内容', label: '站点与首页', desc: '网站名称、各列表页的分页条数，以及首页取哪几个分类、每个分类显示多少条。' },
+  { id: 'taxonomy', section: '站点与内容', label: '地区与分类' },
+  { id: 'studios', section: '站点与内容', label: '片商' },
+  { id: 'versions', section: '站点与内容', label: '版本类型' },
+  { id: 'links', section: '站点与内容', label: '友情链接', desc: '显示在页脚：用每行的 ↑ ↓ 调位置，也可以直接改排序数字。' },
+  { id: 'paths', section: '文件与片源', label: '目录与路径', desc: '图片存在哪儿，以及导入影片、封面、字幕时去哪儿找文件。' },
+  { id: 'verify', section: '文件与片源', label: '片源核对', desc: '挂载卷在不在、库和缩略图缓存能不能写，加上后台那轮"逐个文件核盘"的开关、频率和上一轮结果。' },
+  { id: 'optimize', section: '文件与片源', label: '文件分析', desc: '按平均码率挑还值得重编码的文件，按内容指纹挑疑似重复；勾选后可以搬移。分析只读库，不碰盘上文件。' },
+  { id: 'status', section: '数据与安全', label: '运行状态', desc: '数据库结构版本、并发模式，以及"每部片恰好一条默认版本"这类不变量的自检结果。整格只读，不改任何东西。' },
+  { id: 'backup', section: '数据与安全', label: '备份与恢复', desc: '每天的库快照：马上存一份、换快照目录、按某一份灌回去。恢复会抹掉那份快照之后写进去的一切，动手前看清条数。' },
+  { id: 'security', section: '数据与安全', label: '安全', desc: '给删除、改名、批量写这几类破坏性接口加一道管理口令；浏览与播放不受影响。' },
+  { id: 'channels', section: '外部数据', label: '抓取通道', desc: '外部站点的查询地址、字段抽取规则，以及限速 / 每日配额 / 连续失败熔断。' },
+  { id: 'mcp', section: '外部数据', label: 'AI 接口' }
 ]
 
 /** content 一律按字符串提交（后端存的就是字符串），所以这里不能用 v-model.number */
@@ -548,7 +502,7 @@ const settingsList = ref([
   },
   { id: 'homePageCategories', group: 'site', label: '首页展示分类', value: '', placeholder: '多个分类用逗号分隔，留空显示全部', hint: '可选值见「地区与分类」' },
   { id: 'homePageCategoryCount', group: 'site', label: '首页分类数量', value: '', type: 'number', min: 1, max: 100, placeholder: '默认 12', hint: '每个分类/板块显示的数量，今日推荐也用这个值' },
-  { id: 'posterDir', group: 'media', label: '艳图目录', value: '', placeholder: '如: /Volumes/disk1/posters' }
+  { id: 'posterDir', group: 'paths', label: '艳图目录', value: '', placeholder: '如: /Volumes/disk1/posters', hint: '艳图与演员海报用的图片目录' }
 ])
 
 const fieldGroups = computed(() =>
@@ -557,6 +511,17 @@ const fieldGroups = computed(() =>
     .filter((g) => g.items.length)
 )
 
+/** 导航按 section 分档渲染；分组顺序就是 GROUPS 的顺序，同档的条目挨在一起 */
+const navSections = computed(() => {
+  const out = []
+  GROUPS.forEach((g) => {
+    const last = out[out.length - 1]
+    if (last && last.title === g.section) last.items.push(g)
+    else out.push({ title: g.section, items: [g] })
+  })
+  return out
+})
+
 // 写操作反馈：留在页面上直到下一次操作，不再定时隐藏
 const feedback = ref({ text: '', type: 'success' })
 const say = (text, type = 'success') => { feedback.value = { text, type } }
@@ -564,27 +529,18 @@ const say = (text, type = 'success') => { feedback.value = { text, type } }
 // 读取状态
 const loadingSettings = ref(true)
 const loadingTaxonomy = ref(true)
-const loadingScanDirs = ref(true)
 const loadingFriendLinks = ref(true)
 const loadError = ref('')
 const taxonomyError = ref('')
 
 // 一次只有一个分组在写，用分组 id 表示，按钮的禁用与转圈都看它
 const savingGroup = ref('')
-const savingScanDir = ref(false)
 const savingLink = ref(false)
 
 const countryRows = ref([])
 const countryOrphans = ref([])
 const categoryRows = ref([])
 const categoryOrphans = ref([])
-
-// 文件目录
-const scanDirList = ref([])
-const showScanDirDialog = ref(false)
-const editingScanDir = ref(null)
-const scanDirForm = ref({ path: '', category: '' })
-const scanDirFormError = ref('')
 
 // 友情链接
 const friendLinkList = ref([])
@@ -593,9 +549,10 @@ const editingFriendLink = ref(null)
 const friendLinkForm = ref({ name: '', link: '', logo: '', description: '', sortorder: 0 })
 const friendLinkFormError = ref('')
 
+// 扫描目录那张表在 ScanDirsPanel 里自己取自己存，这里不再挂一份状态
 const loadAll = async () => {
   loadError.value = ''
-  await Promise.all([loadSettings(), loadTaxonomy(), loadScanDirList(), loadFriendLinkList()])
+  await Promise.all([loadSettings(), loadTaxonomy(), loadFriendLinkList()])
 }
 
 /** 一次 GET /api/systemsetting 拿全部设置：缺键就是"没配过"，不算失败 */
@@ -632,20 +589,6 @@ const loadTaxonomy = async () => {
     taxonomyError.value = '地区与分类加载失败，请确认后端服务可用'
   } finally {
     loadingTaxonomy.value = false
-  }
-}
-
-const loadScanDirList = async () => {
-  loadingScanDirs.value = true
-  try {
-    const res = await scanDirectoryApi.getList()
-    if (res.success) scanDirList.value = res.data || []
-    else loadError.value = res.message || '文件目录加载失败'
-  } catch (error) {
-    console.error('加载文件目录失败:', error)
-    loadError.value = '文件目录加载失败，请确认后端服务可用'
-  } finally {
-    loadingScanDirs.value = false
   }
 }
 
@@ -700,8 +643,13 @@ const saveGroup = async (group) => {
 
 // 分区可深链：/settings?group=channels 直接落到那一格，刷新也停在原地。
 // 之前只记在组件里，从别处想跳"抓取通道"就只能让人自己点两下
-const knownGroup = (g) => typeof g === 'string' && GROUPS.some((x) => x.id === g)
-const activeGroup = ref(knownGroup(route.query.group) ? route.query.group : GROUPS[0].id)
+// 分区结构动过（图片目录 + 扫描目录 合成「目录与路径」），旧链接继续认，别让它掉回第一格
+const MOVED_GROUPS = { media: 'paths', dirs: 'paths' }
+const groupFromQuery = (g) => {
+  const id = MOVED_GROUPS[g] || g
+  return typeof id === 'string' && GROUPS.some((x) => x.id === id) ? id : GROUPS[0].id
+}
+const activeGroup = ref(groupFromQuery(route.query.group))
 const navEl = ref(null)
 
 const activeFieldGroup = computed(
@@ -730,100 +678,6 @@ const onTabKey = async (event) => {
 }
 
 onMounted(loadAll)
-
-// ---------- 文件目录 ----------
-
-const openAddScanDirDialog = () => {
-  editingScanDir.value = null
-  scanDirForm.value = { path: '', category: '' }
-  scanDirFormError.value = ''
-  showScanDirDialog.value = true
-}
-
-const openEditScanDirDialog = (item) => {
-  editingScanDir.value = item
-  scanDirForm.value = { path: item.path || '', category: item.category || '' }
-  scanDirFormError.value = ''
-  showScanDirDialog.value = true
-}
-
-function closeScanDirDialog() {
-  showScanDirDialog.value = false
-  scanDirFormError.value = ''
-}
-
-/** 校验接口没有收进 scanDirectoryApi，走同一个 axios 实例，路径与请求体保持不变 */
-const checkDirExists = async (path) => {
-  const res = await api.post('/scandirectory/check', { path })
-  return !!(res?.success && res.exists)
-}
-
-const saveScanDir = async () => {
-  if (savingScanDir.value) return
-  scanDirFormError.value = ''
-  if (!scanDirForm.value.path) {
-    scanDirFormError.value = '目录路径不能为空'
-    return
-  }
-
-  savingScanDir.value = true
-  try {
-    let exists
-    try {
-      exists = await checkDirExists(scanDirForm.value.path)
-    } catch (error) {
-      console.error('校验目录失败:', error)
-      scanDirFormError.value = '目录校验请求失败，请确认后端服务可用'
-      return
-    }
-    if (!exists) {
-      scanDirFormError.value = '目录路径不存在，请检查后重试'
-      return
-    }
-
-    const payload = {
-      path: scanDirForm.value.path,
-      category: scanDirForm.value.category
-    }
-    const res = editingScanDir.value
-      ? await scanDirectoryApi.update(editingScanDir.value.id, payload)
-      : await scanDirectoryApi.add(payload)
-
-    if (res.success) {
-      showScanDirDialog.value = false
-      say(editingScanDir.value ? '目录已更新' : '目录已添加')
-      await loadScanDirList()
-    } else {
-      scanDirFormError.value = res.message || '保存失败'
-    }
-  } catch (error) {
-    console.error('保存文件目录失败:', error)
-    scanDirFormError.value = '保存失败: ' + (error.message || error)
-  } finally {
-    savingScanDir.value = false
-  }
-}
-
-const deleteScanDir = async (item) => {
-  const go = await ui.confirm({
-    title: '确认删除',
-    message: `确定删除文件目录 "${item.path}" 吗？`,
-    danger: true
-  })
-  if (!go) return
-  try {
-    const res = await scanDirectoryApi.delete(item.id)
-    if (res.success) {
-      say('删除成功')
-      await loadScanDirList()
-    } else {
-      say(res.message || '删除失败', 'error')
-    }
-  } catch (error) {
-    console.error('删除文件目录失败:', error)
-    say('删除失败: ' + (error.message || error), 'error')
-  }
-}
 
 // ---------- 友情链接 ----------
 
@@ -1007,6 +861,18 @@ const deleteFriendLink = async (item) => {
     color var(--dur) var(--ease);
 }
 
+/* 档位小标题：多出来的上边距是"换档"的记号，不是条目间距（条目间距归 gap 管） */
+.settings-nav__section {
+  margin: var(--s3) 0 0;
+  padding-inline: var(--ctl-pad-x-sm);
+  color: var(--text-faint);
+  font-size: var(--f-xs);
+}
+
+.settings-nav__section:first-child {
+  margin-top: 0;
+}
+
 .settings-nav__link:hover {
   background: var(--bg-hover);
   color: var(--text);
@@ -1018,6 +884,12 @@ const deleteFriendLink = async (item) => {
   border-color: var(--accent);
   color: var(--accent);
   font-weight: 600;
+}
+
+/* 「目录与路径」里那张扫描目录表：跟上面的图片目录输入框分个段 */
+.paths-dirs {
+  padding-top: var(--s3);
+  border-top: 1px solid var(--border);
 }
 
 .settings-body {

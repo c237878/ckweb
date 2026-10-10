@@ -20,10 +20,11 @@
 
       <div class="header-tools">
         <!-- 平时什么都不显示；只有存储/目录真出事时才出现一个入口。
-             这个项目的故障面是"卷没挂上"，服务本身却完全健康，不提示就会被当成软件坏了 -->
+             这个项目的故障面是"卷没挂上"，服务本身却完全健康，不提示就会被当成软件坏了。
+             落点是「片源核对」——挂载卷的清单就在那一格 -->
         <router-link
           v-if="healthProblem"
-          to="/settings?group=status"
+          to="/settings?group=verify"
           class="health-flag"
           :title="healthProblem"
         >
