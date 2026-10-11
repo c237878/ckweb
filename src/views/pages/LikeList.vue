@@ -7,6 +7,15 @@
           <input type="checkbox" :checked="allChecked" @change="toggleAll" />
           全选本页
         </label>
+        <button
+          v-if="selectedIds.length > 0"
+          class="btn btn--sm"
+          :disabled="!withPosition.length"
+          :title="withPosition.length ? '只清掉点赞那一刻的位置，记录留着' : '选中的记录都没有点赞位置'"
+          @click="handleClearPosition"
+        >
+          清空点赞位置 ({{ withPosition.length }})
+        </button>
         <button v-if="selectedIds.length > 0" class="btn btn--sm btn--danger" @click="handleBatchDelete">
           删除选中 ({{ selectedIds.length }})
         </button>
@@ -309,6 +318,36 @@ const handleBatchDelete = async () => {
   } catch (err) {
     console.error('批量删除失败:', err)
     tell('批量删除失败：' + (err.message || err), true)
+  }
+}
+
+// 选中里"确实带着点赞位置"的那几条：没有位置的记录不该出现在影响条数里，
+// 否则按钮写着 5、实际只动 2，人就学不会信这个数
+const withPosition = computed(() =>
+  likeList.value.filter((i) => selectedIds.value.includes(i.id) && i.playTime !== null && i.playTime !== undefined)
+)
+
+const handleClearPosition = async () => {
+  if (!withPosition.value.length) return
+  const go = await ui.confirm({
+    title: '确认清空点赞位置',
+    message: `选中的 ${selectedIds.value.length} 条里有 ${withPosition.value.length} 条带着点赞那一刻的位置，`
+      + '清掉后详情页时间轴上少这些标记，记录本身保留（哪天点的、在哪一版都不动）。',
+    confirmLabel: '清掉位置'
+  })
+  if (!go) return
+  try {
+    const res = await likeApi.clearPosition(withPosition.value.map((i) => i.id))
+    if (res.success) {
+      selectedIds.value = []
+      await loadList()
+      tell(res.cleared ? `已清掉 ${res.cleared} 条的点赞位置` : '这些记录本来就没有点赞位置')
+    } else {
+      tell(res.message || '清空失败', true)
+    }
+  } catch (err) {
+    console.error('清空点赞位置失败:', err)
+    tell('清空失败：' + (err.message || err), true)
   }
 }
 

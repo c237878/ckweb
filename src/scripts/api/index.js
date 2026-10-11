@@ -94,7 +94,9 @@ export const comicApi = {
 export const likeApi = {
   getList: (params) => api.get('/like/list', { params }),
   delete: (id) => api.delete(`/like/${id}`),
-  batchDelete: (ids) => api.post('/like/batch-delete', { ids })
+  batchDelete: (ids) => api.post('/like/batch-delete', { ids }),
+  // 只清「点赞那一刻的播放位置」，记录保留：有些赞是顺手在片头点的，位置不值得留成精彩瞬间
+  clearPosition: (ids) => api.post('/like/clear-position', { ids })
 }
 
 // 视频相关API
